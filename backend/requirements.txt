@@ -1,0 +1,8 @@
+# Backend dependencies
+# To be defined during development
+# fastapi
+# uvicorn
+# sqlalchemy
+# psycopg2
+# python-dotenv
+# pydantic
