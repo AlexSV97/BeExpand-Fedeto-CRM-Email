@@ -1,4 +1,4 @@
-# Proyecto Be Expand FEDETO
+# BeExpand-Fedeto-CRM-Email
 
 Proyecto desarrollado para **Be Expand** — sistema de centralización y estructuración de información clave proveniente del correo electrónico, con integración CRM para la gestión de contactos, oportunidades y seguimiento comercial.
 
@@ -94,7 +94,7 @@ Desarrollo de un sistema que:
 ## Estructura del Proyecto
 
 ```
-Proyecto_Be_Expand_Fedeto/
+BeExpand-Fedeto-CRM-Email/
 ├── backend/
 │   ├── src/
 │   │   ├── email_processor/    # Procesamiento y parsing de correos
@@ -125,8 +125,8 @@ Proyecto_Be_Expand_Fedeto/
 
 ```bash
 # Clonar el repositorio
-git clone https://github.com/AlexSV97/Proyecto_Be_Expand_Fedeto.git
-cd Proyecto_Be_Expand_Fedeto
+git clone https://github.com/AlexSV97/BeExpand-Fedeto-CRM-Email.git
+cd BeExpand-Fedeto-CRM-Email
 
 # (Instrucciones específicas según tecnología seleccionada)
 ```
