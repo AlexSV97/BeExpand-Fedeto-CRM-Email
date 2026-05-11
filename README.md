@@ -1,6 +1,6 @@
 # Proyecto Be Expand FEDETO
 
-Sistema de centralización y estructuración de información clave proveniente del correo electrónico, con integración CRM para la gestión de contactos, oportunidades y seguimiento comercial.
+Proyecto desarrollado para **Be Expand** — sistema de centralización y estructuración de información clave proveniente del correo electrónico, con integración CRM para la gestión de contactos, oportunidades y seguimiento comercial.
 
 ## Índice
 
@@ -17,7 +17,7 @@ Sistema de centralización y estructuración de información clave proveniente d
 
 ## Descripción del Proyecto
 
-**Be Expand FEDETO** es una solución híbrida diseñada para centralizar, estructurar y procesar automáticamente la información proveniente del correo electrónico empresarial. El sistema clasifica contactos (clientes, leads, proveedores, etc.), determina el estado de las interacciones y se integra con el CRM para proporcionar una visión operativa clara de la actividad comercial.
+Sistema diseñado para **Be Expand** que permite centralizar, estructurar y procesar automáticamente la información proveniente del correo electrónico empresarial. Clasifica contactos (clientes, leads, proveedores, etc.), determina el estado de las interacciones y se integra con el CRM para proporcionar una visión operativa clara de la actividad comercial.
 
 ## Problema
 
@@ -147,4 +147,4 @@ Para contribuir al proyecto:
 
 ## Licencia
 
-Este proyecto está desarrollado en el marco de **Be Expand FEDETO**.
+Este proyecto está desarrollado para **Be Expand**.
