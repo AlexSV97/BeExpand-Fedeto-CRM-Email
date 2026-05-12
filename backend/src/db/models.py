@@ -202,6 +202,26 @@ class Opportunity(Base):
     contact: Mapped["Contact"] = relationship("Contact", back_populates="opportunities")
 
 
+class ClassificationRule(Base):
+    """Regla de clasificación por keywords.
+
+    Evalúa campos del email (subject, sender_email, sender_name, body_plain)
+    contra una lista de keywords, ordenada por prioridad ascendente.
+    """
+
+    __tablename__ = "classification_rules"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    category: Mapped[str] = mapped_column(String(20), nullable=False)
+    keywords: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    match_fields: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    priority: Mapped[int] = mapped_column(Integer, nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.7)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class User(Base):
     """Usuario del sistema interno."""
     __tablename__ = "users"
