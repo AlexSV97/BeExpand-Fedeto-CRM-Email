@@ -36,6 +36,8 @@ logs/
 
 # Database
 *.sqlite3
+*.db
+*.db-journal
 
 # OS
 Thumbs.db
