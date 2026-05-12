@@ -28,3 +28,9 @@ redis>=5.2.0
 # Development
 pytest>=8.3.0
 pytest-asyncio>=0.24.0
+
+# HTTP mocking (VTiger tests)
+respx>=0.21.0
+
+# Retry logic (VTiger API calls)
+tenacity>=9.0.0

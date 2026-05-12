@@ -62,6 +62,13 @@ class UserRole(str, Enum):
     VIEWER = "viewer"
 
 
+class SyncStatus(str, Enum):
+    """Estado de sincronización con VTiger."""
+    PENDING = "pending"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
 # ── Modelos ──
 
 class Account(Base):
@@ -200,6 +207,45 @@ class Opportunity(Base):
     # Relaciones
     email: Mapped[Optional["Email"]] = relationship("Email", back_populates="opportunities")
     contact: Mapped["Contact"] = relationship("Contact", back_populates="opportunities")
+
+
+class ClassificationRule(Base):
+    """Regla de clasificación por keywords.
+
+    Evalúa campos del email (subject, sender_email, sender_name, body_plain)
+    contra una lista de keywords, ordenada por prioridad ascendente.
+    """
+
+    __tablename__ = "classification_rules"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    category: Mapped[str] = mapped_column(String(20), nullable=False)
+    keywords: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    match_fields: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    priority: Mapped[int] = mapped_column(Integer, nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.7)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class SyncLogEntry(Base):
+    """Registro de sincronización con VTiger CRM.
+
+    Cada vez que un email clasificado se sincroniza con VTiger,
+    queda un registro acá para auditoría y trazabilidad.
+    """
+
+    __tablename__ = "sync_log_entries"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    email_id: Mapped[str] = mapped_column(String(36), ForeignKey("emails.id", ondelete="CASCADE"), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default=SyncStatus.PENDING)
+    details: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    # Relaciones
+    email: Mapped["Email"] = relationship("Email", backref="sync_logs")
 
 
 class User(Base):
