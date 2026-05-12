@@ -23,6 +23,15 @@ class Settings(BaseSettings):
     # ── VTiger ──
     vtiger_url: str = ""
     vtiger_token: str = ""
+    vtiger_username: str = ""
+    vtiger_access_key: str = ""
+    vtiger_api_version: str = "v1"
+
+    # ── M3 Feature Flag ──
+    m3_enabled: bool = False
+
+    # ── Classification ──
+    classification_default_confidence: float = 0.7
 
     # ── Entorno ──
     debug: bool = True
