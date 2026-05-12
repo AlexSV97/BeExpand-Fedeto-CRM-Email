@@ -80,16 +80,21 @@ Desarrollo de un sistema que:
 
 ## Tecnologías
 
-*Tecnologías propuestas — sujetas a validación durante el desarrollo.*
+Stack definitivo — validado con Be Expand en reunión del 11/05/2026.
 
-| Capa | Tecnología |
-|------|-----------|
-| Backend | Python / Node.js |
-| Base de Datos | PostgreSQL / MongoDB |
-| Frontend | React / Vue.js |
-| Email Processing | IMAP / Microsoft Graph API |
-| CRM | HubSpot / Salesforce API |
-| Contenedores | Docker |
+| Capa | Tecnología | Detalle |
+|------|-----------|---------|
+| Backend | **Python 3.12+** | FastAPI, SQLAlchemy 2.0, Celery |
+| Base de Datos | **PostgreSQL 16** | JSONB para metadatos, tsvector para búsqueda |
+| Frontend | **React 19 + TypeScript** | Vite, Recharts, React Router |
+| Email Processing | **IMAP nativo** (`imaplib`) | Ionos e Imax confirmados |
+| CRM | **VTiger REST API** | Cliente HTTP con `httpx` |
+| Task Queue | **Celery + Redis** | Polling periódico de buzones |
+| Clasificación | **Híbrida (Keywords → NLP futuro)** | RuleEngine + spaCy (Strategy Pattern) |
+| Contenedores | **Docker + docker-compose** | Entorno reproducible |
+| Autenticación | **JWT** | `python-jose` + `passlib` |
+
+> 📄 Documentación detallada del stack y la arquitectura en [`docs/stack-architecture.md`](docs/stack-architecture.md)
 
 ## Estructura del Proyecto
 
@@ -97,24 +102,42 @@ Desarrollo de un sistema que:
 BeExpand-Fedeto-CRM-Email/
 ├── backend/
 │   ├── src/
-│   │   ├── email_processor/    # Procesamiento y parsing de correos
-│   │   ├── classifier/         # Clasificación de contactos y estados
-│   │   ├── crm_integration/    # Integración con el CRM
-│   │   ├── api/                # API REST endpoints
-│   │   └── utils/              # Utilidades compartidas
+│   │   ├── email_processor/    # Conexión IMAP, parseo y filtrado
+│   │   ├── classifier/         # Clasificación híbrida (keywords → NLP)
+│   │   ├── crm_integration/    # Integración con VTiger REST API
+│   │   ├── api/                # FastAPI REST endpoints
+│   │   └── tasks/              # Celery tareas periódicas
 │   ├── tests/
-│   └── requirements.txt
+│   ├── alembic/                # Migraciones de BD
+│   ├── requirements.txt
+│   └── Dockerfile
 ├── frontend/
 │   ├── src/
 │   │   ├── components/         # Componentes reutilizables
-│   │   ├── pages/              # Páginas/dashboards
+│   │   ├── pages/              # Dashboard, Contacts, Pipeline
 │   │   ├── services/           # Conexión con API
 │   │   └── utils/              # Utilidades frontend
-│   └── package.json
+│   ├── package.json
+│   ├── vite.config.ts
+│   └── Dockerfile
 ├── infrastructure/
-│   ├── docker/                 # Dockerfiles y docker-compose
-│   └── database/               # Migraciones y seeds
-├── docs/                       # Documentación adicional
+│   ├── docker/
+│   │   ├── nginx/              # Reverse proxy config
+│   │   └── postgres/           # Init scripts
+│   └── database/
+│       └── seeds/              # Datos de ejemplo
+├── docs/
+│   ├── stack-architecture.md   # Stack y arquitectura definitivos
+│   ├── data-model.md           # Modelo de datos (ERD)
+│   ├── requirements.md         # Requisitos funcionales y no funcionales
+│   ├── planning-30-60-90.md    # Planificación temporal
+│   ├── SESION_2026-05-11.md    # Sesión 1
+│   ├── SESION_2026-05-12.md    # Sesión 2
+│   ├── diagrama_arquitectura.png
+│   ├── diagrama_flujo.png
+│   ├── diagrama_modelodatos.png
+│   ├── diagrama_motor.png
+│   └── diagrama_completo.png
 ├── .gitignore
 └── README.md
 ```
