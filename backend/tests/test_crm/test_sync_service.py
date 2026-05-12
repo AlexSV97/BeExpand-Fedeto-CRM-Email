@@ -241,8 +241,10 @@ class TestSyncContactCliente:
         )
 
         assert result["success"] is True
-        assert result["contact_id"] is None  # no se pudo obtener ID
-        mock_vtiger.update_contact.assert_not_called()
+        # Sin contact_id porque no se pudo obtener
+        assert result["contact_id"] is None
+        assert result["action"] == "updated"  # _contact_exists = True porque existing es truthy
+        mock_vtiger.update_contact.assert_not_called()  # no se actualiza porque no hay ID
 
 
 class TestSyncContactLead:
