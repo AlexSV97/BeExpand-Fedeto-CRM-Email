@@ -8,6 +8,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.api.routers import (
+    accounts,
+    auth,
+    classification,
+    contacts,
+    dashboard,
+    emails,
+    opportunities,
+)
 from src.db.session import init_db
 
 
@@ -26,6 +35,15 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+# ── Routers ─────────────────────────────────────────────────────────────────
+app.include_router(auth.router, prefix="/api/v1/auth")
+app.include_router(accounts.router, prefix="/api/v1/accounts")
+app.include_router(emails.router, prefix="/api/v1/emails")
+app.include_router(contacts.router, prefix="/api/v1/contacts")
+app.include_router(opportunities.router, prefix="/api/v1/opportunities")
+app.include_router(classification.router, prefix="/api/v1/classification-history")
+app.include_router(dashboard.router, prefix="/api/v1/dashboard")
 
 # CORS: permitir que el frontend (React en otro puerto) llame al API
 app.add_middleware(
