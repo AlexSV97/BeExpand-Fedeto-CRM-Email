@@ -49,6 +49,30 @@ class TestEmailsList:
         for item in data["items"]:
             assert item["status"] == "pendiente"
 
+    async def test_list_with_date_from_filter(
+        self, client, auth_headers, email_with_date
+    ):
+        """GET /api/v1/emails?date_from=2026-05-01 filters by start date."""
+        response = await client.get(
+            "/api/v1/emails?date_from=2026-05-01T00:00:00Z", headers=auth_headers
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] >= 1
+        assert data["items"][0]["id"] == "email-date-1"
+
+    async def test_list_with_date_to_filter(
+        self, client, auth_headers, email_with_date
+    ):
+        """GET /api/v1/emails?date_to=2026-04-30 filters by end date (empty)."""
+        response = await client.get(
+            "/api/v1/emails?date_to=2026-04-30T23:59:59Z", headers=auth_headers
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 0
+        assert data["items"] == []
+
     async def test_list_empty_result(self, client, auth_headers):
         """GET /api/v1/emails with no data returns empty list."""
         response = await client.get(

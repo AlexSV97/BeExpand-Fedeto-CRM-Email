@@ -43,6 +43,16 @@ class TestLogin:
         data = response.json()
         assert "detail" in data
 
+    async def test_login_inactive_user(self, client, inactive_user):
+        """Login with an inactive user returns 401."""
+        response = await client.post(
+            "/api/v1/auth/login",
+            json=inactive_user,
+        )
+        assert response.status_code == 401
+        data = response.json()
+        assert "detail" in data
+
 
 class TestMe:
     """GET /api/v1/auth/me — authenticated user info."""

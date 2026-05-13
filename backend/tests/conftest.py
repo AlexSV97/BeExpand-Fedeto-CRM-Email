@@ -100,6 +100,51 @@ async def auth_headers(client):
 
 
 @pytest.fixture
+async def inactive_user():
+    """Seed an inactive user for testing auth denial (active=False → 401)."""
+    async with TestSession() as session:
+        user = User(
+            id="inactive-uuid-1",
+            username="inactive_user",
+            hashed_password=bcrypt.hash("inactive123"),
+            role="viewer",
+            active=False,
+        )
+        session.add(user)
+        await session.commit()
+    return {"username": "inactive_user", "password": "inactive123"}
+
+
+@pytest.fixture
+async def email_with_date():
+    """Seed an email with a known received_at for date filter testing."""
+    from datetime import datetime, timezone
+
+    async with TestSession() as session:
+        account = Account(
+            id="acct-date-1",
+            name="Date Test Mailbox",
+            email_host="imap.test.com",
+            email_port=993,
+            email_user="date@test.com",
+            email_pass="pass",
+            provider="other",
+            active=True,
+        )
+        session.add(account)
+        email = Email(
+            id="email-date-1",
+            account_id="acct-date-1",
+            sender_email="sender@test.com",
+            sender_name="Sender",
+            subject="Date Test",
+            received_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
+        )
+        session.add(email)
+        await session.commit()
+
+
+@pytest.fixture
 async def seed_data():
     """Seed standard test entities: Account, Email, ClassificationHistory, Contact, Opportunity.
 
