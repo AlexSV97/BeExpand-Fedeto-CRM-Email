@@ -17,8 +17,22 @@ from src.db.session import get_db
 
 from src.api.deps import get_current_user, pagination_params
 from src.api.schemas import EmailList, EmailResponse
+from src.email_processor import sync_emails
 
 router = APIRouter(tags=["emails"])
+
+
+@router.post("/sync")
+async def sync_imap_emails(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Sincroniza correos desde Gmail vía IMAP.
+    Busca UNSEEN, parsea, clasifica por reglas y guarda en BD.
+    """
+    result = await sync_emails(db=db)
+    return result
 
 
 @router.get("", response_model=EmailList)

@@ -107,77 +107,55 @@ export default function Opportunities() {
     setCreating(true)
   }
 
-  if (loading) return <p>Cargando pipeline...</p>
-  if (error) return <p style={{ color: '#d32f2f' }}>Error: {error}</p>
+  if (loading) return <p className="text-slate-500">Cargando pipeline...</p>
+  if (error) return <p className="text-red-500">Error: {error}</p>
 
   const totalOpps = Object.values(byStage).reduce((sum, arr) => sum + arr.length, 0)
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <h2 style={{ margin: 0 }}>Pipeline de Oportunidades</h2>
-        <button onClick={openCreateForm} style={primaryBtnStyle}>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="m-0 text-2xl font-bold text-slate-900">Pipeline de Oportunidades</h2>
+        <button onClick={openCreateForm} className="bg-slate-800 text-white px-4 py-2 rounded-lg hover:bg-slate-700 text-sm font-medium cursor-pointer">
           + Nueva oportunidad
         </button>
       </div>
 
       {totalOpps === 0 ? (
-        <p style={{ color: '#aaa', textAlign: 'center', padding: '3rem 0' }}>
+        <p className="text-slate-400 text-center py-12">
           No hay oportunidades todavía. ¡Crea la primera!
         </p>
       ) : (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: `repeat(${STAGES.length}, 1fr)`,
-            gap: '0.75rem',
-            alignItems: 'start',
-          }}
-        >
+        <div className="grid grid-cols-6 gap-3 items-start">
           {STAGES.map(stage => {
             const items = byStage[stage.key] || []
             return (
-              <div key={stage.key} style={{ background: '#fafafa', borderRadius: 10, padding: '0.75rem', minHeight: 200 }}>
+              <div key={stage.key} className="bg-slate-100 rounded-xl p-3 min-h-[200px]">
                 <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '0.75rem',
-                    padding: '0.5rem',
-                    background: stage.color,
-                    borderRadius: 8,
-                    color: '#fff',
-                  }}
+                  className="flex justify-between items-center mb-2 px-3 py-2 rounded-lg text-white text-sm font-semibold"
+                  style={{ background: stage.color }}
                 >
-                  <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{stage.label}</span>
-                  <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>{items.length}</span>
+                  <span>{stage.label}</span>
+                  <span className="text-xs opacity-80">{items.length}</span>
                 </div>
 
                 {items.map(opp => (
                   <div
                     key={opp.id}
                     onClick={() => openEditForm(opp)}
-                    style={{
-                      background: '#fff',
-                      borderRadius: 8,
-                      padding: '0.75rem',
-                      marginBottom: '0.5rem',
-                      boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-                      cursor: 'pointer',
-                      borderLeft: `3px solid ${stage.color}`,
-                    }}
+                    className="bg-white rounded-lg p-3 mb-2 shadow-sm cursor-pointer border-l-4 hover:shadow-md transition-shadow"
+                    style={{ borderLeftColor: stage.color }}
                   >
-                    <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.25rem' }}>
+                    <div className="font-semibold text-sm text-slate-900 mb-1">
                       {opp.title}
                     </div>
                     {opp.value && (
-                      <div style={{ fontSize: '0.85rem', color: '#2e7d32', fontWeight: 600 }}>
+                      <div className="text-sm font-semibold text-green-600">
                         ${Number(opp.value).toLocaleString()}
                       </div>
                     )}
                     {opp.probability && (
-                      <div style={{ fontSize: '0.75rem', color: '#888' }}>
+                      <div className="text-xs text-slate-500">
                         {opp.probability}% probabilidad
                       </div>
                     )}
@@ -271,18 +249,18 @@ function OppFormModal({
   }
 
   return (
-    <div style={modalOverlay} onClick={onClose}>
-      <div style={modalContent} onClick={e => e.stopPropagation()}>
-        <h3 style={{ margin: '0 0 1rem' }}>{title}</h3>
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white rounded-xl p-6 w-[480px] max-w-[90vw] max-h-[85vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+        <h3 className="m-0 mb-4 text-lg font-semibold text-slate-900">{title}</h3>
         <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '0.75rem' }}>
-            <label style={labelStyle}>Título *</label>
-            <input value={titleVal} onChange={e => setTitleVal(e.target.value)} style={inputStyle} required />
+          <div className="mb-3">
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Título *</label>
+            <input value={titleVal} onChange={e => setTitleVal(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500" required />
           </div>
 
-          <div style={{ marginBottom: '0.75rem' }}>
-            <label style={labelStyle}>Contacto *</label>
-            <select value={contactId} onChange={e => setContactId(e.target.value)} style={inputStyle} required>
+          <div className="mb-3">
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Contacto *</label>
+            <select value={contactId} onChange={e => setContactId(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500" required>
               <option value="">Seleccionar contacto</option>
               {contacts.map(c => (
                 <option key={c.id} value={c.id}>{c.name} ({c.email})</option>
@@ -291,9 +269,9 @@ function OppFormModal({
           </div>
 
           {stages && (
-            <div style={{ marginBottom: '0.75rem' }}>
-              <label style={labelStyle}>Etapa</label>
-              <select value={stage} onChange={e => { setStage(e.target.value); onStageChange?.(e.target.value) }} style={inputStyle}>
+            <div className="mb-3">
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Etapa</label>
+              <select value={stage} onChange={e => { setStage(e.target.value); onStageChange?.(e.target.value) }} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500">
                 {stages.map(s => (
                   <option key={s.key} value={s.key}>{s.label}</option>
                 ))}
@@ -301,42 +279,42 @@ function OppFormModal({
             </div>
           )}
 
-          <div style={{ marginBottom: '0.75rem' }}>
-            <label style={labelStyle}>Descripción</label>
-            <textarea value={description} onChange={e => setDescription(e.target.value)} style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} />
+          <div className="mb-3">
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Descripción</label>
+            <textarea value={description} onChange={e => setDescription(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 min-h-[60px] resize-y" />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+          <div className="grid grid-cols-2 gap-3 mb-3">
             <div>
-              <label style={labelStyle}>Valor ($)</label>
-              <input type="number" value={value} onChange={e => setValue(e.target.value)} style={inputStyle} />
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Valor ($)</label>
+              <input type="number" value={value} onChange={e => setValue(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500" />
             </div>
             <div>
-              <label style={labelStyle}>Probabilidad (%)</label>
-              <input type="number" value={probability} onChange={e => setProbability(e.target.value)} style={inputStyle} min={0} max={100} />
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Probabilidad (%)</label>
+              <input type="number" value={probability} onChange={e => setProbability(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500" min={0} max={100} />
             </div>
           </div>
 
-          <div style={{ marginBottom: '0.75rem' }}>
-            <label style={labelStyle}>Cierre estimado</label>
-            <input type="date" value={expectedClose} onChange={e => setExpectedClose(e.target.value)} style={inputStyle} />
+          <div className="mb-3">
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Cierre estimado</label>
+            <input type="date" value={expectedClose} onChange={e => setExpectedClose(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500" />
           </div>
 
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={labelStyle}>Notas</label>
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} />
+          <div className="mb-4">
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Notas</label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 min-h-[60px] resize-y" />
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+          <div className="flex gap-2 justify-end">
             {onDelete && (
-              <button type="button" onClick={onDelete} style={deleteBtnStyle}>
+              <button type="button" onClick={onDelete} className="px-4 py-2 bg-white text-red-500 border border-red-500 rounded-lg cursor-pointer text-sm hover:bg-red-50">
                 Eliminar
               </button>
             )}
-            <button type="button" onClick={onClose} style={cancelBtnStyle}>
+            <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-100 border-none rounded-lg cursor-pointer text-sm hover:bg-slate-200 text-slate-700">
               Cancelar
             </button>
-            <button type="submit" disabled={saving} style={primaryBtnStyle}>
+            <button type="submit" disabled={saving} className="px-4 py-2 bg-slate-800 text-white border-none rounded-lg cursor-pointer text-sm font-medium hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">
               {saving ? 'Guardando...' : 'Guardar'}
             </button>
           </div>
@@ -346,71 +324,3 @@ function OppFormModal({
   )
 }
 
-const labelStyle: React.CSSProperties = {
-  display: 'block',
-  marginBottom: '0.25rem',
-  fontSize: '0.8rem',
-  fontWeight: 600,
-  color: '#555',
-}
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '0.5rem 0.65rem',
-  border: '1px solid #ddd',
-  borderRadius: 6,
-  fontSize: '0.9rem',
-  outline: 'none',
-  boxSizing: 'border-box',
-}
-
-const primaryBtnStyle: React.CSSProperties = {
-  padding: '0.5rem 1rem',
-  background: '#1a1a2e',
-  color: '#fff',
-  border: 'none',
-  borderRadius: 6,
-  cursor: 'pointer',
-  fontWeight: 600,
-  fontSize: '0.85rem',
-}
-
-const deleteBtnStyle: React.CSSProperties = {
-  padding: '0.5rem 1rem',
-  background: '#fff',
-  color: '#d32f2f',
-  border: '1px solid #d32f2f',
-  borderRadius: 6,
-  cursor: 'pointer',
-  fontSize: '0.85rem',
-}
-
-const cancelBtnStyle: React.CSSProperties = {
-  padding: '0.5rem 1rem',
-  background: '#eee',
-  border: 'none',
-  borderRadius: 6,
-  cursor: 'pointer',
-  fontSize: '0.85rem',
-}
-
-const modalOverlay: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  background: 'rgba(0,0,0,0.4)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 100,
-}
-
-const modalContent: React.CSSProperties = {
-  background: '#fff',
-  borderRadius: 12,
-  padding: '2rem',
-  width: 480,
-  maxWidth: '90vw',
-  maxHeight: '85vh',
-  overflowY: 'auto',
-  boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-}

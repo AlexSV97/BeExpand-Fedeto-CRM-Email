@@ -17,14 +17,39 @@ from src.api.routers import (
     emails,
     opportunities,
 )
-from src.db.session import init_db
+from passlib.hash import bcrypt
+from sqlalchemy import select
+
+from src.config import get_settings
+from src.db.models import User
+from src.db.session import async_session_factory, init_db
+
+
+async def seed_admin():
+    """Crea el usuario admin por defecto si no existe."""
+    settings = get_settings()
+    async with async_session_factory() as session:
+        result = await session.execute(
+            select(User).where(User.username == settings.admin_username)
+        )
+        if result.scalar_one_or_none() is None:
+            user = User(
+                username=settings.admin_username,
+                hashed_password=bcrypt.hash(settings.admin_password),
+                role="admin",
+                active=True,
+                full_name="Administrador",
+            )
+            session.add(user)
+            await session.commit()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Ciclo de vida: se ejecuta al arrancar y al cerrar la app."""
-    # Al arrancar: crear tablas si no existen
+    # Al arrancar: crear tablas si no existen + seed admin
     await init_db()
+    await seed_admin()
     yield
     # Al cerrar: limpiar si es necesario
 

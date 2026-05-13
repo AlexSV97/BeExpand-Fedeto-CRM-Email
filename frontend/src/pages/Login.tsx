@@ -34,60 +34,43 @@ export default function Login() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: '#1a1a2e',
-        fontFamily: 'system-ui, sans-serif',
-      }}
-    >
-      <div
-        style={{
-          background: '#fff',
-          borderRadius: 12,
-          padding: '2.5rem',
-          width: 360,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-        }}
-      >
-        <h1 style={{ margin: '0 0 0.25rem', fontSize: '1.5rem', color: '#1a1a2e' }}>
+    <div className="min-h-screen flex items-center justify-center bg-slate-900">
+      <div className="bg-white rounded-xl shadow-2xl p-8 w-96">
+        <h1 className="m-0 mb-1 text-2xl font-bold text-slate-900">
           BeExpand CRM
         </h1>
-        <p style={{ margin: '0 0 1.5rem', color: '#888', fontSize: '0.9rem' }}>
+        <p className="m-0 mb-6 text-sm text-slate-500">
           Inicia sesión para continuar
         </p>
 
         <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={labelStyle}>Usuario</label>
+          <div className="mb-4">
+            <label className="block text-sm font-semibold text-slate-600 mb-1">Usuario</label>
             <input
               type="text"
               value={username}
               onChange={e => setUsername(e.target.value)}
-              style={inputStyle}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
               placeholder="admin"
               required
               autoFocus
             />
           </div>
 
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label style={labelStyle}>Contraseña</label>
+          <div className="mb-6">
+            <label className="block text-sm font-semibold text-slate-600 mb-1">Contraseña</label>
             <input
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              style={inputStyle}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
               placeholder="••••••••"
               required
             />
           </div>
 
           {(localError || error) && (
-            <p style={{ color: '#d32f2f', fontSize: '0.85rem', margin: '0 0 1rem' }}>
+            <p className="text-red-500 text-sm m-0 mb-4">
               {localError || error}
             </p>
           )}
@@ -95,16 +78,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={submitting}
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              background: submitting ? '#888' : '#1a1a2e',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 8,
-              fontSize: '1rem',
-              cursor: submitting ? 'not-allowed' : 'pointer',
-            }}
+            className="w-full bg-slate-800 text-white rounded-lg py-2.5 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-base font-medium"
           >
             {submitting ? 'Entrando...' : 'Iniciar sesión'}
           </button>
@@ -114,20 +88,3 @@ export default function Login() {
   )
 }
 
-const labelStyle: React.CSSProperties = {
-  display: 'block',
-  marginBottom: '0.35rem',
-  fontSize: '0.85rem',
-  fontWeight: 600,
-  color: '#555',
-}
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '0.65rem 0.75rem',
-  border: '1px solid #ddd',
-  borderRadius: 8,
-  fontSize: '0.95rem',
-  outline: 'none',
-  boxSizing: 'border-box',
-}

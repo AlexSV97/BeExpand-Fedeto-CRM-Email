@@ -38,9 +38,9 @@ export default function Dashboard() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <p>Cargando dashboard...</p>
-  if (error) return <p style={{ color: '#d32f2f' }}>Error: {error}</p>
-  if (!data) return <p>Sin datos</p>
+  if (loading) return <p className="text-slate-500">Cargando dashboard...</p>
+  if (error) return <p className="text-red-500">Error: {error}</p>
+  if (!data) return <p className="text-slate-500">Sin datos</p>
 
   const contactsData = Object.entries(data.contacts_by_category).map(
     ([name, value]) => ({ name, value }),
@@ -51,10 +51,10 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h2 style={{ marginTop: 0 }}>Dashboard</h2>
+      <h2 className="text-2xl font-bold text-slate-900 mb-6">Dashboard</h2>
 
       {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <KpiCard label="Total correos" value={data.total_emails} color="#4fc3f7" />
         <KpiCard label="Correos hoy" value={data.emails_today} color="#81c784" />
         <KpiCard label="Categorías" value={contactsData.length} color="#ffb74d" />
@@ -62,7 +62,7 @@ export default function Dashboard() {
       </div>
 
       {/* Gráficos */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Contactos por categoría */}
         <Card title="Contactos por categoría">
           {contactsData.length > 0 ? (
@@ -122,18 +122,13 @@ function KpiCard({
 }) {
   return (
     <div
-      style={{
-        background: '#fff',
-        borderRadius: 10,
-        padding: '1.25rem',
-        borderTop: `4px solid ${color}`,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-      }}
+      className="bg-white rounded-xl p-5 shadow-sm"
+      style={{ borderTop: `4px solid ${color}` }}
     >
-      <p style={{ margin: 0, fontSize: '0.8rem', color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>
+      <p className="m-0 text-xs font-semibold uppercase tracking-wider text-slate-500">
         {label}
       </p>
-      <p style={{ margin: '0.5rem 0 0', fontSize: '2rem', fontWeight: 700, color: '#1a1a2e' }}>
+      <p className="mt-2 text-3xl font-bold text-slate-900">
         {value}
       </p>
     </div>
@@ -142,15 +137,8 @@ function KpiCard({
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div
-      style={{
-        background: '#fff',
-        borderRadius: 10,
-        padding: '1.25rem',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-      }}
-    >
-      <h3 style={{ margin: '0 0 1rem', fontSize: '1rem', color: '#555' }}>{title}</h3>
+    <div className="bg-white rounded-xl p-5 shadow-sm">
+      <h3 className="m-0 mb-4 text-sm font-semibold text-slate-700">{title}</h3>
       {children}
     </div>
   )
@@ -158,7 +146,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 
 function EmptyState() {
   return (
-    <p style={{ color: '#aaa', textAlign: 'center', padding: '2rem 0' }}>
+    <p className="text-slate-400 text-center py-8">
       Sin datos disponibles
     </p>
   )

@@ -9,6 +9,7 @@
 
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { cn } from '../lib/utils'
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: '📊' },
@@ -26,56 +27,36 @@ export default function Layout() {
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', fontFamily: 'system-ui, sans-serif' }}>
+    <div className="flex min-h-screen">
       {/* Sidebar */}
-      <nav
-        style={{
-          width: 240,
-          background: '#1a1a2e',
-          color: '#eee',
-          padding: '1.5rem 0',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        <div style={{ padding: '0 1.5rem 1.5rem', borderBottom: '1px solid #333', marginBottom: '1rem' }}>
-          <h2 style={{ margin: 0, fontSize: '1.1rem', color: '#fff' }}>BeExpand CRM</h2>
-          <span style={{ fontSize: '0.8rem', color: '#888' }}>{user?.username}</span>
+      <nav className="w-60 bg-slate-900 text-slate-400 py-6 flex flex-col min-h-screen">
+        <div className="px-6 pb-6 border-b border-slate-700 mb-4">
+          <h2 className="m-0 text-lg text-white">BeExpand CRM</h2>
+          <span className="text-xs text-slate-400">{user?.username}</span>
         </div>
 
         {navItems.map(item => (
           <NavLink
             key={item.to}
             to={item.to}
-            style={({ isActive }) => ({
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.75rem 1.5rem',
-              color: isActive ? '#fff' : '#aaa',
-              background: isActive ? '#16213e' : 'transparent',
-              textDecoration: 'none',
-              borderLeft: isActive ? '3px solid #4fc3f7' : '3px solid transparent',
-              fontWeight: isActive ? 600 : 400,
-            })}
+            className={({ isActive }) =>
+              cn(
+                'flex items-center gap-2 px-6 py-3 no-underline border-l-4 transition-colors',
+                isActive
+                  ? 'bg-slate-800 text-white border-sky-500 font-semibold'
+                  : 'bg-transparent text-slate-400 border-transparent hover:bg-slate-800 hover:text-white',
+              )
+            }
           >
             <span>{item.icon}</span>
             <span>{item.label}</span>
           </NavLink>
         ))}
 
-        <div style={{ marginTop: 'auto', padding: '1rem 1.5rem' }}>
+        <div className="mt-auto px-6 py-4">
           <button
             onClick={handleLogout}
-            style={{
-              width: '100%',
-              padding: '0.5rem',
-              background: 'transparent',
-              border: '1px solid #555',
-              borderRadius: 6,
-              color: '#ccc',
-              cursor: 'pointer',
-            }}
+            className="w-full py-2 bg-transparent border border-slate-600 rounded-lg text-slate-300 hover:bg-slate-800 cursor-pointer text-sm"
           >
             Cerrar sesión
           </button>
@@ -83,7 +64,7 @@ export default function Layout() {
       </nav>
 
       {/* Contenido */}
-      <main style={{ flex: 1, background: '#f5f5f5', padding: '2rem', overflowY: 'auto' }}>
+      <main className="flex-1 bg-slate-50 p-8 overflow-y-auto">
         <Outlet />
       </main>
     </div>

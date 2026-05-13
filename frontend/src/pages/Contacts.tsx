@@ -85,28 +85,21 @@ export default function Contacts() {
 
   return (
     <div>
-      <h2 style={{ marginTop: 0 }}>Contactos</h2>
+      <h2 className="text-2xl font-bold text-slate-900 mb-6">Contactos</h2>
 
       {/* Filtros */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '0.75rem',
-          marginBottom: '1.5rem',
-          alignItems: 'center',
-        }}
-      >
+      <div className="flex gap-3 items-center mb-6">
         <input
           type="text"
           placeholder="Buscar por nombre o email..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          style={filterInputStyle}
+          className="w-64 px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-sky-500"
         />
         <select
           value={category}
           onChange={e => setCategory(e.target.value)}
-          style={filterInputStyle}
+          className="px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm"
         >
           <option value="">Todas las categorías</option>
           {CATEGORIES.map(c => (
@@ -115,43 +108,43 @@ export default function Contacts() {
             </option>
           ))}
         </select>
-        <span style={{ fontSize: '0.85rem', color: '#888' }}>
+        <span className="text-sm text-slate-500">
           {total} contacto{total !== 1 ? 's' : ''}
         </span>
       </div>
 
       {/* Tabla */}
       {loading ? (
-        <p>Cargando...</p>
+        <p className="text-slate-500">Cargando...</p>
       ) : error ? (
-        <p style={{ color: '#d32f2f' }}>{error}</p>
+        <p className="text-red-500">{error}</p>
       ) : contacts.length === 0 ? (
         <EmptyState message="No se encontraron contactos" />
       ) : (
         <>
-          <table style={tableStyle}>
+          <table className="w-full bg-white rounded-xl shadow-sm overflow-hidden">
             <thead>
               <tr>
-                <th style={thStyle}>Nombre</th>
-                <th style={thStyle}>Email</th>
-                <th style={thStyle}>Empresa</th>
-                <th style={thStyle}>Categoría</th>
-                <th style={thStyle}>Correos</th>
-                <th style={thStyle}></th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 border-b-2 border-slate-200">Nombre</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 border-b-2 border-slate-200">Email</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 border-b-2 border-slate-200">Empresa</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 border-b-2 border-slate-200">Categoría</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 border-b-2 border-slate-200">Correos</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 border-b-2 border-slate-200"></th>
               </tr>
             </thead>
             <tbody>
               {contacts.map(c => (
-                <tr key={c.id} style={{ borderBottom: '1px solid #eee' }}>
-                  <td style={tdStyle}>{c.name}</td>
-                  <td style={tdStyle}>{c.email}</td>
-                  <td style={tdStyle}>{c.company || '-'}</td>
-                  <td style={tdStyle}>
+                <tr key={c.id}>
+                  <td className="px-4 py-3 text-sm text-slate-700 border-b border-slate-100">{c.name}</td>
+                  <td className="px-4 py-3 text-sm text-slate-700 border-b border-slate-100">{c.email}</td>
+                  <td className="px-4 py-3 text-sm text-slate-700 border-b border-slate-100">{c.company || '-'}</td>
+                  <td className="px-4 py-3 text-sm text-slate-700 border-b border-slate-100">
                     <CategoryBadge category={c.category} />
                   </td>
-                  <td style={tdStyle}>{c.email_count}</td>
-                  <td style={tdStyle}>
-                    <button onClick={() => openDetail(c.id)} style={linkStyle}>
+                  <td className="px-4 py-3 text-sm text-slate-700 border-b border-slate-100">{c.email_count}</td>
+                  <td className="px-4 py-3 text-sm text-slate-700 border-b border-slate-100">
+                    <button onClick={() => openDetail(c.id)} className="bg-transparent border-none text-sky-500 cursor-pointer underline text-sm hover:text-sky-600">
                       Ver
                     </button>
                   </td>
@@ -162,21 +155,21 @@ export default function Contacts() {
 
           {/* Paginación */}
           {totalPages > 1 && (
-            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginTop: '1rem' }}>
+            <div className="flex gap-2 justify-center mt-4 items-center">
               <button
                 disabled={page === 0}
                 onClick={() => setPage(p => p - 1)}
-                style={pageBtnStyle}
+                className="px-3 py-1.5 border border-slate-300 rounded-lg bg-white cursor-pointer text-sm hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
               >
                 ← Anterior
               </button>
-              <span style={{ padding: '0.5rem', color: '#888' }}>
+              <span className="px-2 py-1.5 text-slate-500 text-sm">
                 {page + 1} / {totalPages}
               </span>
               <button
                 disabled={page >= totalPages - 1}
                 onClick={() => setPage(p => p + 1)}
-                style={pageBtnStyle}
+                className="px-3 py-1.5 border border-slate-300 rounded-lg bg-white cursor-pointer text-sm hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
               >
                 Siguiente →
               </button>
@@ -188,17 +181,17 @@ export default function Contacts() {
       {/* Modal detalle */}
       {detailId && detail && (
         <div
-          style={modalOverlay}
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
           onClick={() => setDetailId(null)}
         >
           <div
-            style={modalContent}
+            className="bg-white rounded-xl p-6 w-[420px] max-w-[90vw] max-h-[80vh] overflow-y-auto shadow-2xl"
             onClick={e => e.stopPropagation()}
           >
-            <h3 style={{ margin: '0 0 0.5rem' }}>{detail.name}</h3>
-            <p style={{ margin: '0 0 1rem', color: '#888' }}>{detail.email}</p>
+            <h3 className="m-0 mb-2 text-lg font-semibold text-slate-900">{detail.name}</h3>
+            <p className="m-0 mb-4 text-sm text-slate-500">{detail.email}</p>
 
-            <div style={{ marginBottom: '1rem' }}>
+            <div className="mb-4">
               <InfoRow label="Empresa" value={detail.company} />
               <InfoRow label="Cargo" value={detail.position} />
               <InfoRow label="Teléfono" value={detail.phone} />
@@ -207,14 +200,14 @@ export default function Contacts() {
               <InfoRow label="Último email" value={detail.last_email_at ? new Date(detail.last_email_at).toLocaleDateString() : '-'} />
             </div>
 
-            <div>
-              <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.85rem', fontWeight: 600, color: '#555' }}>
+            <div className="mb-4">
+              <label className="block mb-1 text-sm font-semibold text-slate-600">
                 Categoría
               </label>
               <select
                 value={detail.category}
                 onChange={e => changeCategory(detail.id, e.target.value)}
-                style={filterInputStyle}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm"
               >
                 {CATEGORIES.map(c => (
                   <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
@@ -224,14 +217,7 @@ export default function Contacts() {
 
             <button
               onClick={() => setDetailId(null)}
-              style={{
-                marginTop: '1.5rem',
-                padding: '0.5rem 1rem',
-                background: '#eee',
-                border: 'none',
-                borderRadius: 6,
-                cursor: 'pointer',
-              }}
+              className="mt-6 px-4 py-2 bg-slate-100 border-none rounded-lg cursor-pointer text-sm hover:bg-slate-200 text-slate-700"
             >
               Cerrar
             </button>
@@ -259,13 +245,10 @@ function CategoryBadge({ category }: { category: string }) {
   }
   return (
     <span
+      className="inline-flex px-3 py-1 rounded-full text-xs font-semibold"
       style={{
         background: colors[category] || '#f5f5f5',
         color: textColors[category] || '#888',
-        padding: '0.2rem 0.6rem',
-        borderRadius: 12,
-        fontSize: '0.8rem',
-        fontWeight: 600,
       }}
     >
       {category}
@@ -275,84 +258,13 @@ function CategoryBadge({ category }: { category: string }) {
 
 function InfoRow({ label, value }: { label: string; value: string | null }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', borderBottom: '1px solid #f0f0f0' }}>
-      <span style={{ color: '#888', fontSize: '0.85rem' }}>{label}</span>
-      <span style={{ fontSize: '0.9rem' }}>{value || '-'}</span>
+    <div className="flex justify-between py-1.5 border-b border-slate-100">
+      <span className="text-slate-500 text-sm">{label}</span>
+      <span className="text-sm text-slate-700">{value || '-'}</span>
     </div>
   )
 }
 
 function EmptyState({ message }: { message: string }) {
-  return <p style={{ color: '#aaa', textAlign: 'center', padding: '3rem 0' }}>{message}</p>
-}
-
-const filterInputStyle: React.CSSProperties = {
-  padding: '0.5rem 0.75rem',
-  border: '1px solid #ddd',
-  borderRadius: 8,
-  fontSize: '0.9rem',
-  outline: 'none',
-}
-
-const tableStyle: React.CSSProperties = {
-  width: '100%',
-  borderCollapse: 'collapse',
-  background: '#fff',
-  borderRadius: 10,
-  overflow: 'hidden',
-  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-}
-
-const thStyle: React.CSSProperties = {
-  textAlign: 'left',
-  padding: '0.75rem 1rem',
-  fontSize: '0.8rem',
-  color: '#888',
-  textTransform: 'uppercase',
-  letterSpacing: 1,
-  borderBottom: '2px solid #eee',
-}
-
-const tdStyle: React.CSSProperties = {
-  padding: '0.75rem 1rem',
-  fontSize: '0.9rem',
-}
-
-const linkStyle: React.CSSProperties = {
-  background: 'none',
-  border: 'none',
-  color: '#4fc3f7',
-  cursor: 'pointer',
-  textDecoration: 'underline',
-  fontSize: '0.85rem',
-}
-
-const pageBtnStyle: React.CSSProperties = {
-  padding: '0.4rem 0.8rem',
-  border: '1px solid #ddd',
-  borderRadius: 6,
-  background: '#fff',
-  cursor: 'pointer',
-  fontSize: '0.85rem',
-}
-
-const modalOverlay: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  background: 'rgba(0,0,0,0.4)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 100,
-}
-
-const modalContent: React.CSSProperties = {
-  background: '#fff',
-  borderRadius: 12,
-  padding: '2rem',
-  width: 420,
-  maxWidth: '90vw',
-  maxHeight: '80vh',
-  overflowY: 'auto',
-  boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+  return <p className="text-slate-400 text-center py-12">{message}</p>
 }

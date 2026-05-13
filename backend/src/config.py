@@ -20,6 +20,14 @@ class Settings(BaseSettings):
     admin_username: str = "admin"
     admin_password: str = "admin123"
 
+    # ── IMAP (Gmail) ──
+    imap_server: str = "imap.gmail.com"
+    imap_port: int = 993
+    imap_email: str = ""
+    imap_password: str = ""
+    imap_folder: str = "INBOX"
+    imap_poll_interval_minutes: int = 5
+
     # ── VTiger ──
     vtiger_url: str = ""
     vtiger_token: str = ""
