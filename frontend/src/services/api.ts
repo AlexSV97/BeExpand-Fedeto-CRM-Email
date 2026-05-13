@@ -1,0 +1,223 @@
+/**
+ * API client — comunicación con el backend FastAPI.
+ *
+ * Todas las llamadas pasan por el proxy de Vite (/api → localhost:8000).
+ * Los endpoints protegidos incluyen automáticamente el token JWT.
+ */
+
+const API_BASE = '/api/v1'
+
+let _token: string | null = null
+
+export function setToken(token: string | null) {
+  _token = token
+  if (token) {
+    localStorage.setItem('auth_token', token)
+  } else {
+    localStorage.removeItem('auth_token')
+  }
+}
+
+export function getToken(): string | null {
+  if (!_token) {
+    _token = localStorage.getItem('auth_token')
+  }
+  return _token
+}
+
+export function isAuthenticated(): boolean {
+  return getToken() !== null
+}
+
+async function request<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+  const token = getToken()
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  })
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(error.detail || `HTTP ${res.status}`)
+  }
+
+  // 204 No Content
+  if (res.status === 204) return undefined as T
+
+  return res.json()
+}
+
+// ── Auth ──
+
+export interface LoginRequest {
+  username: string
+  password: string
+}
+
+export interface TokenResponse {
+  access_token: string
+  token_type: string
+}
+
+export interface UserResponse {
+  id: string
+  username: string
+  full_name: string | null
+  role: string
+  active: boolean
+}
+
+export async function login(data: LoginRequest): Promise<TokenResponse> {
+  return request<TokenResponse>('POST', '/auth/login', data)
+}
+
+export async function getMe(): Promise<UserResponse> {
+  return request<UserResponse>('GET', '/auth/me')
+}
+
+// ── Dashboard ──
+
+export interface DashboardSummary {
+  total_emails: number
+  emails_today: number
+  contacts_by_category: Record<string, number>
+  opportunities_by_stage: Record<string, number>
+}
+
+export async function getDashboardSummary(): Promise<DashboardSummary> {
+  return request<DashboardSummary>('GET', '/dashboard/summary')
+}
+
+// ── Contacts ──
+
+export interface ContactResponse {
+  id: string
+  name: string
+  email: string
+  company: string | null
+  position: string | null
+  category: string
+  phone: string | null
+  email_count: number
+  first_email_at: string | null
+  last_email_at: string | null
+  created_at: string
+}
+
+export interface ContactsListResponse {
+  items: ContactResponse[]
+  total: number
+  skip: number
+  limit: number
+}
+
+export async function getContacts(params?: {
+  category?: string
+  search?: string
+  skip?: number
+  limit?: number
+}): Promise<ContactsListResponse> {
+  const q = new URLSearchParams()
+  if (params?.category) q.set('category', params.category)
+  if (params?.search) q.set('search', params.search)
+  if (params?.skip) q.set('skip', String(params.skip))
+  if (params?.limit) q.set('limit', String(params.limit))
+  const qs = q.toString()
+  return request<ContactsListResponse>('GET', `/contacts${qs ? '?' + qs : ''}`)
+}
+
+export async function getContact(id: string): Promise<ContactResponse> {
+  return request<ContactResponse>('GET', `/contacts/${id}`)
+}
+
+export async function updateContact(
+  id: string,
+  data: { category?: string },
+): Promise<ContactResponse> {
+  return request<ContactResponse>('PATCH', `/contacts/${id}`, data)
+}
+
+// ── Opportunities ──
+
+export interface OpportunityResponse {
+  id: string
+  email_id: string | null
+  contact_id: string
+  title: string
+  description: string | null
+  stage: string
+  value: number | null
+  probability: number | null
+  expected_close: string | null
+  source: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface OpportunityCreate {
+  contact_id: string
+  title: string
+  description?: string
+  stage?: string
+  value?: number
+  probability?: number
+  expected_close?: string
+  notes?: string
+}
+
+export interface OpportunitiesListResponse {
+  items: OpportunityResponse[]
+  total: number
+  skip: number
+  limit: number
+}
+
+export async function getOpportunities(params?: {
+  stage?: string
+  skip?: number
+  limit?: number
+}): Promise<OpportunitiesListResponse> {
+  const q = new URLSearchParams()
+  if (params?.stage) q.set('stage', params.stage)
+  if (params?.skip) q.set('skip', String(params.skip))
+  if (params?.limit) q.set('limit', String(params.limit))
+  const qs = q.toString()
+  return request<OpportunitiesListResponse>(
+    'GET',
+    `/opportunities${qs ? '?' + qs : ''}`,
+  )
+}
+
+export async function getOpportunity(id: string): Promise<OpportunityResponse> {
+  return request<OpportunityResponse>('GET', `/opportunities/${id}`)
+}
+
+export async function createOpportunity(
+  data: OpportunityCreate,
+): Promise<OpportunityResponse> {
+  return request<OpportunityResponse>('POST', '/opportunities', data)
+}
+
+export async function updateOpportunity(
+  id: string,
+  data: OpportunityCreate,
+): Promise<OpportunityResponse> {
+  return request<OpportunityResponse>('PUT', `/opportunities/${id}`, data)
+}
+
+export async function deleteOpportunity(id: string): Promise<void> {
+  return request<void>('DELETE', `/opportunities/${id}`)
+}
