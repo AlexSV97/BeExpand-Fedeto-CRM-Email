@@ -218,16 +218,15 @@ async def hybrid_classify(subject: str, body: str) -> tuple[str, float, str, str
         )
         return category, confidence, "rule_engine", "coincidencia por palabra clave"
 
-    # Paso 2: BERT (rápido, modelo local fine-tuned)
-    # BERT está sobreajustado a datos sintéticos y da confianza alta incluso
-    # cuando se equivoca. Umbral alto (>= 95%) para aceptar solo predicciones
-    # extremadamente seguras. Si duda, pasa a Ollama que tiene mejor criterio.
+    # Paso 2: BERT (rápido, modelo local fine-tuned con datos reales + sintéticos)
+    # Umbral 80%: el modelo actual está calibrado con datos reales y aumentados.
+    # Por debajo de 80%, pasa a Ollama que tiene mejor criterio semántico.
     logger.info("RuleEngine inseguro (%.0f%%) → consultando BERT...", confidence * 100)
     bert_category, bert_confidence = await asyncio.to_thread(
         classify_with_bert, subject, body
     )
 
-    if bert_confidence >= 0.95:
+    if bert_confidence >= 0.80:
         logger.info(
             "BERT clasificó: %s (%.0f%%)", bert_category, bert_confidence * 100
         )
