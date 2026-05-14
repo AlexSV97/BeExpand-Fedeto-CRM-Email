@@ -1,0 +1,225 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" font-family="Inter, system-ui, sans-serif">
+  <defs>
+    <style>
+      .bg { fill: #F9FAFB; }
+      .header { fill: #FFFFFF; }
+      .header-border { stroke: #E5E7EB; stroke-width: 1; }
+      .card { fill: #FFFFFF; stroke: #E5E7EB; stroke-width: 1; rx: 8; }
+      .tab-inactive { fill: #6B7280; font-size: 14px; }
+      .tab-active { fill: #2563EB; font-size: 14px; font-weight: 600; }
+      .tab-bg-active { fill: #EFF6FF; }
+      .table-header { fill: #F9FAFB; font-size: 12px; font-weight: 600; fill: #6B7280; }
+      .table-row { font-size: 13px; fill: #374151; }
+      .table-border { stroke: #E5E7EB; stroke-width: 1; }
+      .chip { rx: 12; ry: 12; }
+      .chip-cliente { fill: #DCFCE7; stroke: #16A34A; stroke-width: 1; font-size: 11px; fill: #166534; }
+      .chip-lead { fill: #FEF3C7; stroke: #D97706; stroke-width: 1; font-size: 11px; fill: #92400E; }
+      .chip-proveedor { fill: #DBEAFE; stroke: #2563EB; stroke-width: 1; font-size: 11px; fill: #1E40AF; }
+      .chip-pill-active { fill: #2563EB; font-size: 12px; fill: #FFFFFF; }
+      .chip-pill { fill: #F3F4F6; stroke: #D1D5DB; stroke-width: 1; font-size: 12px; fill: #374151; }
+      .section-title { font-size: 16px; font-weight: 600; fill: #111827; }
+      .search-bg { fill: #FFFFFF; stroke: #D1D5DB; stroke-width: 1; rx: 6; }
+      .search-text { font-size: 14px; fill: #9CA3AF; }
+      .detail-label { font-size: 12px; fill: #6B7280; }
+      .detail-value { font-size: 14px; fill: #111827; }
+      .btn-secondary { fill: #FFFFFF; stroke: #D1D5DB; stroke-width: 1; rx: 6; font-size: 12px; fill: #374151; }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect class="bg" width="1200" height="900"/>
+
+  <!-- Header -->
+  <rect class="header" x="0" y="0" width="1200" height="56"/>
+  <line class="header-border" x1="0" y1="56" x2="1200" y2="56"/>
+  <text x="24" y="36" font-size="18" font-weight="700" fill="#111827">BeExpand CRM</text>
+  <circle cx="1140" cy="28" r="14" fill="#E5E7EB"/>
+  <circle cx="1170" cy="28" r="4" fill="#DC2626"/>
+  <text x="1100" y="32" font-size="13" fill="#6B7280">Admin</text>
+
+  <!-- Navigation Tabs -->
+  <text x="48" y="92" class="tab-inactive">📊 Dashboard</text>
+  <rect x="155" y="72" width="120" height="32" rx="6" class="tab-bg-active"/>
+  <text x="180" y="92" class="tab-active">👥 Contactos</text>
+  <text x="300" y="92" class="tab-inactive">📈 Pipeline</text>
+  <line x1="155" y1="108" x2="275" y2="108" stroke="#2563EB" stroke-width="2"/>
+
+  <!-- Section Title -->
+  <text x="24" y="148" class="section-title">👥 Contactos</text>
+
+  <!-- Search Bar -->
+  <rect x="24" y="164" width="400" height="40" class="search-bg"/>
+  <text x="40" y="190" font-size="14" fill="#9CA3AF">🔍 Buscar por nombre, email, empresa...</text>
+  <rect x="440" y="164" width="100" height="40" rx="6" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="1"/>
+  <text x="458" y="190" font-size="13" fill="#374151">▼ Filtros</text>
+
+  <!-- Filter Chips -->
+  <rect x="554" y="170" width="70" height="28" class="chip-pill-active"/>
+  <text x="564" y="189" class="chip-pill-active">Todos</text>
+  <rect x="632" y="170" width="70" height="28" class="chip-pill"/>
+  <text x="642" y="189" class="chip-pill">Cliente</text>
+  <rect x="710" y="170" width="60" height="28" class="chip-pill"/>
+  <text x="720" y="189" class="chip-pill">Lead</text>
+  <rect x="778" y="170" width="80" height="28" class="chip-pill"/>
+  <text x="788" y="189" class="chip-pill">Proveedor</text>
+
+  <!-- Table -->
+  <rect x="24" y="220" width="750" height="36" rx="6" class="table-header"/>
+  <text x="48" y="243" class="table-header">Nombre</text>
+  <text x="228" y="243" class="table-header">Empresa</text>
+  <text x="408" y="243" class="table-header">Email</text>
+  <text x="564" y="243" class="table-header">Tipo</text>
+  <text x="660" y="243" class="table-header">Correos</text>
+
+  <!-- Row 1 -->
+  <line x1="24" y1="256" x2="774" y2="256" class="table-border"/>
+  <circle cx="56" cy="274" r="10" fill="#DBEAFE"/>
+  <text x="52" y="278" font-size="11" fill="#1E40AF">A</text>
+  <text x="78" y="278" class="table-row" font-weight="600">Ana García</text>
+  <text x="228" y="278" class="table-row">García SL</text>
+  <text x="408" y="278" class="table-row" fill="#6B7280">ana@garcia-sl.com</text>
+  <rect x="560" y="264" width="60" height="20" class="chip-cliente"/>
+  <text x="566" y="278" font-size="11" fill="#166534">Cliente</text>
+  <text x="678" y="278" class="table-row" font-weight="600">23</text>
+
+  <!-- Row 2 -->
+  <line x1="24" y1="290" x2="774" y2="290" class="table-border"/>
+  <circle cx="56" cy="308" r="10" fill="#FEF3C7"/>
+  <text x="52" y="312" font-size="11" fill="#92400E">C</text>
+  <text x="78" y="312" class="table-row" font-weight="600">Construcciones Pérez</text>
+  <text x="228" y="312" class="table-row">Const. Pérez SL</text>
+  <text x="408" y="312" class="table-row" fill="#6B7280">obras@constperez.com</text>
+  <rect x="560" y="298" width="50" height="20" class="chip-lead"/>
+  <text x="566" y="312" font-size="11" fill="#92400E">Lead</text>
+  <text x="678" y="312" class="table-row" font-weight="600">5</text>
+
+  <!-- Row 3 -->
+  <line x1="24" y1="324" x2="774" y2="324" class="table-border"/>
+  <circle cx="56" cy="342" r="10" fill="#DBEAFE"/>
+  <text x="52" y="346" font-size="11" fill="#1E40AF">S</text>
+  <text x="78" y="342" class="table-row" font-weight="600">Suministros SA</text>
+  <text x="228" y="342" class="table-row">Suministros SA</text>
+  <text x="408" y="342" class="table-row" fill="#6B7280">facturas@sumi-sa.com</text>
+  <rect x="560" y="328" width="70" height="20" class="chip-proveedor"/>
+  <text x="566" y="342" font-size="11" fill="#1E40AF">Proveedor</text>
+  <text x="678" y="342" class="table-row" font-weight="600">12</text>
+
+  <!-- Row 4 -->
+  <line x1="24" y1="358" x2="774" y2="358" class="table-border"/>
+  <circle cx="56" cy="376" r="10" fill="#DBEAFE"/>
+  <text x="52" y="380" font-size="11" fill="#1E40AF">M</text>
+  <text x="78" y="376" class="table-row" font-weight="600">María López</text>
+  <text x="228" y="376" class="table-row">Tech Corp</text>
+  <text x="408" y="376" class="table-row" fill="#6B7280">maria@techcorp.com</text>
+  <rect x="560" y="362" width="60" height="20" class="chip-cliente"/>
+  <text x="566" y="376" font-size="11" fill="#166534">Cliente</text>
+  <text x="678" y="376" class="table-row" font-weight="600">8</text>
+
+  <!-- Row 5 -->
+  <line x1="24" y1="392" x2="774" y2="392" class="table-border"/>
+  <circle cx="56" cy="410" r="10" fill="#FEF3C7"/>
+  <text x="52" y="414" font-size="11" fill="#92400E">T</text>
+  <text x="78" y="410" class="table-row" font-weight="600">TechCorp</text>
+  <text x="228" y="410" class="table-row">TechCorp SL</text>
+  <text x="408" y="410" class="table-row" fill="#6B7280">info@techcorp.com</text>
+  <rect x="560" y="396" width="50" height="20" class="chip-lead"/>
+  <text x="566" y="410" font-size="11" fill="#92400E">Lead</text>
+  <text x="678" y="410" class="table-row" font-weight="600">3</text>
+
+  <!-- Row 6 -->
+  <line x1="24" y1="426" x2="774" y2="426" class="table-border"/>
+  <circle cx="56" cy="444" r="10" fill="#DBEAFE"/>
+  <text x="52" y="448" font-size="11" fill="#1E40AF">J</text>
+  <text x="78" y="444" class="table-row" font-weight="600">Juan Ruiz</text>
+  <text x="228" y="444" class="table-row">—</text>
+  <text x="408" y="444" class="table-row" fill="#6B7280">juan.ruiz@email.com</text>
+  <rect x="560" y="430" width="60" height="20" class="chip-cliente"/>
+  <text x="566" y="444" font-size="11" fill="#166534">Cliente</text>
+  <text x="678" y="444" class="table-row" font-weight="600">15</text>
+
+  <!-- Row 7 -->
+  <line x1="24" y1="460" x2="774" y2="460" class="table-border"/>
+  <circle cx="56" cy="478" r="10" fill="#DBEAFE"/>
+  <text x="52" y="482" font-size="11" fill="#1E40AF">B</text>
+  <text x="78" y="478" class="table-row" font-weight="600">BCN Soluciones</text>
+  <text x="228" y="478" class="table-row">BCN Soluciones SL</text>
+  <text x="408" y="478" class="table-row" fill="#6B7280">contacto@bcnsol.com</text>
+  <rect x="560" y="464" width="70" height="20" class="chip-proveedor"/>
+  <text x="566" y="478" font-size="11" fill="#1E40AF">Proveedor</text>
+  <text x="678" y="478" class="table-row" font-weight="600">7</text>
+
+  <!-- Row 8 -->
+  <line x1="24" y1="494" x2="774" y2="494" class="table-border"/>
+  <circle cx="56" cy="512" r="10" fill="#FEF3C7"/>
+  <text x="52" y="516" font-size="11" fill="#92400E">L</text>
+  <text x="78" y="512" class="table-row" font-weight="600">Laura Gómez</text>
+  <text x="228" y="512" class="table-row">Inmob. Gómez</text>
+  <text x="408" y="512" class="table-row" fill="#6B7280">laura@gomez-inmo.com</text>
+  <rect x="560" y="498" width="50" height="20" class="chip-lead"/>
+  <text x="566" y="512" font-size="11" fill="#92400E">Lead</text>
+  <text x="678" y="512" class="table-row" font-weight="600">2</text>
+
+  <!-- Pagination -->
+  <text x="24" y="560" font-size="13" fill="#6B7280">Mostrando 8 de 12 contactos</text>
+  <rect x="500" y="544" width="32" height="28" rx="4" fill="#2563EB"/>
+  <text x="512" y="563" font-size="13" fill="#FFFFFF" font-weight="600">1</text>
+  <rect x="540" y="544" width="32" height="28" rx="4" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="1"/>
+  <text x="552" y="563" font-size="13" fill="#374151">2</text>
+  <rect x="580" y="544" width="32" height="28" rx="4" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="1"/>
+  <text x="592" y="563" font-size="13" fill="#374151">3</text>
+
+  <!-- Detail Panel -->
+  <rect x="810" y="164" width="366" height="500" class="card"/>
+  <line x1="810" y1="220" x2="1176" y2="220" stroke="#E5E7EB" stroke-width="1"/>
+
+  <!-- Contact Avatar -->
+  <circle cx="993" cy="262" r="24" fill="#DBEAFE"/>
+  <text x="989" y="268" font-size="22" fill="#1E40AF" font-weight="bold">AG</text>
+
+  <!-- Contact Name & Actions -->
+  <text x="900" y="306" font-size="18" font-weight="600" fill="#111827" text-anchor="middle">Ana García</text>
+  <rect x="850" y="320" width="90" height="28" rx="6" class="btn-secondary"/>
+  <text x="868" y="339" font-size="12" fill="#374151">✏️ Editar</text>
+  <rect x="950" y="320" width="110" height="28" rx="6" fill="#2563EB"/>
+  <text x="962" y="339" font-size="12" fill="#FFFFFF">👤 Ver en VTiger</text>
+
+  <line x1="830" y1="365" x2="1156" y2="365" stroke="#E5E7EB" stroke-width="1"/>
+
+  <!-- Contact Details -->
+  <text x="840" y="392" class="detail-label">Email</text>
+  <text x="840" y="410" class="detail-value">ana@garcia-sl.com</text>
+
+  <text x="840" y="440" class="detail-label">Empresa</text>
+  <text x="840" y="458" class="detail-value">García SL</text>
+
+  <text x="840" y="488" class="detail-label">Cargo</text>
+  <text x="840" y="506" class="detail-value">Directora Comercial</text>
+
+  <text x="840" y="536" class="detail-label">Categoría</text>
+  <rect x="840" y="544" width="60" height="22" class="chip-cliente"/>
+  <text x="846" y="559" font-size="11" fill="#166534">Cliente</text>
+
+  <text x="920" y="536" class="detail-label">Relevancia</text>
+  <rect x="920" y="544" width="50" height="22" rx="11" fill="#DCFCE7" stroke="#16A34A" stroke-width="1"/>
+  <text x="928" y="559" font-size="11" fill="#166534">Alta</text>
+
+  <line x1="830" y1="580" x2="1156" y2="580" stroke="#E5E7EB" stroke-width="1"/>
+
+  <!-- Stats -->
+  <text x="840" y="606" class="detail-label">📧 Correos totales</text>
+  <text x="980" y="606" class="table-row" font-weight="600">23</text>
+
+  <text x="840" y="632" class="detail-label">📅 Último email</text>
+  <text x="980" y="632" class="table-row">12/05/2026</text>
+
+  <text x="840" y="658" class="detail-label">📈 Oportunidad activa</text>
+  <text x="980" y="658" class="table-row" fill="#D97706">Renovación contrato — 15.000€</text>
+
+  <line x1="830" y1="680" x2="1156" y2="680" stroke="#E5E7EB" stroke-width="1"/>
+
+  <!-- Recent Activity -->
+  <text x="840" y="706" class="detail-label" font-weight="600">Última actividad</text>
+  <text x="840" y="730" font-size="13" fill="#374151">📨 Pedido #3842 — Confirmación materiales</text>
+  <text x="840" y="748" font-size="12" fill="#6B7280">12/05/2026 09:34 · Clasificado como Cliente</text>
+  <text x="840" y="770" font-size="13" fill="#374151">✅ Estado: Cerrado</text>
+</svg>

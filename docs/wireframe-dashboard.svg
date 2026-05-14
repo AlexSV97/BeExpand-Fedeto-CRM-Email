@@ -1,0 +1,185 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" font-family="Inter, system-ui, sans-serif">
+  <defs>
+    <style>
+      .bg { fill: #F9FAFB; }
+      .header { fill: #FFFFFF; }
+      .header-border { stroke: #E5E7EB; stroke-width: 1; }
+      .card { fill: #FFFFFF; stroke: #E5E7EB; stroke-width: 1; rx: 8; }
+      .kpi-icon { fill: #EFF6FF; }
+      .kpi-value { font-size: 28px; font-weight: bold; fill: #111827; }
+      .kpi-label { font-size: 13px; fill: #6B7280; }
+      .bar-fill { fill: #2563EB; rx: 4; height: 20; }
+      .bar-bg { fill: #E5E7EB; rx: 4; height: 20; }
+      .bar-label { font-size: 12px; fill: #374151; }
+      .bar-pct { font-size: 12px; fill: #6B7280; text-anchor: end; }
+      .tab-active { fill: #2563EB; font-size: 14px; font-weight: 600; }
+      .tab-inactive { fill: #6B7280; font-size: 14px; }
+      .tab-line { stroke: #2563EB; stroke-width: 2; }
+      .table-header { fill: #F9FAFB; font-size: 12px; font-weight: 600; fill: #6B7280; }
+      .table-row { font-size: 13px; fill: #374151; }
+      .table-border { stroke: #E5E7EB; stroke-width: 1; }
+      .chip { rx: 12; ry: 12; }
+      .chip-cliente { fill: #DCFCE7; stroke: #16A34A; stroke-width: 1; font-size: 11px; fill: #166534; }
+      .chip-lead { fill: #FEF3C7; stroke: #D97706; stroke-width: 1; font-size: 11px; fill: #92400E; }
+      .chip-proveedor { fill: #DBEAFE; stroke: #2563EB; stroke-width: 1; font-size: 11px; fill: #1E40AF; }
+      .dot-high { fill: #DC2626; }
+      .dot-med { fill: #D97706; }
+      .dot-low { fill: #16A034; }
+      .section-title { font-size: 16px; font-weight: 600; fill: #111827; }
+      .link { font-size: 13px; fill: #2563EB; text-decoration: underline; }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect class="bg" width="1200" height="900"/>
+
+  <!-- Header -->
+  <rect class="header" x="0" y="0" width="1200" height="56"/>
+  <line class="header-border" x1="0" y1="56" x2="1200" y2="56"/>
+  <text x="24" y="36" font-size="18" font-weight="700" fill="#111827">BeExpand CRM</text>
+  <circle cx="1140" cy="28" r="14" fill="#E5E7EB"/>
+  <circle cx="1170" cy="28" r="4" fill="#DC2626"/>
+  <text x="1100" y="32" font-size="13" fill="#6B7280">Admin</text>
+
+  <!-- Navigation Tabs -->
+  <rect x="24" y="72" width="120" height="32" rx="6" fill="#EFF6FF"/>
+  <text x="48" y="92" class="tab-active">📊 Dashboard</text>
+  <text x="180" y="92" class="tab-inactive">👥 Contactos</text>
+  <text x="300" y="92" class="tab-inactive">📈 Pipeline</text>
+  <line x1="24" y1="108" x2="144" y2="108" class="tab-line"/>
+
+  <!-- Section Title -->
+  <text x="24" y="148" class="section-title">📅 Resumen Semanal — 11/05 al 17/05</text>
+
+  <!-- KPI Cards -->
+  <!-- Card 1: Correos -->
+  <rect x="24" y="168" width="270" height="90" class="card"/>
+  <rect x="36" y="180" width="36" height="36" rx="8" class="kpi-icon"/>
+  <text x="44" y="204" font-size="18">📨</text>
+  <text x="84" y="206" class="kpi-value">47</text>
+  <text x="84" y="226" class="kpi-label">Correos nuevos</text>
+
+  <!-- Card 2: Contactos -->
+  <rect x="310" y="168" width="270" height="90" class="card"/>
+  <rect x="322" y="180" width="36" height="36" rx="8" class="kpi-icon"/>
+  <text x="330" y="204" font-size="18">👤</text>
+  <text x="370" y="206" class="kpi-value">12</text>
+  <text x="370" y="226" class="kpi-label">Contactos nuevos</text>
+
+  <!-- Card 3: Oportunidades -->
+  <rect x="596" y="168" width="270" height="90" class="card"/>
+  <rect x="608" y="180" width="36" height="36" rx="8" class="kpi-icon"/>
+  <text x="616" y="204" font-size="18">📈</text>
+  <text x="656" y="206" class="kpi-value">3</text>
+  <text x="656" y="226" class="kpi-label">Oportunidades nuevas</text>
+
+  <!-- Card 4: Pendientes -->
+  <rect x="882" y="168" width="270" height="90" class="card"/>
+  <rect x="894" y="180" width="36" height="36" rx="8" class="kpi-icon"/>
+  <text x="902" y="204" font-size="18">⏳</text>
+  <text x="942" y="206" class="kpi-value">8</text>
+  <text x="942" y="226" class="kpi-label">Pendientes revisión</text>
+
+  <!-- Divider -->
+  <line x1="24" y1="278" x2="1176" y2="278" stroke="#E5E7EB" stroke-width="1"/>
+
+  <!-- Classification Section -->
+  <text x="24" y="312" class="section-title">📊 Clasificación de Correos (últimos 7 días)</text>
+
+  <!-- Bar 1: Cliente -->
+  <text x="24" y="348" class="bar-label">Cliente</text>
+  <rect x="120" y="336" width="500" height="16" class="bar-bg"/>
+  <rect x="120" y="336" width="225" height="16" class="bar-fill"/>
+  <text x="630" y="348" class="bar-pct">45%</text>
+
+  <!-- Bar 2: Lead -->
+  <text x="24" y="378" class="bar-label">Lead</text>
+  <rect x="120" y="366" width="500" height="16" class="bar-bg"/>
+  <rect x="120" y="366" width="150" height="16" fill="#D97706" rx="4"/>
+  <text x="630" y="378" class="bar-pct">30%</text>
+
+  <!-- Bar 3: Proveedor -->
+  <text x="24" y="408" class="bar-label">Proveedor</text>
+  <rect x="120" y="396" width="500" height="16" class="bar-bg"/>
+  <rect x="120" y="396" width="90" height="16" fill="#3B82F6" rx="4"/>
+  <text x="630" y="408" class="bar-pct">18%</text>
+
+  <!-- Bar 4: Otro -->
+  <text x="24" y="438" class="bar-label">Otro</text>
+  <rect x="120" y="426" width="500" height="16" class="bar-bg"/>
+  <rect x="120" y="426" width="35" height="16" fill="#9CA3AF" rx="4"/>
+  <text x="630" y="438" class="bar-pct">7%</text>
+
+  <!-- Divider -->
+  <line x1="24" y1="460" x2="1176" y2="460" stroke="#E5E7EB" stroke-width="1"/>
+
+  <!-- Recent Emails Section -->
+  <text x="24" y="494" class="section-title">📨 Últimos Correos Clasificados</text>
+
+  <!-- Table Header -->
+  <rect x="24" y="512" width="1152" height="36" rx="6" class="table-header"/>
+  <text x="48" y="535" class="table-header"></text>
+  <text x="72" y="535" class="table-header">Asunto</text>
+  <text x="372" y="535" class="table-header">Remitente</text>
+  <text x="632" y="535" class="table-header">Tipo</text>
+  <text x="792" y="535" class="table-header">Estado</text>
+  <text x="972" y="535" class="table-header">Relevancia</text>
+
+  <!-- Row 1 -->
+  <line x1="24" y1="548" x2="1176" y2="548" class="table-border"/>
+  <circle cx="52" cy="566" r="5" class="dot-high"/>
+  <text x="72" y="570" class="table-row">Pedido #3842 — Confirmación materiales</text>
+  <text x="372" y="570" class="table-row">Ana García</text>
+  <rect x="632" y="556" width="60" height="20" class="chip-cliente"/>
+  <text x="638" y="570" class="bar-label" fill="#166534">Cliente</text>
+  <text x="792" y="570" class="table-row" fill="#16A34A">✅ Cerrado</text>
+  <text x="972" y="570" class="table-row">🔴 Alta</text>
+
+  <!-- Row 2 -->
+  <line x1="24" y1="582" x2="1176" y2="582" class="table-border"/>
+  <circle cx="52" cy="600" r="5" class="dot-med"/>
+  <text x="72" y="604" class="table-row">Presupuesto obras — Reforma oficinas</text>
+  <text x="372" y="604" class="table-row">Construcciones Pérez</text>
+  <rect x="632" y="590" width="50" height="20" class="chip-lead"/>
+  <text x="638" y="604" class="bar-label" fill="#92400E">Lead</text>
+  <text x="792" y="604" class="table-row" fill="#D97706">⏳ Pendiente</text>
+  <text x="972" y="604" class="table-row">🟡 Media</text>
+
+  <!-- Row 3 -->
+  <line x1="24" y1="616" x2="1176" y2="616" class="table-border"/>
+  <circle cx="52" cy="634" r="5" class="dot-low"/>
+  <text x="72" y="638" class="table-row">Factura mensual — Material oficina</text>
+  <text x="372" y="638" class="table-row">Suministros SA</text>
+  <rect x="632" y="624" width="70" height="20" class="chip-proveedor"/>
+  <text x="638" y="638" class="bar-label" fill="#1E40AF">Proveedor</text>
+  <text x="792" y="638" class="table-row" fill="#16A34A">✅ Cerrado</text>
+  <text x="972" y="638" class="table-row">🟢 Baja</text>
+
+  <!-- Row 4 -->
+  <line x1="24" y1="650" x2="1176" y2="650" class="table-border"/>
+  <circle cx="52" cy="668" r="5" class="dot-high"/>
+  <text x="72" y="672" class="table-row">Soporte urgente — Incidencia servidor</text>
+  <text x="372" y="672" class="table-row">María López</text>
+  <rect x="632" y="658" width="60" height="20" class="chip-cliente"/>
+  <text x="638" y="672" class="bar-label" fill="#166534">Cliente</text>
+  <text x="792" y="672" class="table-row" fill="#D97706">🔍 Seguimiento</text>
+  <text x="972" y="672" class="table-row">🔴 Alta</text>
+
+  <!-- Row 5 -->
+  <line x1="24" y1="684" x2="1176" y2="684" class="table-border"/>
+  <circle cx="52" cy="702" r="5" class="dot-med"/>
+  <text x="72" y="706" class="table-row">Información productos — Catálogo 2026</text>
+  <text x="372" y="706" class="table-row">TechCorp</text>
+  <rect x="632" y="692" width="50" height="20" class="chip-lead"/>
+  <text x="638" y="706" class="bar-label" fill="#92400E">Lead</text>
+  <text x="792" y="706" class="table-row" fill="#D97706">⏳ Pendiente</text>
+  <text x="972" y="706" class="table-row">🟡 Media</text>
+
+  <!-- View All Link -->
+  <text x="24" y="745" class="link">Ver todos los correos →</text>
+
+  <!-- Footer -->
+  <line x1="24" y1="780" x2="1176" y2="780" stroke="#E5E7EB" stroke-width="1"/>
+  <text x="24" y="810" font-size="12" fill="#9CA3AF">© Be Expand — Sistema Interno</text>
+  <text x="1050" y="810" font-size="12" fill="#9CA3AF">Wireframe v1.0 — 12/05/2026</text>
+</svg>

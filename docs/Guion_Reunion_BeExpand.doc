@@ -1,0 +1,114 @@
+<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head>
+<meta charset="UTF-8">
+<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml><![endif]-->
+<style>
+body { font-family: Arial, sans-serif; font-size: 11pt; margin: 2cm; }
+h1 { text-align: center; font-size: 20pt; color: #1a1a2e; }
+h2 { text-align: center; font-size: 14pt; color: #1a1a2e; margin-top: 5px; }
+h3 { font-size: 13pt; color: #1a1a2e; border-bottom: 2px solid #1a1a2e; padding-bottom: 3px; margin-top: 20px; }
+.info-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+.info-table td { padding: 4px 8px; }
+.label { font-weight: bold; width: 120px; }
+.question-block { margin: 8px 0 8px 20px; }
+.question { margin: 3px 0; }
+.impact { margin: 0 0 8px 0; font-style: italic; color: #555; font-size: 10pt; }
+.notes { border: 1px solid #ccc; padding: 10px; margin: 10px 0; min-height: 60px; }
+.section-time { float: right; font-weight: bold; color: #888; font-size: 10pt; }
+</style>
+</head>
+<body>
+
+<h1>GUIÓN DE REUNIÓN INICIAL</h1>
+<h2>Be Expand — Proyecto CRM Email</h2>
+
+<table class="info-table">
+<tr><td class="label">Cliente:</td><td>Be Expand</td></tr>
+<tr><td class="label">Proyecto:</td><td>Sistema de centralización y clasificación de correos con integración CRM</td></tr>
+<tr><td class="label">Duración:</td><td>~90 horas estimadas</td></tr>
+<tr><td class="label">Fecha reunión:</td><td>_________________</td></tr>
+<tr><td class="label">Asistentes:</td><td>_________________</td></tr>
+</table>
+
+<h3>1. APERTURA <span class="section-time">(5 min)</span></h3>
+<ul>
+<li>Presentación personal y del proyecto</li>
+<li>Contexto: problema de gestión de correos y oportunidad de mejora</li>
+<li>Objetivo de la reunión: conocer su entorno y definir requisitos</li>
+<li>Entregar visión general del planning (30h / 60h / 90h)</li>
+</ul>
+
+<h3>2. ENTORNO TECNOLÓGICO <span class="section-time">(10 min)</span></h3>
+<div class="question-block">
+<p class="question"><b>¿Qué CRM utilizáis actualmente?</b> (HubSpot, Salesforce, otro...)</p>
+<p class="impact">→ Impacto: define la API de integración</p>
+<p class="question"><b>¿Qué plataforma de correo usáis?</b> (Office 365, Gmail, servidor IMAP propio...)</p>
+<p class="impact">→ Impacto: define el método de conexión</p>
+<p class="question"><b>¿Tenéis ya una cuenta intermedia o hay que crearla?</b></p>
+<p class="impact">→ Impacto: tarea de setup inicial</p>
+</div>
+
+<h3>3. VOLUMEN Y ALCANCE <span class="section-time">(10 min)</span></h3>
+<div class="question-block">
+<p class="question"><b>¿Cuántos correos recibís al día / semana aproximadamente?</b></p>
+<p class="impact">→ Impacto: dimensionamiento del sistema</p>
+<p class="question"><b>¿Cuántos departamentos o personas usarán el sistema?</b></p>
+<p class="impact">→ Impacto: alcance del rollout</p>
+<p class="question"><b>¿El sistema lo usará toda la empresa o solo dirección?</b></p>
+<p class="impact">→ Impacto: requisitos de permisos y autenticación</p>
+</div>
+
+<h3>4. REGLAS DE NEGOCIO <span class="section-time">(10 min)</span></h3>
+<div class="question-block">
+<p class="question"><b>¿Tenéis criterios definidos para clasificar un contacto?</b></p>
+<p class="impact">→ Ejemplo: cliente vs lead vs proveedor. Impacto: reglas del motor de clasificación</p>
+<p class="question"><b>¿Qué palabras clave o patrones indican una oportunidad de negocio?</b></p>
+<p class="impact">→ Impacto: detección de relevancia</p>
+<p class="question"><b>¿Cómo determináis hoy si un correo es relevante o no?</b></p>
+<p class="impact">→ Impacto: criterios de filtrado</p>
+</div>
+
+<h3>5. CRM E INTEGRACIÓN <span class="section-time">(10 min)</span></h3>
+<div class="question-block">
+<p class="question"><b>¿Qué datos mínimos deben pasar al CRM de cada correo?</b></p>
+<p class="impact">→ Impacto: modelo de datos y mapeo de campos</p>
+<p class="question"><b>¿La integración debe ser bidireccional?</b> (solo escritura o también leer del CRM)</p>
+<p class="impact">→ Impacto: complejidad de la integración</p>
+<p class="question"><b>¿Hay contactos ya registrados en el CRM o arrancamos de cero?</b></p>
+<p class="impact">→ Impacto: migración y deduplicación</p>
+</div>
+
+<h3>6. SEGURIDAD Y CUMPLIMIENTO <span class="section-time">(5 min)</span></h3>
+<div class="question-block">
+<p class="question"><b>¿Manejáis datos especialmente protegidos (GDPR)?</b></p>
+<p class="impact">→ Impacto: cifrado, almacenamiento, retention policies</p>
+<p class="question"><b>¿Hay requisitos de auditoría o trazabilidad?</b></p>
+<p class="impact">→ Impacto: logging y registro de actividad</p>
+</div>
+
+<h3>7. EXPECTATIVAS Y CIERRE <span class="section-time">(10 min)</span></h3>
+<div class="question-block">
+<p class="question"><b>¿Hay una fecha límite o hito importante?</b></p>
+<p class="impact">→ Impacto: priorización del roadmap</p>
+<p class="question"><b>¿Qué consideraríais un "mínimo viable" para empezar a usar el sistema?</b></p>
+<p class="impact">→ Impacto: definición del MVP</p>
+<p class="question"><b>¿Cómo mediríais el éxito del proyecto?</b></p>
+<p class="impact">→ Impacto: KPIs y criterios de aceptación</p>
+</div>
+
+<h3>PRÓXIMOS PASOS</h3>
+<ul>
+<li>Validación de requisitos y diseño de arquitectura</li>
+<li>Fecha estimada para siguiente reunión: _________________</li>
+</ul>
+
+<h3>NOTAS DE LA REUNIÓN</h3>
+
+<p><b>Observaciones:</b></p>
+<div class="notes"></div>
+
+<p><b>Acuerdos / Acciones:</b></p>
+<div class="notes"></div>
+
+</body>
+</html>
