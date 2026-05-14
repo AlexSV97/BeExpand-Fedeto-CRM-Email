@@ -46,3 +46,4 @@ Thumbs.db
 *.err
 backend*.log
 backend_debug.log
+fetcher_debug.py
