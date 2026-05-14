@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     vtiger_url: str = ""
     vtiger_token: str = ""
 
+    # ── Ollama (IA local) ──
+    ollama_url: str = "http://127.0.0.1:11434"
+    ollama_model: str = "llama3.2:3b"
+    ollama_timeout: int = 30
+
     # ── Entorno ──
     debug: bool = True
 

@@ -87,13 +87,42 @@ export async function getMe(): Promise<UserResponse> {
   return request<UserResponse>('GET', '/auth/me')
 }
 
+// ── Sync ──
+
+export interface SyncResponse {
+  connected: boolean
+  fetched: number
+  saved: number
+  duplicates: number
+  errors: number
+  account_email: string
+  error?: string
+}
+
+export async function syncEmails(): Promise<SyncResponse> {
+  return request<SyncResponse>('POST', '/emails/sync')
+}
+
 // ── Dashboard ──
+
+export interface RecentEmailItem {
+  id: string
+  subject: string | null
+  sender_name: string | null
+  sender_email: string
+  category: string | null
+  confidence: number
+  method: string
+  received_at: string | null
+}
 
 export interface DashboardSummary {
   total_emails: number
   emails_today: number
   contacts_by_category: Record<string, number>
   opportunities_by_stage: Record<string, number>
+  recent_emails: RecentEmailItem[]
+  classification_by_method: Record<string, number>
 }
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {

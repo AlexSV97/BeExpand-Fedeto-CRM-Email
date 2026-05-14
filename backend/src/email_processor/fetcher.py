@@ -11,18 +11,22 @@ Flujo:
 7. Marca como VISTO en Gmail
 """
 
+import asyncio
 import email
 import email.message
 import email.utils
+import json
 import logging
 import uuid
 from datetime import datetime, timezone
 from email.header import decode_header
 from typing import Optional
 
+import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.classifier.bert_classifier import classify_with_bert
 from src.config import get_settings
 from src.db.models import Account, ClassificationHistory, Contact, Email
 from src.db.session import async_session_factory
@@ -31,26 +35,220 @@ logger = logging.getLogger(__name__)
 
 # ── Clasificador por reglas básico (RuleEngine) ──
 
-CATEGORY_RULES: list[tuple[list[str], str]] = [
-    (["factura", "invoice", "pago", "payment", "recibo", "receipt"], "cliente"),
-    (["presupuesto", "budget", "quote", "cotización"], "lead"),
-    (["proveedor", "supplier", "vendor", "orden de compra"], "proveedor"),
-    (["soporte", "support", "ayuda", "help", "incidente", "bug"], "cliente"),
-    (["reunión", "meeting", "schedule", "agendar"], "cliente"),
+# Cada keyword tiene un peso individual (1=genérico, 2=normal, 3=fuerte, 4=muy fuerte).
+# El peso refleja qué tan exclusiva es esa palabra de su categoría.
+# "gracias" con peso 1 no debería desempatar contra "orden de compra" con peso 4.
+KEYWORD_WEIGHTS: list[tuple[str, int, str]] = [
+    # ── Cliente: facturación (2) ──
+    ("factura", 2, "cliente"),
+    ("invoice", 2, "cliente"),
+    ("pago", 2, "cliente"),
+    ("payment", 2, "cliente"),
+    ("recibo", 2, "cliente"),
+    ("receipt", 2, "cliente"),
+    # ── Cliente: soporte (2-3) ──
+    ("soporte", 2, "cliente"),
+    ("support", 2, "cliente"),
+    ("incidente", 3, "cliente"),
+    ("bug", 3, "cliente"),
+    ("error", 2, "cliente"),
+    ("problema", 2, "cliente"),
+    ("urgente", 2, "cliente"),
+    ("fallo", 2, "cliente"),
+    # ── Cliente: reuniones (1-2) ──
+    ("reunión", 2, "cliente"),
+    ("reunion", 2, "cliente"),
+    ("meeting", 2, "cliente"),
+    ("meet", 1, "cliente"),
+    ("schedule", 1, "cliente"),
+    ("agendar", 1, "cliente"),
+    ("follow-up", 2, "cliente"),
+    # ── Cliente: genéricos (1 — no desempatan solos) ──
+    ("gracias", 1, "cliente"),
+    ("thanks", 1, "cliente"),
+    ("ayuda", 1, "cliente"),
+    ("help", 1, "cliente"),
+    # ── Lead: consultas comerciales (2-3) ──
+    ("presupuesto", 3, "lead"),
+    ("budget", 3, "lead"),
+    ("cotización", 3, "lead"),
+    ("quot", 2, "lead"),
+    ("quote", 2, "lead"),
+    ("precio", 2, "lead"),
+    ("costo", 2, "lead"),
+    ("cost", 2, "lead"),
+    ("price", 2, "lead"),
+    ("colaboración", 2, "lead"),
+    ("partner", 2, "lead"),
+    ("collaboration", 2, "lead"),
+    ("partnership", 2, "lead"),
+    # ── Proveedor: compras y suministros (2-4) ──
+    ("orden de compra", 4, "proveedor"),
+    ("proveedor", 3, "proveedor"),
+    ("supplier", 3, "proveedor"),
+    ("vendor", 3, "proveedor"),
+    ("pedido", 3, "proveedor"),
+    ("order", 2, "proveedor"),
+    ("compra", 2, "proveedor"),
+    ("purchase", 2, "proveedor"),
+    ("materiales", 3, "proveedor"),
+    ("suministro", 3, "proveedor"),
 ]
+
+# Orden de prioridad para desempate.
+# En contexto B2B: si hay ambigüedad, proveedor es más específico que lead que cliente.
+CATEGORY_PRIORITY: dict[str, int] = {
+    "proveedor": 3,
+    "lead": 2,
+    "cliente": 1,
+}
 
 
 def classify_by_rules(subject: str, body: str) -> tuple[str, float]:
     """
-    Clasifica un correo usando reglas de palabras clave.
-    Retorna (categoría, confianza).
+    Clasifica un correo usando palabras clave con pesos individuales.
+
+    - Cada keyword aporta su peso al score de su categoría.
+    - Si hay empate, gana la categoría con mayor prioridad (proveedor > lead > cliente).
+    - Retorna (categoría, confianza).
     """
     text = f"{subject or ''} {body or ''}".lower()
-    for keywords, category in CATEGORY_RULES:
-        for kw in keywords:
-            if kw in text:
-                return category, 0.7
-    return "pendiente", 0.3
+    scores: dict[str, float] = {}
+
+    for keyword, weight, category in KEYWORD_WEIGHTS:
+        if keyword in text:
+            scores[category] = scores.get(category, 0) + weight
+
+    if not scores:
+        return "pendiente", 0.3
+
+    # Encontrar el score máximo
+    max_score = max(scores.values())
+
+    # Todas las categorías que alcanzaron el máximo
+    tied = [cat for cat, sc in scores.items() if sc == max_score]
+
+    if len(tied) == 1:
+        return tied[0], 0.7
+
+    # Desempate por prioridad de categoría (mayor prioridad gana)
+    tied.sort(key=lambda c: CATEGORY_PRIORITY.get(c, 0), reverse=True)
+    winner = tied[0]
+    logger.info(
+        "RuleEngine empate entre %s → desempate gana %s (prioridad %d)",
+        tied,
+        winner,
+        CATEGORY_PRIORITY.get(winner, 0),
+    )
+    return winner, 0.7
+
+
+# ── Clasificador por IA (Ollama) ──
+
+CLASSIFY_PROMPT = """Eres un clasificador de correos empresariales.
+Analiza el siguiente email y clasifícalo en UNA de estas categorias:
+- cliente: el remitente ES un cliente (facturas, pagos, soporte, reuniones)
+- lead: es un potencial cliente (presupuestos, cotizaciones, consultas)
+- proveedor: el remitente es un proveedor (ordenes de compra, facturas de proveedor)
+
+Responde SOLO con un JSON valido: {{"category": "cliente|lead|proveedor|pendiente", "confidence": 0.0-1.0, "reason": "breve explicacion"}}
+
+Asunto: {subject}
+Cuerpo: {body}"""
+
+
+async def classify_with_ollama(subject: str, body: str) -> tuple[str, float, str]:
+    """
+    Clasifica un correo usando Ollama (LLM local).
+    Retorna (categoría, confianza, razón).
+    """
+    settings = get_settings()
+    prompt = CLASSIFY_PROMPT.format(subject=subject or "", body=body or "")
+
+    try:
+        async with httpx.AsyncClient(timeout=settings.ollama_timeout) as client:
+            resp = await client.post(
+                f"{settings.ollama_url}/api/generate",
+                json={
+                    "model": settings.ollama_model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "temperature": 0.1,
+                    "max_tokens": 128,
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            raw = data.get("response", "").strip()
+
+            # Extraer JSON de la respuesta (puede venir con markdown)
+            if "```json" in raw:
+                raw = raw.split("```json")[1].split("```")[0].strip()
+            elif "```" in raw:
+                raw = raw.split("```")[1].split("```")[0].strip()
+
+            result = json.loads(raw)
+            category = result.get("category", "pendiente")
+            confidence = float(result.get("confidence", 0.5))
+            reason = result.get("reason", "")
+            return category, confidence, reason
+
+    except Exception as e:
+        logger.warning("Ollama classification failed: %s", e)
+        return "pendiente", 0.0, f"error: {e}"
+
+
+# ── Clasificador híbrido ──
+
+
+async def hybrid_classify(subject: str, body: str) -> tuple[str, float, str, str]:
+    """
+    Clasificador híbrido de 3 niveles:
+    1. RuleEngine  (1ms,  sin red,         confianza >= 70%)
+    2. DistilBERT  (50ms, local,            confianza >= 50%)
+    3. Ollama/LLM  (1-3s, llama3.2 local,   confianza >= 50%)
+    Retorna (categoría, confianza, método, razón).
+    """
+    # Paso 1: Reglas (instantáneo, sin dependencias)
+    category, confidence = classify_by_rules(subject, body)
+
+    if confidence >= 0.7:
+        logger.info(
+            "RuleEngine acertó: %s (%.0f%%)", category, confidence * 100
+        )
+        return category, confidence, "rule_engine", "coincidencia por palabra clave"
+
+    # Paso 2: BERT (rápido, modelo local fine-tuned)
+    # BERT está sobreajustado a datos sintéticos y da confianza alta incluso
+    # cuando se equivoca. Umbral alto (>= 95%) para aceptar solo predicciones
+    # extremadamente seguras. Si duda, pasa a Ollama que tiene mejor criterio.
+    logger.info("RuleEngine inseguro (%.0f%%) → consultando BERT...", confidence * 100)
+    bert_category, bert_confidence = await asyncio.to_thread(
+        classify_with_bert, subject, body
+    )
+
+    if bert_confidence >= 0.95:
+        logger.info(
+            "BERT clasificó: %s (%.0f%%)", bert_category, bert_confidence * 100
+        )
+        return bert_category, bert_confidence, "bert", f"distilBERT: {bert_confidence:.0%}"
+
+    # Paso 3: Ollama (LLM local, último recurso)
+    logger.info(
+        "BERT inseguro (%.0f%%) → consultando Ollama...", bert_confidence * 100
+    )
+    ai_category, ai_confidence, ai_reason = await classify_with_ollama(subject, body)
+
+    if ai_confidence >= 0.5:
+        return ai_category, ai_confidence, "ollama", ai_reason
+
+    # Si todos fallan, mantener "pendiente"
+    return (
+        "pendiente",
+        max(confidence, bert_confidence, ai_confidence),
+        "hybrid_fallback",
+        "baja confianza en los 3 niveles",
+    )
 
 
 # ── Parseo de cabeceras de email ──
@@ -194,8 +392,8 @@ async def save_email(
 
     now = datetime.now(timezone.utc)
 
-    # Clasificar
-    category, confidence = classify_by_rules(
+    # Clasificar (híbrido: reglas → IA)
+    category, confidence, method, reason = await hybrid_classify(
         msg_data.get("subject", ""),
         msg_data.get("body_plain", ""),
     )
@@ -226,8 +424,8 @@ async def save_email(
         email_id=email.id,
         category=category,
         confidence=confidence,
-        method="rule_engine",
-        details={"rules_matched": True},
+        method=method,
+        details={"reason": reason},
     )
     db.add(ch)
 

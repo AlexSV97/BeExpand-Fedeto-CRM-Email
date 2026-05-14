@@ -1,6 +1,21 @@
 """Schemas para el dashboard / KPIs."""
 
+from datetime import datetime
+from typing import Optional
+
 from pydantic import BaseModel
+
+
+class RecentEmail(BaseModel):
+    """Correo reciente para el feed del dashboard."""
+    id: str
+    subject: Optional[str] = None
+    sender_name: Optional[str] = None
+    sender_email: str
+    category: Optional[str] = None
+    confidence: float = 0.0
+    method: str = "unknown"
+    received_at: Optional[datetime] = None
 
 
 class DashboardSummary(BaseModel):
@@ -9,3 +24,5 @@ class DashboardSummary(BaseModel):
     emails_today: int
     contacts_by_category: dict[str, int]
     opportunities_by_stage: dict[str, int]
+    recent_emails: list[RecentEmail] = []
+    classification_by_method: dict[str, int] = {}
