@@ -133,6 +133,7 @@ export default function Dashboard() {
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<string | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
+  const [expandedSummary, setExpandedSummary] = useState<string | null>(null)
 
   const fetchDashboard = useCallback(() => {
     getDashboardSummary()
@@ -264,7 +265,14 @@ export default function Dashboard() {
         {recentEmails.length > 0 ? (
           <div className="divide-y divide-slate-100">
             {recentEmails.map((email) => (
-              <EmailRow key={email.id} email={email} />
+              <EmailRow
+                key={email.id}
+                email={email}
+                isSummaryExpanded={expandedSummary === email.id}
+                onToggleSummary={() =>
+                  setExpandedSummary(expandedSummary === email.id ? null : email.id)
+                }
+              />
             ))}
           </div>
         ) : (
@@ -396,51 +404,110 @@ function KpiCard({
   )
 }
 
-function EmailRow({ email }: { email: RecentEmailItem }) {
+function EmailRow({
+  email,
+  isSummaryExpanded,
+  onToggleSummary,
+}: {
+  email: RecentEmailItem
+  isSummaryExpanded: boolean
+  onToggleSummary: () => void
+}) {
   const category = email.category ?? 'pendiente'
   const catColor = CATEGORY_COLORS[category] ?? '#94a3b8'
   const methodLabel = METHOD_LABELS[email.method] ?? email.method
   const methodColor = METHOD_COLORS[email.method] ?? '#cbd5e1'
+  const hasSummary = !!email.summary && email.summary !== ''
 
   return (
-    <div className="flex items-center gap-4 py-3 first:pt-0 last:pb-0">
-      {/* Badge categoría */}
-      <span
-        className="shrink-0 w-2 h-2 rounded-full"
-        style={{ backgroundColor: catColor }}
-        title={category}
-      />
+    <div>
+      {/* Fila principal */}
+      <div className="flex items-center gap-4 py-3 first:pt-0">
+        {/* Badge categoría */}
+        <span
+          className="shrink-0 w-2 h-2 rounded-full"
+          style={{ backgroundColor: catColor }}
+          title={category}
+        />
 
-      {/* Contenido */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-900 truncate">
-          {email.subject ?? '(sin asunto)'}
-        </p>
-        <p className="text-xs text-slate-500 truncate">
-          {email.sender_name ?? email.sender_email}
-        </p>
+        {/* Contenido */}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-slate-900 truncate">
+            {email.subject ?? '(sin asunto)'}
+          </p>
+          <p className="text-xs text-slate-500 truncate">
+            {email.sender_name ?? email.sender_email}
+          </p>
+        </div>
+
+        {/* Botón resumen */}
+        {hasSummary && (
+          <button
+            onClick={onToggleSummary}
+            className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium
+              text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            title="Ver resumen"
+          >
+            <svg
+              className={`w-3.5 h-3.5 transition-transform duration-200 ${isSummaryExpanded ? 'rotate-180' : ''}`}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+            Resumen
+          </button>
+        )}
+
+        {/* Confianza */}
+        <span className="text-xs text-slate-400 font-mono shrink-0 w-10 text-right">
+          {formatConfidence(email.confidence)}
+        </span>
+
+        {/* Badge método */}
+        <span
+          className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+          style={{
+            backgroundColor: `${methodColor}18`,
+            color: methodColor,
+          }}
+        >
+          {methodLabel}
+        </span>
+
+        {/* Tiempo */}
+        <span className="text-xs text-slate-400 shrink-0 w-16 text-right">
+          {formatTimeAgo(email.received_at)}
+        </span>
       </div>
 
-      {/* Confianza */}
-      <span className="text-xs text-slate-400 font-mono shrink-0 w-10 text-right">
-        {formatConfidence(email.confidence)}
-      </span>
-
-      {/* Badge método */}
-      <span
-        className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-        style={{
-          backgroundColor: `${methodColor}18`,
-          color: methodColor,
-        }}
-      >
-        {methodLabel}
-      </span>
-
-      {/* Tiempo */}
-      <span className="text-xs text-slate-400 shrink-0 w-16 text-right">
-        {formatTimeAgo(email.received_at)}
-      </span>
+      {/* Panel de resumen expandible */}
+      {isSummaryExpanded && hasSummary && (
+        <div className="ml-6 mb-3 p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm text-slate-700 animate-fadeIn">
+          <div className="flex items-start gap-2">
+            <svg
+              className="w-4 h-4 mt-0.5 shrink-0 text-slate-400"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+              <path d="M14 2v6h6" />
+              <path d="M16 13H8" />
+              <path d="M16 17H8" />
+              <path d="M10 9H8" />
+            </svg>
+            <p className="leading-relaxed">{email.summary}</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

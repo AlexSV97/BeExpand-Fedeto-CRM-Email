@@ -258,7 +258,8 @@ BeExpand-Fedeto-CRM-Email/
 │   │   ├── classifier/
 │   │   │   └── bert_classifier.py   # Clasificador BERT
 │   │   ├── email_processor/
-│   │   │   └── fetcher.py           # Conexión IMAP + parseo
+│   │   │   ├── fetcher.py           # Conexión IMAP + parseo + clasificación
+│   │   │   └── summarizer.py        # Generación de resúmenes con Ollama
 │   │   ├── db/
 │   │   │   ├── models.py            # SQLAlchemy models
 │   │   │   └── session.py           # DB session management
@@ -342,7 +343,7 @@ BeExpand-Fedeto-CRM-Email/
 | Pantalla | Ruta | Descripción |
 |----------|------|-------------|
 | **Login** | `/login` | Autenticación JWT |
-| **Dashboard** | `/dashboard` | 4 KPI cards, feed últimos 10 emails clasificados, donut de distribución, botón sync IMAP |
+| **Dashboard** | `/dashboard` | 4 KPI cards, feed últimos 10 emails clasificados con resumen expandible, donut de distribución, botón sync IMAP |
 | **Contactos** | `/contacts` | Lista con filtros, búsqueda, detalle de contacto |
 | **Pipeline** | `/opportunities` | Kanban de oportunidades, proyección mensual |
 
@@ -489,7 +490,13 @@ BeExpand-Fedeto-CRM-Email/
 - **Layout**: Sidebar con SVG icons, header con breadcrumb
 
 ### Sesión 5 — 15/05/2026
-- Recuperación de contexto y documentación del proyecto (sesión actual)
+- **FASE 1: Resumen de correos en Dashboard** implementada
+- Nuevo módulo `summarizer.py` que genera resúmenes con Ollama (prompt estructurado JSON)
+- Resumen se genera automáticamente al procesar cada correo (en `fetcher.py`)
+- Campo `summary` añadido a tabla `emails` en BD + migración Alembic
+- Dashboard: cada correo en el feed tiene botón "Resumen" que despliega panel con el resumen
+- Animación fadeIn para el panel expandible
+- Documentación completa del proyecto creada en `docs/DOCUMENTACION_COMPLETA_PROYECTO.md`
 
 ---
 

@@ -30,6 +30,7 @@ from src.classifier.bert_classifier import classify_with_bert
 from src.config import get_settings
 from src.db.models import Account, ClassificationHistory, Contact, Email
 from src.db.session import async_session_factory
+from src.email_processor.summarizer import generate_summary
 
 logger = logging.getLogger(__name__)
 
@@ -397,6 +398,12 @@ async def save_email(
         msg_data.get("body_plain", ""),
     )
 
+    # Generar resumen con Ollama
+    summary_result = await generate_summary(
+        msg_data.get("subject", ""),
+        msg_data.get("body_plain", ""),
+    )
+
     email = Email(
         id=str(uuid.uuid4()),
         account_id=account.id,
@@ -413,6 +420,7 @@ async def save_email(
         category=category,
         relevance="media",
         status="pendiente",
+        summary=summary_result.get("summary"),
     )
     db.add(email)
     await db.flush()

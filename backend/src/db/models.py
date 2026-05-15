@@ -104,6 +104,7 @@ class Email(Base):
     category: Mapped[Optional[str]] = mapped_column(String(20), default="pendiente")
     relevance: Mapped[Optional[str]] = mapped_column(String(10), default="media")
     status: Mapped[Optional[str]] = mapped_column(String(20), default="pendiente")
+    summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     extra_data: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

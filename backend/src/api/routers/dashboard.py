@@ -87,6 +87,7 @@ async def _recent_emails(db: AsyncSession) -> list[RecentEmail]:
                 category=email.category,
                 confidence=latest.confidence if latest else 0.0,
                 method=latest.method if latest else "unknown",
+                summary=email.summary,
                 received_at=email.received_at,
             )
         )

@@ -15,6 +15,7 @@ class RecentEmail(BaseModel):
     category: Optional[str] = None
     confidence: float = 0.0
     method: str = "unknown"
+    summary: Optional[str] = None
     received_at: Optional[datetime] = None
 
 

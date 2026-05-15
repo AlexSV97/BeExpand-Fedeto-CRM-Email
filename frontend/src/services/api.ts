@@ -113,6 +113,7 @@ export interface RecentEmailItem {
   category: string | null
   confidence: number
   method: string
+  summary: string | null
   received_at: string | null
 }
 
