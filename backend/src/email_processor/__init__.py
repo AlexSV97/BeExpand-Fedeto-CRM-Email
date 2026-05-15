@@ -2,7 +2,8 @@
 Procesador de correos electrónicos.
 
 Módulos:
-- fetcher: conexión IMAP, parseo, clasificación por reglas, persistencia
+- fetcher: conexión IMAP, parseo, delegación al Orchestrator
+- forwarder: reenvío SMTP a departamentos
 """
 
 from src.email_processor.fetcher import sync_emails

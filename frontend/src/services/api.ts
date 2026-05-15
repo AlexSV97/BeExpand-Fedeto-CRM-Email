@@ -89,13 +89,26 @@ export async function getMe(): Promise<UserResponse> {
 
 // ── Sync ──
 
+export interface SyncResultItem {
+  subject: string | null
+  sender_name: string
+  category: string | null
+  confidence: number
+  resolution: string | null
+  routing: { departments: string[]; persons: string[] }
+  summary: string | null
+  urgency: string
+  actions: { action: string; success: boolean; detail: string | null }[]
+  error: string | null
+}
+
 export interface SyncResponse {
   connected: boolean
   fetched: number
-  saved: number
-  duplicates: number
+  processed: number
   errors: number
   account_email: string
+  results: SyncResultItem[]
   error?: string
 }
 
@@ -115,6 +128,10 @@ export interface RecentEmailItem {
   method: string
   summary: string | null
   received_at: string | null
+  resolution: string | null          // consensus | majority | llm_judge | fallback
+  departments: string[]              // Departamentos destino
+  urgency: string                    // alta | media | baja
+  action_required: string | null     // pago | soporte | consulta | ...
 }
 
 export interface DashboardSummary {

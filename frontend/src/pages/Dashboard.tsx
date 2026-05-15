@@ -44,6 +44,10 @@ const METHOD_LABELS: Record<string, string> = {
   bert: 'BERT',
   ollama: 'Ollama',
   hybrid_fallback: 'Fallback',
+  orchestrator_consensus: 'Consenso',
+  orchestrator_majority: 'Mayoría',
+  orchestrator_llm_judge: 'Juez LLM',
+  orchestrator_fallback: 'Fallback',
   unknown: 'Desconocido',
 }
 
@@ -52,7 +56,46 @@ const METHOD_COLORS: Record<string, string> = {
   bert: '#8b5cf6',
   ollama: '#22c55e',
   hybrid_fallback: '#94a3b8',
+  orchestrator_consensus: '#0ea5e9',
+  orchestrator_majority: '#f59e0b',
+  orchestrator_llm_judge: '#8b5cf6',
+  orchestrator_fallback: '#94a3b8',
   unknown: '#cbd5e1',
+}
+
+const RESOLUTION_LABELS: Record<string, string> = {
+  consensus: 'Consenso',
+  majority: 'Mayoría',
+  llm_judge: 'Juez LLM',
+  fallback: 'Fallback',
+}
+
+const RESOLUTION_COLORS: Record<string, string> = {
+  consensus: '#0ea5e9',
+  majority: '#f59e0b',
+  llm_judge: '#8b5cf6',
+  fallback: '#94a3b8',
+}
+
+const URGENCY_LABELS: Record<string, string> = {
+  alta: 'Urgente',
+  media: 'Normal',
+  baja: 'Baja',
+}
+
+const URGENCY_COLORS: Record<string, string> = {
+  alta: '#ef4444',
+  media: '#f59e0b',
+  baja: '#94a3b8',
+}
+
+const DEPARTMENT_LABELS: Record<string, string> = {
+  contabilidad: 'Contabilidad',
+  soporte: 'Soporte',
+  comercial: 'Comercial',
+  proveedores: 'Proveedores',
+  direccion: 'Dirección',
+  otro: 'Otro',
 }
 
 const CHART_COLORS = ['#0ea5e9', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
@@ -152,8 +195,10 @@ export default function Dashboard() {
     setSyncError(null)
     try {
       const result = await syncEmails()
-      const msg = `${result.saved} nuevo(s) · ${result.duplicates} duplicado(s) · ${result.errors} error(es)`
-      setSyncResult(msg)
+      const categorized = result.results.filter(r => r.category && r.category !== 'nulo')
+      const nulos = result.results.filter(r => r.category === 'nulo')
+      const line = `${result.processed} procesado(s) · ${categorized.length} clasificado(s) · ${nulos.length} nulo(s) · ${result.errors} error(es)`
+      setSyncResult(line)
       getDashboardSummary().then(setData).catch(() => {})
     } catch (e: unknown) {
       setSyncError(e instanceof Error ? e.message : 'Error al sincronizar')
@@ -418,11 +463,15 @@ function EmailRow({
   const methodLabel = METHOD_LABELS[email.method] ?? email.method
   const methodColor = METHOD_COLORS[email.method] ?? '#cbd5e1'
   const hasSummary = !!email.summary && email.summary !== ''
+  const hasRouting = email.departments && email.departments.length > 0
+  const resolutionLabel = RESOLUTION_LABELS[email.resolution ?? ''] ?? null
+  const resolutionColor = RESOLUTION_COLORS[email.resolution ?? ''] ?? null
+  const urgencyColor = URGENCY_COLORS[email.urgency] ?? null
 
   return (
     <div>
       {/* Fila principal */}
-      <div className="flex items-center gap-4 py-3 first:pt-0">
+      <div className="flex items-center gap-3 py-3 first:pt-0">
         {/* Badge categoría */}
         <span
           className="shrink-0 w-2 h-2 rounded-full"
@@ -437,8 +486,39 @@ function EmailRow({
           </p>
           <p className="text-xs text-slate-500 truncate">
             {email.sender_name ?? email.sender_email}
+            {email.action_required && (
+              <span className="ml-2 text-slate-400">
+                · {email.action_required}
+              </span>
+            )}
           </p>
+          {/* Departamentos destino */}
+          {hasRouting && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {email.departments!.map((dept) => (
+                <span
+                  key={dept}
+                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-50 text-indigo-600"
+                >
+                  {DEPARTMENT_LABELS[dept] ?? dept}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
+
+        {/* Urgencia */}
+        {urgencyColor && email.urgency !== 'media' && (
+          <span
+            className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider"
+            style={{
+              backgroundColor: `${urgencyColor}15`,
+              color: urgencyColor,
+            }}
+          >
+            {URGENCY_LABELS[email.urgency] ?? email.urgency}
+          </span>
+        )}
 
         {/* Botón resumen */}
         {hasSummary && (
@@ -463,6 +543,19 @@ function EmailRow({
           </button>
         )}
 
+        {/* Badge resolución */}
+        {resolutionLabel && (
+          <span
+            className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium"
+            style={{
+              backgroundColor: `${resolutionColor!}15`,
+              color: resolutionColor!,
+            }}
+          >
+            {resolutionLabel}
+          </span>
+        )}
+
         {/* Confianza */}
         <span className="text-xs text-slate-400 font-mono shrink-0 w-10 text-right">
           {formatConfidence(email.confidence)}
@@ -485,27 +578,43 @@ function EmailRow({
         </span>
       </div>
 
-      {/* Panel de resumen expandible */}
-      {isSummaryExpanded && hasSummary && (
-        <div className="ml-6 mb-3 p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm text-slate-700 animate-fadeIn">
-          <div className="flex items-start gap-2">
-            <svg
-              className="w-4 h-4 mt-0.5 shrink-0 text-slate-400"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-              <path d="M14 2v6h6" />
-              <path d="M16 13H8" />
-              <path d="M16 17H8" />
-              <path d="M10 9H8" />
-            </svg>
-            <p className="leading-relaxed">{email.summary}</p>
-          </div>
+      {/* Panel de resumen expandible + detalles del análisis */}
+      {isSummaryExpanded && (
+        <div className="ml-6 mb-3 p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm text-slate-700 animate-fadeIn space-y-2">
+          {hasSummary && (
+            <div className="flex items-start gap-2">
+              <svg
+                className="w-4 h-4 mt-0.5 shrink-0 text-slate-400"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                <path d="M14 2v6h6" />
+                <path d="M16 13H8" />
+                <path d="M16 17H8" />
+                <path d="M10 9H8" />
+              </svg>
+              <p className="leading-relaxed">{email.summary}</p>
+            </div>
+          )}
+          {/* Detalles del análisis */}
+          {hasRouting && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 border-t border-slate-200 pt-2 mt-1">
+              <span>📬 Enrutado a: <strong>
+                {email.departments!.map((d) => DEPARTMENT_LABELS[d] ?? d).join(', ')}
+              </strong></span>
+              {email.resolution && (
+                <span>⚖️ Resolución: <strong>{RESOLUTION_LABELS[email.resolution] ?? email.resolution}</strong></span>
+              )}
+              {email.action_required && (
+                <span>🎯 Acción: <strong>{email.action_required}</strong></span>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

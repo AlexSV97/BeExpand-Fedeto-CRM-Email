@@ -78,6 +78,11 @@ async def _recent_emails(db: AsyncSession) -> list[RecentEmail]:
             reverse=True,
         )
         latest = ch_list[0] if ch_list else None
+        # Extraer datos del orquestador desde extra_data (JSON)
+        extra = email.extra_data or {}
+        routing_data = extra.get("routing", {})
+        analyzer_data = extra.get("analyzer", {})
+
         items.append(
             RecentEmail(
                 id=email.id,
@@ -89,6 +94,10 @@ async def _recent_emails(db: AsyncSession) -> list[RecentEmail]:
                 method=latest.method if latest else "unknown",
                 summary=email.summary,
                 received_at=email.received_at,
+                resolution=extra.get("resolution_method"),
+                departments=routing_data.get("departments", []),
+                urgency=analyzer_data.get("urgency", "media"),
+                action_required=analyzer_data.get("action_required"),
             )
         )
     return items

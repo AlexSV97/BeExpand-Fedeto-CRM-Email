@@ -17,6 +17,10 @@ class RecentEmail(BaseModel):
     method: str = "unknown"
     summary: Optional[str] = None
     received_at: Optional[datetime] = None
+    resolution: Optional[str] = None         # consensus | majority | llm_judge | fallback
+    departments: list[str] = []               # Departamentos destino
+    urgency: str = "media"                    # alta | media | baja
+    action_required: Optional[str] = None     # pago | soporte | consulta | ...
 
 
 class DashboardSummary(BaseModel):

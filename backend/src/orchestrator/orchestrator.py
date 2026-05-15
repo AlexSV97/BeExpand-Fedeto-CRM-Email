@@ -1,0 +1,194 @@
+"""
+Orchestrator — coordinador central del sistema multi-agente.
+
+Flujo completo:
+1. Recibe EmailData (desde IMAP fetcher o API)
+2. Crea EmailContext con los datos crudos
+3. Lanza agentes en orden:
+   a. Analyzer Agent (extrae info estructurada)
+   b. Classifier sub-agentes (3 votos en paralelo)
+   c. VoteResolver (decide categoría final)
+   d. Router Agent (decide enrutamiento)
+   e. Action Executor (persiste + reenvía + notifica)
+4. Retorna EmailContext completo con resultados
+"""
+
+import asyncio
+import logging
+import time
+from datetime import datetime, timezone
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.agents import (
+    ActionExecutor,
+    AnalyzerAgent,
+    BertClassifierAgent,
+    LLMClassifierAgent,
+    RouterAgent,
+    RuleClassifierAgent,
+)
+from src.orchestrator.context import EmailData, EmailContext
+from src.orchestrator.resolver import VoteResolver
+
+logger = logging.getLogger(__name__)
+
+
+class Orchestrator:
+    """Orquestador central del pipeline de agentes."""
+
+    def __init__(
+        self,
+        db: AsyncSession | None = None,
+        analyzer: AnalyzerAgent | None = None,
+        rule_classifier: RuleClassifierAgent | None = None,
+        bert_classifier: BertClassifierAgent | None = None,
+        llm_classifier: LLMClassifierAgent | None = None,
+        resolver: VoteResolver | None = None,
+        router: RouterAgent | None = None,
+    ):
+        self.db = db
+        self.analyzer = analyzer or AnalyzerAgent()
+        self.rule_classifier = rule_classifier or RuleClassifierAgent()
+        self.bert_classifier = bert_classifier or BertClassifierAgent()
+        self.llm_classifier = llm_classifier or LLMClassifierAgent()
+        self.resolver = resolver or VoteResolver()
+        self.router = router or RouterAgent()
+
+    async def process(
+        self,
+        email_data: EmailData,
+        db: AsyncSession | None = None,
+    ) -> EmailContext:
+        """
+        Procesa un email a través de todo el pipeline de agentes.
+
+        Args:
+            email_data: Datos crudos del email (desde IMAP fetcher o API).
+            db: Sesión de BD (si no se pasó en el constructor).
+
+        Returns:
+            EmailContext completo con todos los resultados del pipeline.
+        """
+        ctx = EmailContext(
+            raw=email_data,
+            processing_start=datetime.now(timezone.utc),
+        )
+
+        session = db or self.db
+        if session is None:
+            raise ValueError(
+                "Se requiere una sesión de BD (pasarla al constructor o al process())"
+            )
+
+        try:
+            # ── Paso 1: Analyzer (extracción estructurada) ──
+            logger.info("🔍 Analyzer: extrayendo info de %s", email_data.subject)
+            analyzer_result = await self.analyzer.analyze(
+                subject=email_data.subject or "",
+                body=email_data.body_plain or "",
+                sender_name=email_data.sender_name,
+                sender_email=email_data.sender_email,
+            )
+            ctx.analyzer_result = analyzer_result
+            ctx.extracted = analyzer_result.extracted
+
+            # ── Paso 2: Classifier sub-agentes (3 votos en paralelo) ──
+            logger.info("🗳️  Classifier: 3 sub-agentes votando en paralelo...")
+            votes = await asyncio.gather(
+                self.rule_classifier.classify(
+                    email_data.subject or "",
+                    email_data.body_plain or "",
+                ),
+                self.bert_classifier.classify(
+                    email_data.subject or "",
+                    email_data.body_plain or "",
+                ),
+                self.llm_classifier.classify(
+                    email_data.subject or "",
+                    email_data.body_plain or "",
+                ),
+            )
+            ctx.votes = list(votes)
+
+            # ── Paso 3: VoteResolver (decide categoría final) ──
+            logger.info("⚖️  Resolver: resolviendo %d votos...", len(votes))
+            category, confidence, method = await self.resolver.resolve(ctx)
+            ctx.final_category = category
+            ctx.final_confidence = confidence
+            ctx.resolution_method = method
+            logger.info(
+                "✅ Decisión: %s (%.0f%%) vía %s",
+                category,
+                confidence * 100,
+                method,
+            )
+
+            # ── Paso 4: Router (enrutamiento a departamentos) ──
+            if category != "nulo":
+                logger.info("🧭 Router: determinando destino...")
+                routing = await self.router.route(
+                    email_data=email_data,
+                    extracted=ctx.extracted,
+                    category=category,
+                )
+                ctx.routing = routing
+                logger.info(
+                    "📍 Ruta: %s",
+                    ", ".join(routing.departments) if routing.departments else "sin destino",
+                )
+            else:
+                ctx.routing = None
+                logger.info("🚫 Email nulo — sin enrutamiento")
+
+            # ── Paso 5: Action Executor (persistir + reenviar) ──
+            logger.info("💾 Action Executor: guardando en BD y reenviando...")
+            executor = ActionExecutor(db=session)
+            await executor.execute_all(ctx)
+
+            ctx.processing_end = datetime.now(timezone.utc)
+            logger.info(
+                "✅ Pipeline completo: %s | categoría=%s (%.0f%%) | %.0fms",
+                email_data.subject,
+                ctx.final_category,
+                ctx.final_confidence * 100,
+                ctx.processing_time_ms,
+            )
+
+        except Exception as e:
+            ctx.processing_end = datetime.now(timezone.utc)
+            ctx.error = str(e)
+            logger.error("❌ Error en pipeline: %s", e, exc_info=True)
+
+        return ctx
+
+    async def process_raw_email(
+        self,
+        subject: str,
+        body_plain: str,
+        sender_name: str,
+        sender_email: str,
+        message_id: str | None = None,
+        recipients: list[str] | None = None,
+        received_at: datetime | None = None,
+        has_attachments: bool = False,
+        body_html: str | None = None,
+        db: AsyncSession | None = None,
+    ) -> EmailContext:
+        """
+        Procesa un email directamente desde parámetros (conveniencia).
+
+        Útil para llamadas desde la API o desde scripts de prueba.
+        """
+        email_data = EmailData(
+            message_id=message_id,
+            subject=subject,
+            body_plain=body_plain,
+            body_html=body_html,
+            sender_name=sender_name,
+            sender_email=sender_email,
+            recipients=recipients or [],
+            has_attachments=has_attachments,
+            received_at=received_at,
+        )
+        return await self.process(email_data, db=db)
