@@ -25,7 +25,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.config import get_settings
 from src.db.models import Account
 from src.db.session import async_session_factory
-from src.orchestrator import EmailContext, Orchestrator
 from src.orchestrator.context import EmailData
 
 logger = logging.getLogger(__name__)
@@ -120,6 +119,8 @@ def parse_raw_email(raw_bytes: bytes) -> dict:
     if date_str:
         try:
             received_at = email.utils.parsedate_to_datetime(date_str)
+            if received_at is not None and received_at.tzinfo is None:
+                received_at = received_at.replace(tzinfo=timezone.utc)
         except Exception:
             received_at = datetime.now(timezone.utc)
 
@@ -207,6 +208,7 @@ async def sync_emails(db: Optional[AsyncSession] = None) -> dict:
     # Procesar cada correo con el Orchestrator
     close_db = db is None
     session = db or async_session_factory()
+    from src.orchestrator.orchestrator import Orchestrator
     orchestrator = Orchestrator()
 
     try:

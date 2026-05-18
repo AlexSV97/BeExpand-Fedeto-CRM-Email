@@ -52,11 +52,12 @@ Cuerpo: {body}"""
 class AnalyzerAgent:
     """Agente que extrae información estructurada del email usando Ollama."""
 
-    def __init__(self, model: str | None = None):
+    def __init__(self, model: str | None = None, timeout: int | None = None):
         settings = get_settings()
         self.model = model or settings.ollama_model
         self.url = settings.ollama_url
-        self.timeout = settings.ollama_timeout
+        # Analyzer prompt es más grande → necesita más tiempo
+        self.timeout = timeout or settings.ollama_timeout * 2
 
     async def analyze(
         self,
@@ -95,7 +96,7 @@ class AnalyzerAgent:
                         "prompt": prompt,
                         "stream": False,
                         "temperature": 0.1,
-                        "max_tokens": 512,
+                        "max_tokens": 256,
                     },
                 )
                 resp.raise_for_status()
@@ -151,12 +152,13 @@ class AnalyzerAgent:
 
         except Exception as e:
             elapsed = (time.time() - start) * 1000
-            logger.warning("Analyzer error: %s", e)
+            err_msg = str(e) or f"{type(e).__name__} (sin mensaje)"
+            logger.warning("Analyzer error: %s", err_msg)
             return AnalyzerResult(
                 success=False,
                 extracted=ExtractedInfo(
                     summary="No se pudo analizar el correo automáticamente.",
                 ),
-                error=str(e),
+                error=err_msg,
                 processing_time_ms=round(elapsed, 1),
             )

@@ -49,7 +49,12 @@ class ActionExecutor:
         db_action = await self._save_to_db(ctx)
         actions.append(db_action)
 
-        # 2. Reenviar email (solo si no es nulo/spam)
+        # 2. Sincronizar con VTiger CRM (si está configurado)
+        crm_action = await self._sync_to_crm(ctx)
+        if crm_action:
+            actions.append(crm_action)
+
+        # 3. Reenviar email (solo si no es nulo/spam)
         if ctx.final_category != Category.NULO.value and ctx.routing:
             forward_action = await self._forward_email(ctx)
             actions.append(forward_action)
@@ -77,7 +82,11 @@ class ActionExecutor:
 
             # 4. Actualizar contadores del contacto
             contact.email_count = (contact.email_count or 0) + 1
-            now = ctx.raw.received_at or datetime.now(timezone.utc)
+            now = ctx.raw.received_at
+            if now is None:
+                now = datetime.now(timezone.utc)
+            elif now.tzinfo is None:
+                now = now.replace(tzinfo=timezone.utc)
             if contact.first_email_at is None or now < contact.first_email_at:
                 contact.first_email_at = now
             if contact.last_email_at is None or now > contact.last_email_at:
@@ -117,6 +126,13 @@ class ActionExecutor:
             select(Contact).where(Contact.email == sender_email)
         )
         contact = result.scalar_one_or_none()
+
+        # Normalizar datetimes al cargar de sqlite (no preserva timezone)
+        if contact is not None:
+            if contact.first_email_at is not None and contact.first_email_at.tzinfo is None:
+                contact.first_email_at = contact.first_email_at.replace(tzinfo=timezone.utc)
+            if contact.last_email_at is not None and contact.last_email_at.tzinfo is None:
+                contact.last_email_at = contact.last_email_at.replace(tzinfo=timezone.utc)
 
         if contact is None:
             # Si el analyzer extrajo empresa/cargo, los usamos
@@ -267,6 +283,93 @@ class ActionExecutor:
             },
         )
         self.db.add(final_ch)
+
+    async def _sync_to_crm(self, ctx: EmailContext) -> ActionResult | None:
+        """Sincroniza el contacto con VTiger CRM (si está configurado).
+
+        Crea el contacto en VTiger si no existe, o actualiza su categoría.
+        Almacena el crm_id en el contacto local para tracking.
+        """
+        settings = get_settings()
+        if not settings.vtiger_url or not settings.vtiger_token:
+            return None  # VTiger no configurado, saltar
+
+        if not ctx.final_category or ctx.final_category == "nulo":
+            return ActionResult(
+                action="crm_sync",
+                success=True,
+                detail="Email nulo — no se sincroniza con CRM",
+            )
+
+        try:
+            from src.integrations.vtiger import VTigerClient, VTigerError
+
+            client = VTigerClient()
+            try:
+                await client.login()
+            except VTigerError as e:
+                logger.warning("VTiger no disponible: %s", e)
+                return ActionResult(
+                    action="crm_sync",
+                    success=False,
+                    detail=f"VTiger no disponible: {e}",
+                )
+
+            # Buscar contacto local
+            result = await self.db.execute(
+                select(Contact).where(Contact.email == ctx.raw.sender_email)
+            )
+            contact = result.scalar_one_or_none()
+            if not contact:
+                return ActionResult(
+                    action="crm_sync",
+                    success=False,
+                    detail="Contacto no encontrado en BD local",
+                )
+
+            # Construir datos para VTiger
+            company = ctx.extracted.company if ctx.extracted else contact.company
+            vtiger_data = {
+                "lastname": contact.name.rsplit(" ", 1)[-1] if " " in contact.name else contact.name,
+                "firstname": contact.name.rsplit(" ", 1)[0] if " " in contact.name else "",
+                "email": contact.email,
+                "phone": contact.phone or "",
+            }
+            if company:
+                vtiger_data["account_id"] = company
+            if ctx.final_category:
+                vtiger_data["cf_categoria"] = ctx.final_category
+
+            # Si ya tiene crm_id, actualizar; si no, crear
+            if contact.crm_id:
+                await client.update_contact(contact.crm_id, vtiger_data)
+                logger.info("Contacto actualizado en VTiger: %s (%s)", contact.crm_id, contact.email)
+            else:
+                vtiger_id = await client.create_contact(vtiger_data)
+                contact.crm_id = vtiger_id
+                await self.db.commit()
+                logger.info("Contacto creado en VTiger: %s (%s)", vtiger_id, contact.email)
+
+            await client.close()
+            return ActionResult(
+                action="crm_sync",
+                success=True,
+                detail=f"Contacto sincronizado con VTiger: {contact.crm_id or 'creado'}",
+            )
+
+        except ImportError:
+            return ActionResult(
+                action="crm_sync",
+                success=False,
+                detail="Módulo VTiger no disponible",
+            )
+        except Exception as e:
+            logger.error("Error sincronizando con VTiger: %s", e)
+            return ActionResult(
+                action="crm_sync",
+                success=False,
+                detail=f"Error CRM: {e}",
+            )
 
     async def _forward_email(self, ctx: EmailContext) -> ActionResult:
         """Reenvía el email a los departamentos destino."""
