@@ -41,7 +41,7 @@ from transformers import (
 MODEL_NAME = "distilbert-base-multilingual-cased"
 MODEL_OUTPUT_DIR = Path(__file__).resolve().parent.parent / "src" / "classifier" / "model"
 NUM_LABELS = 4
-LABEL_MAP = {"cliente": 0, "lead": 1, "proveedor": 2, "pendiente": 3}
+LABEL_MAP = {"cliente": 0, "lead": 1, "proveedor": 2, "nulo": 3}
 ID2LABEL = {v: k for k, v in LABEL_MAP.items()}
 SEED = 42
 TEST_SIZE = 0.15
@@ -302,7 +302,7 @@ SUBJECT_PATTERNS = {
         "Comunicado del proveedor",
         "Aviso de facturación",
     ],
-    "pendiente": [
+    "nulo": [
         "Felicitaciones navidad",
         "Invitación a evento",
         "Comunicado interno",
@@ -364,7 +364,7 @@ BODY_TEMPLATES = {
         "Buenos días, adjuntamos la factura del mes de {mes} por los suministros entregados. Importe total: {importe} EUR.",
         "Les recordamos que el pedido {num} está pendiente de pago. Por favor, regularicen la situación a la mayor brevedad.",
     ],
-    "pendiente": [
+    "nulo": [
         "Gracias por su confianza durante este año. Les deseamos unas felices fiestas y un próspero año nuevo.",
         "Le invitamos al evento anual del sector que tendrá lugar el {fecha}.",
         "Les recordamos que el plazo de presentación de {tema} finaliza el {fecha}.",
@@ -405,7 +405,7 @@ ENGLISH_SUBJECTS = {
         "Delivery notice",
         "Supply offer",
     ],
-    "pendiente": [
+    "nulo": [
         "Newsletter",
         "Event invitation",
         "System notification",
