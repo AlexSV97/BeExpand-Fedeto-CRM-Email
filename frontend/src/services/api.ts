@@ -132,6 +132,7 @@ export interface RecentEmailItem {
   departments: string[]              // Departamentos destino
   urgency: string                    // alta | media | baja
   action_required: string | null     // pago | soporte | consulta | ...
+  reviewed: boolean                  // Revisado manualmente
 }
 
 export interface DashboardSummary {
@@ -145,6 +146,58 @@ export interface DashboardSummary {
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
   return request<DashboardSummary>('GET', '/dashboard/summary')
+}
+
+export async function reviewEmail(emailId: string, category: string): Promise<RecentEmailItem> {
+  return request<RecentEmailItem>('PATCH', `/emails/${emailId}/review`, { category })
+}
+
+// ── Retrain ──
+
+export interface RetrainResponse {
+  status: string
+  accuracy: number | null
+  f1_macro: number | null
+  train_samples: number | null
+  test_samples: number | null
+  real_samples: number | null
+  training_time_seconds: number | null
+  detail: string | null
+}
+
+// ── CRM ──
+
+export interface CrmSyncItem {
+  email: string
+  name: string
+  crm_id: string | null
+  action: string
+  detail: string | null
+}
+
+export interface CrmSyncResponse {
+  total: number
+  created: number
+  updated: number
+  skipped: number
+  errors: number
+  results: CrmSyncItem[]
+  connected: boolean
+  detail: string | null
+}
+
+export async function syncCrm(): Promise<CrmSyncResponse> {
+  return request<CrmSyncResponse>('POST', '/crm/sync')
+}
+
+export async function retrainModel(params?: {
+  epochs?: number
+  augment_multiplier?: number
+  synthetic_count?: number
+  learning_rate?: number
+  real_only?: boolean
+}): Promise<RetrainResponse> {
+  return request<RetrainResponse>('POST', '/classification-history/retrain', params ?? {})
 }
 
 // ── Contacts ──

@@ -83,6 +83,12 @@ async def _recent_emails(db: AsyncSession) -> list[RecentEmail]:
         routing_data = extra.get("routing", {})
         analyzer_data = extra.get("analyzer", {})
 
+        # ¿Tiene alguna revisión manual?
+        reviewed = any(
+            ch.method == "manual_review" and ch.reviewed
+            for ch in (email.classification_history or [])
+        )
+
         items.append(
             RecentEmail(
                 id=email.id,
@@ -98,6 +104,7 @@ async def _recent_emails(db: AsyncSession) -> list[RecentEmail]:
                 departments=routing_data.get("departments", []),
                 urgency=analyzer_data.get("urgency", "media"),
                 action_required=analyzer_data.get("action_required"),
+                reviewed=reviewed,
             )
         )
     return items

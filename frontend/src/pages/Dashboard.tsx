@@ -26,8 +26,13 @@ import {
 import {
   getDashboardSummary,
   syncEmails,
+  reviewEmail,
+  retrainModel,
+  syncCrm,
+  type CrmSyncResponse,
   type DashboardSummary,
   type RecentEmailItem,
+  type RetrainResponse,
 } from '../services/api'
 
 // ── Constantes ──
@@ -36,8 +41,18 @@ const CATEGORY_COLORS: Record<string, string> = {
   cliente: '#0ea5e9',
   lead: '#f59e0b',
   proveedor: '#22c55e',
+  nulo: '#94a3b8',
   pendiente: '#94a3b8',
 }
+
+const CATEGORY_LABELS: Record<string, string> = {
+  cliente: 'Cliente',
+  lead: 'Lead',
+  proveedor: 'Proveedor',
+  nulo: 'Spam / Nulo',
+}
+
+const CATEGORY_OPTIONS = ['cliente', 'lead', 'proveedor', 'nulo'] as const
 
 const METHOD_LABELS: Record<string, string> = {
   rule_engine: 'Reglas',
@@ -177,6 +192,70 @@ export default function Dashboard() {
   const [syncResult, setSyncResult] = useState<string | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
   const [expandedSummary, setExpandedSummary] = useState<string | null>(null)
+  const [syncingCrm, setSyncingCrm] = useState(false)
+  const [crmResult, setCrmResult] = useState<CrmSyncResponse | null>(null)
+  const [crmError, setCrmError] = useState<string | null>(null)
+  const [retraining, setRetraining] = useState(false)
+  const [retrainResult, setRetrainResult] = useState<RetrainResponse | null>(null)
+  const [retrainError, setRetrainError] = useState<string | null>(null)
+  const [reviewingId, setReviewingId] = useState<string | null>(null)
+  const [reviewFeedback, setReviewFeedback] = useState<{
+    id: string
+    success: boolean
+    text: string
+  } | null>(null)
+
+  const clearReviewFeedback = useCallback(() => {
+    setReviewFeedback(null)
+  }, [])
+
+  const handleSyncCrm = useCallback(async () => {
+    setSyncingCrm(true)
+    setCrmResult(null)
+    setCrmError(null)
+    try {
+      const result = await syncCrm()
+      setCrmResult(result)
+    } catch (e: unknown) {
+      setCrmError(e instanceof Error ? e.message : 'Error al sincronizar CRM')
+    } finally {
+      setSyncingCrm(false)
+    }
+  }, [])
+
+  const handleRetrain = useCallback(async () => {
+    setRetraining(true)
+    setRetrainResult(null)
+    setRetrainError(null)
+    try {
+      const result = await retrainModel({ epochs: 6 })
+      setRetrainResult(result)
+    } catch (e: unknown) {
+      setRetrainError(e instanceof Error ? e.message : 'Error al re-entrenar')
+    } finally {
+      setRetraining(false)
+    }
+  }, [])
+
+  const handleReview = useCallback(async (emailId: string, category: string) => {
+    setReviewingId(emailId)
+    setReviewFeedback(null)
+    try {
+      await reviewEmail(emailId, category)
+      setReviewFeedback({ id: emailId, success: true, text: 'Revisado correctamente' })
+      getDashboardSummary().then(setData).catch(() => {})
+      setTimeout(clearReviewFeedback, 3000)
+    } catch (e: unknown) {
+      setReviewFeedback({
+        id: emailId,
+        success: false,
+        text: e instanceof Error ? e.message : 'Error al revisar',
+      })
+      setTimeout(clearReviewFeedback, 5000)
+    } finally {
+      setReviewingId(null)
+    }
+  }, [clearReviewFeedback])
 
   const fetchDashboard = useCallback(() => {
     getDashboardSummary()
@@ -242,21 +321,63 @@ export default function Dashboard() {
             Resumen del sistema de clasificación de correos
           </p>
         </div>
-        <button
-          onClick={handleSync}
-          disabled={syncing}
-          className={`
-            inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold
-            transition-all duration-200 shadow-sm border
-            ${syncing
-              ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200'
-              : 'bg-white text-slate-700 hover:bg-slate-50 active:scale-95 border-slate-300 hover:border-slate-400'
-            }
-          `}
-        >
-          <IconSync />
-          {syncing ? 'Sincronizando...' : 'Sincronizar correos'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSyncCrm}
+            disabled={syncingCrm}
+            className={`
+              inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold
+              transition-all duration-200 shadow-sm border
+              ${syncingCrm
+                ? 'bg-emerald-100 text-emerald-400 cursor-not-allowed border-emerald-200'
+                : 'bg-white text-emerald-700 hover:bg-emerald-50 active:scale-95 border-emerald-300 hover:border-emerald-400'
+              }
+            `}
+          >
+            <svg className={`w-4 h-4 ${syncingCrm ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+              <circle cx="8.5" cy="7" r="4" />
+              <path d="M20 8v6" />
+              <path d="M23 11h-6" />
+            </svg>
+            {syncingCrm ? 'Sincronizando...' : 'CRM'}
+          </button>
+          <button
+            onClick={handleRetrain}
+            disabled={retraining}
+            className={`
+              inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold
+              transition-all duration-200 shadow-sm border
+              ${retraining
+                ? 'bg-purple-100 text-purple-400 cursor-not-allowed border-purple-200'
+                : 'bg-white text-purple-700 hover:bg-purple-50 active:scale-95 border-purple-300 hover:border-purple-400'
+              }
+            `}
+          >
+            <svg className={`w-4 h-4 ${retraining ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 2v6h-6" />
+              <path d="M3 12a9 9 0 0115.36-6.36L21 8" />
+              <path d="M3 22v-6h6" />
+              <path d="M21 12a9 9 0 01-15.36 6.36L3 16" />
+            </svg>
+            {retraining ? 'Re-entrenando...' : 'Re-entrenar modelo'}
+          </button>
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className={`
+              inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold
+              transition-all duration-200 shadow-sm border
+              ${syncing
+                ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200'
+                : 'bg-white text-slate-700 hover:bg-slate-50 active:scale-95 border-slate-300 hover:border-slate-400'
+              }
+            `}
+          >
+            <IconSync />
+            {syncing ? 'Sincronizando...' : 'Sincronizar correos'}
+          </button>
+        </div>
       </div>
 
       {/* Feedback sync */}
@@ -270,6 +391,108 @@ export default function Dashboard() {
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800 flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
           Error: {syncError}
+        </div>
+      )}
+
+      {/* Feedback retrain */}
+      {retraining && (
+        <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl text-sm text-purple-800 flex items-center gap-3">
+          <div className="w-5 h-5 border-2 border-purple-300 border-t-purple-600 rounded-full animate-spin shrink-0" />
+          <div>
+            <p className="font-semibold">Re-entrenando modelo BERT...</p>
+            <p className="text-xs text-purple-600 mt-0.5">
+              Este proceso tarda varios minutos en CPU. No cierres la página.
+            </p>
+          </div>
+        </div>
+      )}
+      {retrainResult && retrainResult.status === 'success' && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-800">
+          <div className="flex items-center justify-between mb-2">
+            <p className="font-semibold">Re-entrenamiento completado</p>
+            <span className="text-[10px] text-emerald-500 font-mono">
+              {retrainResult.training_time_seconds?.toFixed(1)}s
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-emerald-100/50 rounded-lg p-2 text-center">
+              <p className="text-lg font-bold tabular-nums">{retrainResult.accuracy != null ? `${(retrainResult.accuracy * 100).toFixed(1)}%` : '-'}</p>
+              <p className="text-[10px] text-emerald-700">Accuracy</p>
+            </div>
+            <div className="bg-emerald-100/50 rounded-lg p-2 text-center">
+              <p className="text-lg font-bold tabular-nums">{retrainResult.f1_macro != null ? `${(retrainResult.f1_macro * 100).toFixed(1)}%` : '-'}</p>
+              <p className="text-[10px] text-emerald-700">F1 Macro</p>
+            </div>
+            <div className="bg-emerald-100/50 rounded-lg p-2 text-center">
+              <p className="text-lg font-bold tabular-nums">{retrainResult.real_samples ?? '-'}</p>
+              <p className="text-[10px] text-emerald-700">Muestras reales</p>
+            </div>
+            <div className="bg-emerald-100/50 rounded-lg p-2 text-center">
+              <p className="text-lg font-bold tabular-nums">{retrainResult.train_samples ?? '-'} / {retrainResult.test_samples ?? '-'}</p>
+              <p className="text-[10px] text-emerald-700">Train/Test</p>
+            </div>
+          </div>
+        </div>
+      )}
+      {retrainError && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+          Error al re-entrenar: {retrainError}
+        </div>
+      )}
+
+      {/* Feedback CRM sync */}
+      {syncingCrm && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-800 flex items-center gap-3">
+          <div className="w-5 h-5 border-2 border-emerald-300 border-t-emerald-600 rounded-full animate-spin shrink-0" />
+          <div>
+            <p className="font-semibold">Sincronizando con VTiger CRM...</p>
+            <p className="text-xs text-emerald-600 mt-0.5">
+              Creando y actualizando contactos en el CRM.
+            </p>
+          </div>
+        </div>
+      )}
+      {crmResult && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-800">
+          <div className="flex items-center justify-between mb-2">
+            <p className="font-semibold">CRM sincronizado</p>
+            <span className="text-[10px] text-emerald-500">{crmResult.total} contacto(s)</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-emerald-100/50 rounded-lg p-2 text-center">
+              <p className="text-lg font-bold tabular-nums text-emerald-700">{crmResult.created}</p>
+              <p className="text-[10px] text-emerald-700">Creados</p>
+            </div>
+            <div className="bg-emerald-100/50 rounded-lg p-2 text-center">
+              <p className="text-lg font-bold tabular-nums text-emerald-700">{crmResult.updated}</p>
+              <p className="text-[10px] text-emerald-700">Actualizados</p>
+            </div>
+            <div className="bg-emerald-100/50 rounded-lg p-2 text-center">
+              <p className="text-lg font-bold tabular-nums text-emerald-700">{crmResult.skipped}</p>
+              <p className="text-[10px] text-emerald-700">Omitidos</p>
+            </div>
+            <div className="bg-emerald-100/50 rounded-lg p-2 text-center">
+              <p className="text-lg font-bold tabular-nums text-emerald-700">{crmResult.errors}</p>
+              <p className="text-[10px] text-emerald-700">Errores</p>
+            </div>
+          </div>
+          {crmResult.errors > 0 && crmResult.results.filter(r => r.action === 'error').length > 0 && (
+            <details className="mt-2 text-xs text-red-600">
+              <summary className="cursor-pointer font-medium">Ver errores</summary>
+              <ul className="mt-1 space-y-1">
+                {crmResult.results.filter(r => r.action === 'error').map((r, i) => (
+                  <li key={i}>{r.email}: {r.detail}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
+      {crmError && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+          Error CRM: {crmError}
         </div>
       )}
 
@@ -317,6 +540,9 @@ export default function Dashboard() {
                 onToggleSummary={() =>
                   setExpandedSummary(expandedSummary === email.id ? null : email.id)
                 }
+                onReview={handleReview}
+                isReviewing={reviewingId === email.id}
+                reviewFeedback={reviewFeedback?.id === email.id ? reviewFeedback : null}
               />
             ))}
           </div>
@@ -453,11 +679,18 @@ function EmailRow({
   email,
   isSummaryExpanded,
   onToggleSummary,
+  onReview,
+  isReviewing,
+  reviewFeedback,
 }: {
   email: RecentEmailItem
   isSummaryExpanded: boolean
   onToggleSummary: () => void
+  onReview: (emailId: string, category: string) => void
+  isReviewing: boolean
+  reviewFeedback: { id: string; success: boolean; text: string } | null
 }) {
+  const [showPicker, setShowPicker] = useState(false)
   const category = email.category ?? 'pendiente'
   const catColor = CATEGORY_COLORS[category] ?? '#94a3b8'
   const methodLabel = METHOD_LABELS[email.method] ?? email.method
@@ -467,6 +700,12 @@ function EmailRow({
   const resolutionLabel = RESOLUTION_LABELS[email.resolution ?? ''] ?? null
   const resolutionColor = RESOLUTION_COLORS[email.resolution ?? ''] ?? null
   const urgencyColor = URGENCY_COLORS[email.urgency] ?? null
+
+  const handleSelectCategory = (newCategory: string) => {
+    setShowPicker(false)
+    if (newCategory === category) return
+    onReview(email.id, newCategory)
+  }
 
   return (
     <div>
@@ -507,8 +746,17 @@ function EmailRow({
           )}
         </div>
 
+        {/* Feedback inline */}
+        {reviewFeedback && (
+          <span
+            className={`shrink-0 text-xs font-semibold ${reviewFeedback.success ? 'text-emerald-600' : 'text-red-600'}`}
+          >
+            {reviewFeedback.text}
+          </span>
+        )}
+
         {/* Urgencia */}
-        {urgencyColor && email.urgency !== 'media' && (
+        {urgencyColor && email.urgency !== 'media' && !reviewFeedback && (
           <span
             className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider"
             style={{
@@ -521,7 +769,7 @@ function EmailRow({
         )}
 
         {/* Botón resumen */}
-        {hasSummary && (
+        {hasSummary && !reviewFeedback && (
           <button
             onClick={onToggleSummary}
             className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium
@@ -543,8 +791,57 @@ function EmailRow({
           </button>
         )}
 
+        {/* Botón Revisar + inline picker */}
+        {!isReviewing && !reviewFeedback && (
+          <div className="relative">
+            <button
+              onClick={() => setShowPicker(!showPicker)}
+              className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium
+                text-amber-600 hover:text-amber-800 hover:bg-amber-50 transition-colors border border-transparent hover:border-amber-200"
+              title="Revisar clasificación"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
+              </svg>
+              Revisar
+            </button>
+            {showPicker && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowPicker(false)} />
+                <div className="absolute right-0 top-full mt-1 z-20 bg-white rounded-lg shadow-lg border border-slate-200 py-1 min-w-[160px]">
+                  <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    Cambiar a...
+                  </p>
+                  {CATEGORY_OPTIONS.map((opt) => (
+                    <button
+                      key={opt}
+                      onClick={() => handleSelectCategory(opt)}
+                      className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 hover:bg-slate-50 transition-colors
+                        ${opt === category ? 'text-slate-400' : 'text-slate-700'}`}
+                    >
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: CATEGORY_COLORS[opt] ?? '#94a3b8' }}
+                      />
+                      {CATEGORY_LABELS[opt] ?? opt}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {isReviewing && (
+          <div className="shrink-0 flex items-center gap-1.5 text-xs text-slate-400">
+            <div className="w-3 h-3 border-2 border-slate-300 border-t-slate-500 rounded-full animate-spin" />
+            Revisando...
+          </div>
+        )}
+
         {/* Badge resolución */}
-        {resolutionLabel && (
+        {resolutionLabel && !reviewFeedback && (
           <span
             className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium"
             style={{
@@ -557,25 +854,44 @@ function EmailRow({
         )}
 
         {/* Confianza */}
-        <span className="text-xs text-slate-400 font-mono shrink-0 w-10 text-right">
-          {formatConfidence(email.confidence)}
-        </span>
+        {!reviewFeedback && (
+          <span className="text-xs text-slate-400 font-mono shrink-0 w-10 text-right">
+            {formatConfidence(email.confidence)}
+          </span>
+        )}
 
         {/* Badge método */}
-        <span
-          className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-          style={{
-            backgroundColor: `${methodColor}18`,
-            color: methodColor,
-          }}
-        >
-          {methodLabel}
-        </span>
+        {!reviewFeedback && (
+          <span
+            className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+            style={{
+              backgroundColor: `${methodColor}18`,
+              color: methodColor,
+            }}
+          >
+            {methodLabel}
+          </span>
+        )}
+
+        {/* Badge Revisado */}
+        {email.reviewed && !reviewFeedback && (
+          <span
+            className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold
+              text-amber-700 bg-amber-50 border border-amber-200"
+          >
+            <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
+            </svg>
+            Revisado
+          </span>
+        )}
 
         {/* Tiempo */}
-        <span className="text-xs text-slate-400 shrink-0 w-16 text-right">
-          {formatTimeAgo(email.received_at)}
-        </span>
+        {!reviewFeedback && (
+          <span className="text-xs text-slate-400 shrink-0 w-16 text-right">
+            {formatTimeAgo(email.received_at)}
+          </span>
+        )}
       </div>
 
       {/* Panel de resumen expandible + detalles del análisis */}

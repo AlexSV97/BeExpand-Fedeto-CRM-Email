@@ -21,6 +21,7 @@ class RecentEmail(BaseModel):
     departments: list[str] = []               # Departamentos destino
     urgency: str = "media"                    # alta | media | baja
     action_required: Optional[str] = None     # pago | soporte | consulta | ...
+    reviewed: bool = False                     # Indica si ha sido revisado manualmente
 
 
 class DashboardSummary(BaseModel):
