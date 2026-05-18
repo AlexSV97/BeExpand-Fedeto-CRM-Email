@@ -3,16 +3,19 @@ Router de correos electrónicos.
 
 GET list con filtros: category, status, date_from/to, skip, limit.
 GET /{id} detail que incluye classification_history.
+PATCH /{id}/review — revisión manual de categoría por un usuario.
 """
 
-from datetime import datetime
+import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.db.models import Email, User
+from src.db.models import ClassificationHistory, Contact, Email, User
 from src.db.session import get_db
 
 from src.api.deps import get_current_user, pagination_params
@@ -20,6 +23,13 @@ from src.api.schemas import EmailList, EmailResponse
 from src.email_processor import sync_emails
 
 router = APIRouter(tags=["emails"])
+
+VALID_CATEGORIES = {"cliente", "lead", "proveedor", "nulo"}
+
+
+class ReviewRequest(BaseModel):
+    """Cuerpo de la petición de revisión manual."""
+    category: str
 
 
 @router.post("/sync")
@@ -113,3 +123,71 @@ async def get_email(
         for ch in email.classification_history
     ]
     return email_data
+
+
+@router.patch("/{email_id}/review", response_model=EmailResponse)
+async def review_email(
+    email_id: str,
+    body: ReviewRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Revisión manual de la categoría de un correo.
+
+    Cambia la categoría, crea un registro en classification_history
+    con method='manual_review', y actualiza la categoría del contacto
+    asociado si es necesario.
+    """
+    # 1. Normalizar
+    new_category = body.category.strip().lower()
+    if new_category not in VALID_CATEGORIES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Categoría inválida: debe ser una de {', '.join(sorted(VALID_CATEGORIES))}",
+        )
+
+    # 2. Cargar email
+    result = await db.execute(
+        select(Email)
+        .where(Email.id == email_id)
+        .options(selectinload(Email.classification_history))
+    )
+    email = result.scalar_one_or_none()
+    if email is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Email not found",
+        )
+
+    # 3. Actualizar category + status
+    old_category = email.category
+    email.category = new_category
+    email.status = "revisado"
+
+    # 4. Crear registro en classification_history
+    now = datetime.now(timezone.utc)
+    history_entry = ClassificationHistory(
+        id=str(uuid.uuid4()),
+        email_id=email.id,
+        category=new_category,
+        confidence=1.0,
+        method="manual_review",
+        details={"previous_category": old_category, "reviewer": current_user.username},
+        reviewed=True,
+        reviewed_by=current_user.username,
+        reviewed_at=now,
+    )
+    db.add(history_entry)
+
+    # 5. Actualizar contacto asociado si el email tiene contacto
+    contact_result = await db.execute(
+        select(Contact).where(Contact.email == email.sender_email)
+    )
+    contact = contact_result.scalar_one_or_none()
+    if contact is not None:
+        contact.category = new_category
+
+    await db.commit()
+    await db.refresh(email)
+
+    return email
