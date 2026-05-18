@@ -1,0 +1,49 @@
+# BeExpand CRM Email — VTiger CRM local para desarrollo
+# Uso: docker compose -f infrastructure/docker/docker-compose.yml -f infrastructure/docker/docker-compose.vtiger.yml up -d
+
+services:
+  # ── VTiger CRM ──
+  vtiger:
+    image: javanile/vtiger:7.2.0
+    profiles: ["vtiger"]
+    environment:
+      VT_SITE_URL: "http://localhost:8080"
+      VT_INSTALL: "true"
+      VT_DEBUG: "false"
+      MYSQL_HOST: vtiger-db
+      MYSQL_DATABASE: vtiger
+      MYSQL_ROOT_PASSWORD: vtiger_secret
+      MYSQL_USER: vtiger
+      MYSQL_PASSWORD: vtiger_pass
+    ports:
+      - "8080:80"
+    volumes:
+      - vtiger_data:/var/lib/vtiger
+    depends_on:
+      vtiger-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Base de datos MySQL para VTiger ──
+  vtiger-db:
+    image: mysql:5.7
+    profiles: ["vtiger"]
+    environment:
+      MYSQL_DATABASE: vtiger
+      MYSQL_USER: vtiger
+      MYSQL_PASSWORD: vtiger_pass
+      MYSQL_ROOT_PASSWORD: vtiger_secret
+    ports:
+      - "3307:3306"
+    volumes:
+      - vtiger_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  vtiger_data:
+  vtiger_mysql_data:

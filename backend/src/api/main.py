@@ -13,6 +13,7 @@ from src.api.routers import (
     auth,
     classification,
     contacts,
+    crm,
     dashboard,
     emails,
     opportunities,
@@ -68,6 +69,7 @@ app.include_router(emails.router, prefix="/api/v1/emails")
 app.include_router(contacts.router, prefix="/api/v1/contacts")
 app.include_router(opportunities.router, prefix="/api/v1/opportunities")
 app.include_router(classification.router, prefix="/api/v1/classification-history")
+app.include_router(crm.router, prefix="/api/v1/crm")
 app.include_router(dashboard.router, prefix="/api/v1/dashboard")
 
 # CORS: permitir que el frontend (React en otro puerto) llame al API

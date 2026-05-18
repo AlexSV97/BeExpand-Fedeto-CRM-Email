@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     # ── VTiger ──
     vtiger_url: str = ""
     vtiger_token: str = ""
+    vtiger_username: str = ""
 
     # ── Ollama (IA local) ──
     ollama_url: str = "http://127.0.0.1:11434"
