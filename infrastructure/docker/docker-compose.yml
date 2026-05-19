@@ -1,5 +1,3 @@
-version: "3.9"
-
 # BeExpand CRM Email — Entorno completo con Docker
 # Uso: docker compose -f infrastructure/docker/docker-compose.yml up -d
 
@@ -40,9 +38,50 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    env_file: ../../backend/.env
     environment:
       DATABASE_URL: postgresql+asyncpg://beexpand:beexpand_secret@postgres:5432/beexpand
+      REDIS_URL: redis://redis:6379/0
+      OLLAMA_URL: http://host.docker.internal:11434
+      OLLAMA_MODEL: qwen2.5:3b
+      OLLAMA_TIMEOUT: 120
       SECRET_KEY: cambiar-en-produccion
+      DEBUG: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Celery Worker (procesa tareas asíncronas) ──
+  celery_worker:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    command: celery -A src.celery_app worker --loglevel=info --pool=solo --concurrency=1
+    env_file: ../../backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://beexpand:beexpand_secret@postgres:5432/beexpand
+      REDIS_URL: redis://redis:6379/0
+      OLLAMA_URL: http://host.docker.internal:11434
+      DEBUG: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Celery Beat (programador de tareas periódicas) ──
+  celery_beat:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    command: celery -A src.celery_app beat --loglevel=info -s /tmp/celerybeat-schedule
+    env_file: ../../backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://beexpand:beexpand_secret@postgres:5432/beexpand
+      REDIS_URL: redis://redis:6379/0
+      OLLAMA_URL: http://host.docker.internal:11434
       DEBUG: "false"
     depends_on:
       postgres:
@@ -53,8 +92,8 @@ services:
   # ── Frontend ──
   frontend:
     build:
-      context: ../../frontend
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: frontend/Dockerfile
     ports:
       - "5173:80"
     depends_on:

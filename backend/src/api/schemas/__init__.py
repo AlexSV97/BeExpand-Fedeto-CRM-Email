@@ -14,7 +14,16 @@ from src.api.schemas.opportunity import (
     OpportunityResponse,
 )
 from src.api.schemas.classification import ClassificationResponse
-from src.api.schemas.dashboard import DashboardSummary, RecentEmail
+from src.api.schemas.dashboard import (
+    CategoryTimeSeriesPoint,
+    DashboardSummary,
+    ForecastByCategory,
+    ForecastDailyPoint,
+    ForecastData,
+    RecentEmail,
+    TimeSeriesPoint,
+    TimeSeriesResponse,
+)
 
 __all__ = [
     "LoginRequest",
@@ -32,4 +41,11 @@ __all__ = [
     "ClassificationResponse",
     "DashboardSummary",
     "RecentEmail",
+    # Time series
+    "TimeSeriesPoint",
+    "CategoryTimeSeriesPoint",
+    "ForecastByCategory",
+    "ForecastDailyPoint",
+    "ForecastData",
+    "TimeSeriesResponse",
 ]

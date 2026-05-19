@@ -321,3 +321,50 @@ export async function updateOpportunity(
 export async function deleteOpportunity(id: string): Promise<void> {
   return request<void>('DELETE', `/opportunities/${id}`)
 }
+
+// ── Time Series & Forecasting ──
+
+export interface TimeSeriesPoint {
+  date: string
+  value: number
+}
+
+export interface CategoryTimeSeriesPoint {
+  date: string
+  category: string
+  value: number
+}
+
+export interface ForecastByCategory {
+  category: string
+  predicted_count: number
+  trend: string  // increasing | decreasing | stable
+}
+
+export interface ForecastDailyPoint {
+  date: string
+  category: string
+  predicted_count: number
+}
+
+export interface ForecastData {
+  days: number  // 30 | 60 | 90
+  total: number
+  by_category: ForecastByCategory[]
+  daily_projections: ForecastDailyPoint[]
+  method: string
+}
+
+export interface TimeSeriesResponse {
+  volume: TimeSeriesPoint[]
+  by_category: CategoryTimeSeriesPoint[]
+  avg_confidence: TimeSeriesPoint[]
+  contacts_cumulative: TimeSeriesPoint[]
+  forecasts: ForecastData[]
+}
+
+export async function getTimeSeries(
+  period: string = '30d',
+): Promise<TimeSeriesResponse> {
+  return request<TimeSeriesResponse>('GET', `/dashboard/timeseries?period=${period}`)
+}

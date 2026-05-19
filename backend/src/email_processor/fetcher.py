@@ -147,6 +147,7 @@ def parse_raw_email(raw_bytes: bytes) -> dict:
         "body_html": body_html,
         "has_attachments": has_attachments,
         "received_at": received_at,
+        "is_beexpand_forwarded": bool(msg.get("X-BeExpand-Category")),
     }
 
 
@@ -217,6 +218,13 @@ async def sync_emails(db: Optional[AsyncSession] = None) -> dict:
                 _, data = imap.fetch(msg_id, "(RFC822)")
                 raw_bytes = data[0][1]
                 parsed = parse_raw_email(raw_bytes)
+
+                # Saltar correos que ya pasaron por el pipeline (el forwarder
+                # añade cabeceras X-BeExpand-* al reenviar)
+                if parsed.get("is_beexpand_forwarded"):
+                    logger.info("Saltando email ya procesado (X-BeExpand): %s", parsed.get("subject"))
+                    imap.store(msg_id, "+FLAGS", "\\Seen")
+                    continue
 
                 # Construir EmailData y procesar con Orchestrator
                 email_data = EmailData(

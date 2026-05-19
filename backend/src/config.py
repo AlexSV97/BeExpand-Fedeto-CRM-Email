@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     ollama_model: str = "llama3.2:3b"
     ollama_timeout: int = 30
 
+    # ── Redis / Celery ──
+    redis_url: str = "redis://localhost:6379/0"
+
     # ── Entorno ──
     debug: bool = True
 

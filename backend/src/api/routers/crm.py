@@ -96,32 +96,28 @@ async def sync_contacts_to_crm(
                 "email": contact.email,
                 "phone": contact.phone or "",
             }
-            if contact.company:
-                vtiger_data["account_id"] = contact.company
+            # NOTA: account_id requiere un ID de Account de VTiger, no un nombre.
+            # Si tenemos ese ID, se puede añadir contact.account_crm_id aquí.
             if contact.category:
                 vtiger_data["cf_categoria"] = contact.category
 
-            if contact.crm_id:
-                # Actualizar existente
-                await client.update_contact(contact.crm_id, vtiger_data)
-                results.append(SyncResult(
-                    email=contact.email,
-                    name=contact.name,
-                    crm_id=contact.crm_id,
-                    action="updated",
-                ))
-                updated += 1
-            else:
-                # Crear nuevo
-                vtiger_id = await client.create_contact(vtiger_data)
-                contact.crm_id = vtiger_id
-                results.append(SyncResult(
-                    email=contact.email,
-                    name=contact.name,
-                    crm_id=vtiger_id,
-                    action="created",
-                ))
+            # upsert_contact maneja create/update con detección por email
+            # y un workaround si el update falla (VTiger 7.2 bug)
+            vtiger_id = await client.upsert_contact(vtiger_data)
+            action = "updated" if contact.crm_id else "created"
+            if contact.crm_id and contact.crm_id != vtiger_id:
+                action = "recreated"
+            contact.crm_id = vtiger_id
+            results.append(SyncResult(
+                email=contact.email,
+                name=contact.name,
+                crm_id=vtiger_id,
+                action=action,
+            ))
+            if action == "created":
                 created += 1
+            else:
+                updated += 1
 
         except VTigerError as e:
             results.append(SyncResult(

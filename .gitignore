@@ -45,6 +45,15 @@ Thumbs.db
 # Logs
 *.err
 
+# Python wheels
+*.whl
+
+# Agent planning files
+.sisyphus/
+
+# Screenshots
+Captura de pantalla*.jpeg
+
 # ML Model checkpoints (too large for git, regenerated with train_bert_classifier.py)
 backend/src/classifier/model/
 token.json

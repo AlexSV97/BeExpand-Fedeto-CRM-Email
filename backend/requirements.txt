@@ -26,6 +26,10 @@ python-multipart>=0.0.18
 celery>=5.4.0
 redis>=5.2.0
 
+# ML / NLP
+transformers>=4.30.0
+torch>=2.0.0  # Instalado con --index-url https://download.pytorch.org/whl/cpu en Dockerfile
+
 # Development
 pytest>=8.3.0
 pytest-asyncio>=0.24.0

@@ -32,3 +32,51 @@ class DashboardSummary(BaseModel):
     opportunities_by_stage: dict[str, int]
     recent_emails: list[RecentEmail] = []
     classification_by_method: dict[str, int] = {}
+
+
+# ── Series Temporales ────────────────────────────────────────────────────────
+
+
+class TimeSeriesPoint(BaseModel):
+    """Un punto en una serie temporal (fecha + valor)."""
+    date: str
+    value: float
+
+
+class CategoryTimeSeriesPoint(BaseModel):
+    """Un punto en una serie temporal desglosado por categoría."""
+    date: str
+    category: str
+    value: float
+
+
+class ForecastByCategory(BaseModel):
+    """Predicción agregada de una categoría para los próximos 30 días."""
+    category: str
+    predicted_count: float
+    trend: str  # increasing | decreasing | stable
+
+
+class ForecastDailyPoint(BaseModel):
+    """Predicción diaria detallada por categoría."""
+    date: str
+    category: str
+    predicted_count: float
+
+
+class ForecastData(BaseModel):
+    """Datos completos de forecasting para un horizonte específico."""
+    days: int  # 30, 60 o 90
+    total: float
+    by_category: list[ForecastByCategory]
+    daily_projections: list[ForecastDailyPoint]
+    method: str = "linear_regression"
+
+
+class TimeSeriesResponse(BaseModel):
+    """Respuesta completa de series temporales + predicciones."""
+    volume: list[TimeSeriesPoint]
+    by_category: list[CategoryTimeSeriesPoint]
+    avg_confidence: list[TimeSeriesPoint]
+    contacts_cumulative: list[TimeSeriesPoint]
+    forecasts: list[ForecastData]

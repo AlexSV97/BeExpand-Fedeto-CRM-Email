@@ -167,7 +167,7 @@ class ClassificationHistory(Base):
     email_id: Mapped[str] = mapped_column(String(36), ForeignKey("emails.id", ondelete="CASCADE"), nullable=False)
     category: Mapped[str] = mapped_column(String(20), nullable=False)
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
-    method: Mapped[str] = mapped_column(String(20), nullable=False)
+    method: Mapped[str] = mapped_column(String(30), nullable=False)
     details: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
     reviewed: Mapped[bool] = mapped_column(Boolean, default=False)
     reviewed_by: Mapped[Optional[str]] = mapped_column(String(100))

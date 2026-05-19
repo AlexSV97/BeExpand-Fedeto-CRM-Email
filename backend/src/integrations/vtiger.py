@@ -161,6 +161,7 @@ class VTigerClient:
             Dict con datos del contacto, o None si no existe.
         """
         session = await self.ensure_session()
+        # NOTA: VTiger 7.2 REQUIERE punto y coma al final
         query = f"SELECT id, firstname, lastname, email, phone FROM Contacts WHERE email = '{email}';"
 
         try:
@@ -239,6 +240,23 @@ class VTigerClient:
         logger.info("Contacto actualizado en VTiger: %s", updated_id)
         return updated_id
 
+    async def delete_contact(self, contact_id: str) -> None:
+        """
+        Elimina un contacto en VTiger por su ID.
+
+        Args:
+            contact_id: ID de VTiger (ej: "12x15").
+        """
+        session = await self.ensure_session()
+        try:
+            await self._request(
+                "POST", "delete",
+                data={"sessionName": session, "id": contact_id},
+            )
+            logger.info("Contacto eliminado en VTiger: %s", contact_id)
+        except VTigerError as e:
+            logger.warning("Error al eliminar contacto %s: %s", contact_id, e)
+
     async def upsert_contact(self, contact_data: dict, lookup_email: str | None = None) -> str:
         """
         Crea o actualiza un contacto. Si existe por email, actualiza; si no, crea.
@@ -255,8 +273,17 @@ class VTigerClient:
             existing = await self.find_contact_by_email(email)
             if existing:
                 vtiger_id = existing["id"]
-                await self.update_contact(vtiger_id, contact_data)
-                return vtiger_id
+                try:
+                    return await self.update_contact(vtiger_id, contact_data)
+                except VTigerError:
+                    # Workaround: VTiger 7.2.0 bug — update falla con
+                    # "Database error" incluso en contactos válidos.
+                    # Eliminamos y recreamos como fallback.
+                    logger.warning(
+                        "Update falló para %s, haciendo delete+create", email
+                    )
+                    await self.delete_contact(vtiger_id)
+                    return await self.create_contact(contact_data)
 
         return await self.create_contact(contact_data)
 

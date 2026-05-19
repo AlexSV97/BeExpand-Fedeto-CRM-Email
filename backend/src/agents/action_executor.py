@@ -13,6 +13,7 @@ el frontend ya ve los datos actualizados.
 """
 
 import logging
+import re
 import uuid
 from datetime import datetime, timezone
 
@@ -25,6 +26,26 @@ from src.email_processor.forwarder import forward_email
 from src.orchestrator.context import ActionResult, Category, EmailContext
 
 logger = logging.getLogger(__name__)
+
+# Patrón para eliminar prefijos de categoría repetidos del asunto
+# Ej: "[🏭 PROVEEDOR] [🏭 PROVEEDOR] Factura..." → "Factura..."
+_CATEGORY_PREFIX_RE = re.compile(
+    r"^(?:\s*\[[^\]]*(?:CLIENTE|LEAD|PROVEEDOR|NULO|SIN\s*CATEGOR)[^\]]*\]\s*)+",
+    re.IGNORECASE,
+)
+
+
+def _strip_category_prefixes(subject: str | None) -> str | None:
+    """Elimina prefijos de categoría repetidos del asunto (safety net)."""
+    if not subject:
+        return subject
+    cleaned = subject
+    while True:
+        m = _CATEGORY_PREFIX_RE.match(cleaned)
+        if not m:
+            break
+        cleaned = cleaned[m.end() :].strip()
+    return cleaned or subject
 
 
 class ActionExecutor:
@@ -185,7 +206,7 @@ class ActionExecutor:
             id=str(uuid.uuid4()),
             account_id=await self._get_or_create_account_id(ctx),
             message_id=ctx.raw.message_id,
-            subject=ctx.raw.subject,
+            subject=_strip_category_prefixes(ctx.raw.subject),
             body_plain=ctx.raw.body_plain,
             body_html=ctx.raw.body_html,
             sender_email=contact.email,
@@ -335,8 +356,10 @@ class ActionExecutor:
                 "email": contact.email,
                 "phone": contact.phone or "",
             }
+            # account_id es un campo de referencia que requiere un ID de Account de VTiger (ej: "11x1"),
+            # NO un nombre de empresa. Para MVP lo omitimos y guardamos la empresa en description.
             if company:
-                vtiger_data["account_id"] = company
+                vtiger_data["description"] = f"Empresa: {company}"
             if ctx.final_category:
                 vtiger_data["cf_categoria"] = ctx.final_category
 

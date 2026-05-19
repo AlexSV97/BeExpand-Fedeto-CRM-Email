@@ -34,6 +34,7 @@ import {
   type RecentEmailItem,
   type RetrainResponse,
 } from '../services/api'
+import TimeSeriesCharts from '../components/TimeSeriesCharts'
 
 // ── Constantes ──
 
@@ -639,6 +640,9 @@ export default function Dashboard() {
           )}
         </Card>
       </div>
+
+      {/* Series temporales y predicciones */}
+      <TimeSeriesCharts />
     </div>
   )
 }
