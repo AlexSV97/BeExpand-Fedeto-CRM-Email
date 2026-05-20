@@ -1,10 +1,10 @@
 /**
- * TimeSeriesCharts — Analizador de series temporales y predicciones.
+ * TimeSeriesCharts — Forecast puro: predicciones a 30/60/90 días.
  *
  * Renderiza:
- * - Selector de período (7d / 30d / 90d / Todo)
- * - Grid 2×2 con 4 gráficos Recharts
- * - Sección de forecasting con predicción a 30 días
+ * - Grid 2×2 con 4 gráficos de proyección (sin datos históricos)
+ * - Sección de forecasting con desglose por categoría + tendencias
+ * - Selector de horizonte (30d / 60d / 90d)
  */
 
 import { useEffect, useMemo, useState } from 'react'
@@ -51,13 +51,6 @@ const TREND_LABELS: Record<string, { label: string; color: string }> = {
   decreasing: { label: '📉 A la baja', color: '#ef4444' },
   stable: { label: '➡️ Estable', color: '#94a3b8' },
 }
-
-const PERIODS = [
-  { key: '7d', label: '7 días' },
-  { key: '30d', label: '30 días' },
-  { key: '90d', label: '90 días' },
-  { key: 'all', label: 'Todo' },
-]
 
 const FORECAST_HORIZONS = [30, 60, 90]
 
@@ -106,56 +99,67 @@ export default function TimeSeriesCharts() {
   const [data, setData] = useState<TimeSeriesResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [period, setPeriod] = useState('30d')
   const [forecastDays, setForecastDays] = useState(30)
 
   useEffect(() => {
     setLoading(true)
     setError(null)
-    getTimeSeries(period)
+    // Usamos '90d' para que el backend entrene con los últimos 90 días
+    getTimeSeries('90d')
       .then(setData)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
-  }, [period])
+  }, [])
 
-  // Datos derivados
-  const stackedData = useMemo(
-    () => (data ? toStackedData(data.by_category) : []),
-    [data?.by_category],
-  )
-  const categories = useMemo(
-    () => extractCategories(stackedData),
-    [stackedData],
-  )
+  // ── Datos exclusivamente de forecast ──
 
-  const volumeData = useMemo(
+  const volumeForecastData = useMemo(
     () =>
-      (data?.volume ?? []).map((p) => ({
-        date: formatDate(p.date),
-        value: p.value,
-      })),
-    [data?.volume],
+      (data?.volume_forecast ?? [])
+        .slice(0, forecastDays)
+        .map((p) => ({
+          date: formatDate(p.date),
+          valor: Math.round(p.value),
+        })),
+    [data?.volume_forecast, forecastDays],
   )
 
-  const confidenceData = useMemo(
+  const categoryForecastStacked = useMemo(
+    () => {
+      const sliced = (data?.by_category_forecast ?? []).slice(0, forecastDays * 4)
+      return toStackedData(sliced)
+    },
+    [data?.by_category_forecast, forecastDays],
+  )
+
+  const forecastCategories = useMemo(
+    () => extractCategories(categoryForecastStacked),
+    [categoryForecastStacked],
+  )
+
+  const confidenceForecastData = useMemo(
     () =>
-      (data?.avg_confidence ?? []).map((p) => ({
-        date: formatDate(p.date),
-        confidence: formatConfidence(p.value),
-        raw: p.value,
-      })),
-    [data?.avg_confidence],
+      (data?.avg_confidence_forecast ?? [])
+        .slice(0, forecastDays)
+        .map((p) => ({
+          date: formatDate(p.date),
+          valor: p.value,
+        })),
+    [data?.avg_confidence_forecast, forecastDays],
   )
 
-  const contactsData = useMemo(
+  const contactsForecastData = useMemo(
     () =>
-      (data?.contacts_cumulative ?? []).map((p) => ({
-        date: formatDate(p.date),
-        value: p.value,
-      })),
-    [data?.contacts_cumulative],
+      (data?.contacts_forecast ?? [])
+        .slice(0, forecastDays)
+        .map((p) => ({
+          date: formatDate(p.date),
+          valor: Math.round(p.value),
+        })),
+    [data?.contacts_forecast, forecastDays],
   )
 
+  // Forecast agregado (sección inferior)
   const currentForecast = useMemo(
     () => data?.forecasts.find((f) => f.days === forecastDays) ?? null,
     [data?.forecasts, forecastDays],
@@ -169,65 +173,72 @@ export default function TimeSeriesCharts() {
     return { total, top, days: f.days }
   }, [currentForecast])
 
-  const hasData = data && data.volume.length > 0
+  const hasForecast = data && (data.volume_forecast?.length ?? 0) > 0
 
   if (loading) return <LoadingState />
   if (error) return <ErrorState message={error} />
 
   return (
     <div className="space-y-6">
-      {/* Cabecera + selector de período */}
+      {/* Cabecera */}
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-bold text-slate-900">
-            Series Temporales y Predicciones
+            Predicción de Correos
           </h3>
           <p className="text-sm text-slate-500 mt-0.5">
-            Evolución del sistema y proyecciones a 30, 60 y 90 días
+            Proyecciones a {forecastDays} días basadas en el histórico del sistema
           </p>
         </div>
-        <PeriodSelector current={period} onChange={setPeriod} />
+        <ForecastHorizonSelector
+          horizons={FORECAST_HORIZONS}
+          selected={forecastDays}
+          onChange={setForecastDays}
+        />
       </div>
 
-      {!hasData ? (
+      {!hasForecast ? (
         <EmptyState />
       ) : (
         <>
-          {/* Grid 2×2 de gráficos */}
+          {/* Grid 2×2 de gráficos — solo forecast */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* 1. Volumen de correos */}
-            <ChartCard title="Volumen de correos">
+            {/* 1. Volumen de correos pronosticado */}
+            <ChartCard title="Volumen de correos pronosticado">
               <ResponsiveContainer width="100%" height={240}>
-                <AreaChart data={volumeData}>
+                <AreaChart data={volumeForecastData}>
                   <defs>
-                    <linearGradient id="volumeGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3} />
+                    <linearGradient id="volFcGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.25} />
                       <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.02} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                   <XAxis dataKey="date" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                  <Tooltip />
+                  <Tooltip
+                    labelFormatter={(label) => `Fecha: ${label}`}
+                    formatter={(value: unknown) => [`${Math.round(Number(value) || 0)} correos`, 'Pronóstico']}
+                  />
                   <Area
                     type="monotone"
-                    dataKey="value"
+                    dataKey="valor"
                     stroke="#0ea5e9"
                     strokeWidth={2}
-                    fill="url(#volumeGrad)"
-                    name="Correos"
+                    fill="url(#volFcGrad)"
+                    name="Pronóstico"
                   />
                 </AreaChart>
               </ResponsiveContainer>
             </ChartCard>
 
-            {/* 2. Correos por categoría (stacked) */}
-            <ChartCard title="Correos por categoría">
+            {/* 2. Correos por categoría pronosticado */}
+            <ChartCard title="Correos por categoría pronosticado">
               <ResponsiveContainer width="100%" height={240}>
-                <AreaChart data={stackedData}>
+                <AreaChart data={categoryForecastStacked}>
                   <defs>
-                    {categories.map((cat) => (
-                      <linearGradient key={cat} id={`stackGrad-${cat}`} x1="0" y1="0" x2="0" y2="1">
+                    {forecastCategories.map((cat) => (
+                      <linearGradient key={cat} id={`stackFcGrad-${cat}`} x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor={CATEGORY_COLORS[cat] ?? '#94a3b8'} stopOpacity={0.3} />
                         <stop offset="95%" stopColor={CATEGORY_COLORS[cat] ?? '#94a3b8'} stopOpacity={0.02} />
                       </linearGradient>
@@ -238,14 +249,14 @@ export default function TimeSeriesCharts() {
                   <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                   <Tooltip />
                   <Legend />
-                  {categories.map((cat) => (
+                  {forecastCategories.map((cat) => (
                     <Area
                       key={cat}
                       type="monotone"
                       dataKey={cat}
                       stackId="1"
                       stroke={CATEGORY_COLORS[cat] ?? '#94a3b8'}
-                      fill={`url(#stackGrad-${cat})`}
+                      fill={`url(#stackFcGrad-${cat})`}
                       name={CATEGORY_LABELS[cat] ?? cat}
                     />
                   ))}
@@ -253,10 +264,10 @@ export default function TimeSeriesCharts() {
               </ResponsiveContainer>
             </ChartCard>
 
-            {/* 3. Confianza media */}
+            {/* 3. Precisión media pronosticada */}
             <ChartCard title="Precisión media del modelo">
               <ResponsiveContainer width="100%" height={240}>
-                <LineChart data={confidenceData}>
+                <LineChart data={confidenceForecastData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                   <XAxis dataKey="date" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
                   <YAxis
@@ -264,40 +275,46 @@ export default function TimeSeriesCharts() {
                     tick={{ fontSize: 11 }}
                     tickFormatter={(v: number) => `${(v * 100).toFixed(0)}%`}
                   />
-                  <Tooltip formatter={(value: unknown) => [formatConfidence(Number(value) || 0), 'Confianza']} />
+                  <Tooltip
+                    labelFormatter={(label) => `Fecha: ${label}`}
+                    formatter={(value: unknown) => [formatConfidence(Number(value) || 0), 'Precisión']}
+                  />
                   <Line
                     type="monotone"
-                    dataKey="raw"
+                    dataKey="valor"
                     stroke="#8b5cf6"
                     strokeWidth={2}
                     dot={false}
-                    name="Confianza"
+                    name="Pronóstico"
                   />
                 </LineChart>
               </ResponsiveContainer>
             </ChartCard>
 
-            {/* 4. Contactos acumulados */}
+            {/* 4. Contactos capturados pronosticados */}
             <ChartCard title="Contactos capturados">
               <ResponsiveContainer width="100%" height={240}>
-                <AreaChart data={contactsData}>
+                <AreaChart data={contactsForecastData}>
                   <defs>
-                    <linearGradient id="contactsGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
+                    <linearGradient id="ctcFcGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#22c55e" stopOpacity={0.25} />
                       <stop offset="95%" stopColor="#22c55e" stopOpacity={0.02} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                   <XAxis dataKey="date" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                  <Tooltip />
+                  <Tooltip
+                    labelFormatter={(label) => `Fecha: ${label}`}
+                    formatter={(value: unknown) => [`${Math.round(Number(value) || 0)} contactos`, 'Pronóstico']}
+                  />
                   <Area
                     type="monotone"
-                    dataKey="value"
+                    dataKey="valor"
                     stroke="#22c55e"
                     strokeWidth={2}
-                    fill="url(#contactsGrad)"
-                    name="Contactos"
+                    fill="url(#ctcFcGrad)"
+                    name="Pronóstico"
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -315,6 +332,36 @@ export default function TimeSeriesCharts() {
           )}
         </>
       )}
+    </div>
+  )
+}
+
+// ── Selector de horizonte ──
+
+function ForecastHorizonSelector({
+  horizons,
+  selected,
+  onChange,
+}: {
+  horizons: number[]
+  selected: number
+  onChange: (d: number) => void
+}) {
+  return (
+    <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+      {horizons.map((d) => (
+        <button
+          key={d}
+          onClick={() => onChange(d)}
+          className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-150 cursor-pointer
+            ${selected === d
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700'
+            }`}
+        >
+          {d} días
+        </button>
+      ))}
     </div>
   )
 }
@@ -450,32 +497,6 @@ function ForecastSection({
 
 // ── Subcomponentes ──
 
-function PeriodSelector({
-  current,
-  onChange,
-}: {
-  current: string
-  onChange: (p: string) => void
-}) {
-  return (
-    <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-      {PERIODS.map((p) => (
-        <button
-          key={p.key}
-          onClick={() => onChange(p.key)}
-          className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-150 cursor-pointer
-            ${current === p.key
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-500 hover:text-slate-700'
-            }`}
-        >
-          {p.label}
-        </button>
-      ))}
-    </div>
-  )
-}
-
 function ChartCard({
   title,
   children,
@@ -496,7 +517,7 @@ function LoadingState() {
     <div className="flex items-center justify-center py-12">
       <div className="text-center">
         <div className="w-6 h-6 border-3 border-sky-200 border-t-sky-500 rounded-full animate-spin mx-auto" />
-        <p className="mt-3 text-sm text-slate-500">Cargando series temporales...</p>
+        <p className="mt-3 text-sm text-slate-500">Cargando predicciones...</p>
       </div>
     </div>
   )
@@ -505,7 +526,7 @@ function LoadingState() {
 function ErrorState({ message }: { message: string }) {
   return (
     <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">
-      Error al cargar series temporales: {message}
+      Error al cargar predicciones: {message}
     </div>
   )
 }
@@ -526,10 +547,10 @@ function EmptyState() {
         <path d="M7 16l4-8 4 4 4-6" />
       </svg>
       <p className="text-sm text-slate-500">
-        No hay suficientes datos para mostrar series temporales.
+        No hay suficientes datos para generar predicciones.
       </p>
       <p className="text-xs text-slate-400 mt-1">
-        Los gráficos aparecerán cuando el sistema haya procesado correos durante varios días.
+        Las predicciones aparecerán cuando el sistema tenga al menos 2 días de datos históricos.
       </p>
     </div>
   )

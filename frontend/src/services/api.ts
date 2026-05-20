@@ -360,7 +360,52 @@ export interface TimeSeriesResponse {
   by_category: CategoryTimeSeriesPoint[]
   avg_confidence: TimeSeriesPoint[]
   contacts_cumulative: TimeSeriesPoint[]
+  volume_forecast: TimeSeriesPoint[]
+  by_category_forecast: CategoryTimeSeriesPoint[]
+  avg_confidence_forecast: TimeSeriesPoint[]
+  contacts_forecast: TimeSeriesPoint[]
   forecasts: ForecastData[]
+}
+
+// ── Email Detail ──
+
+export interface ClassificationHistoryItem {
+  id: string
+  email_id: string
+  category: string
+  confidence: number
+  method: string
+  details: Record<string, unknown> | null
+  reviewed: boolean
+  reviewed_by: string | null
+  reviewed_at: string | null
+  created_at: string | null
+}
+
+export interface EmailDetail {
+  id: string
+  account_id: string
+  subject: string | null
+  body_plain: string | null
+  body_html: string | null
+  sender_email: string
+  sender_name: string | null
+  recipients: { email: string; name: string | null }[] | null
+  has_attachments: boolean
+  attachments: { filename: string; type: string; size: number }[] | null
+  received_at: string | null
+  processed_at: string | null
+  category: string | null
+  relevance: string | null
+  status: string | null
+  summary: string | null
+  extra_data: Record<string, unknown> | null
+  created_at: string
+  classification_history: ClassificationHistoryItem[]
+}
+
+export async function getEmail(id: string): Promise<EmailDetail> {
+  return request<EmailDetail>('GET', `/emails/${id}`)
 }
 
 export async function getTimeSeries(

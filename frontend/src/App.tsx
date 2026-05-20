@@ -17,6 +17,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
+import EmailDetail from './pages/EmailDetail'
 import Contacts from './pages/Contacts'
 import Opportunities from './pages/Opportunities'
 
@@ -39,6 +40,7 @@ function AppRoutes() {
         }
       >
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/emails/:id" element={<EmailDetail />} />
         <Route path="/contacts" element={<Contacts />} />
         <Route path="/opportunities" element={<Opportunities />} />
       </Route>

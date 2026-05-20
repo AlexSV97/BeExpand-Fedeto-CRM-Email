@@ -23,6 +23,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts'
+import { useNavigate } from 'react-router-dom'
 import {
   getDashboardSummary,
   syncEmails,
@@ -705,6 +706,7 @@ function EmailRow({
   const resolutionColor = RESOLUTION_COLORS[email.resolution ?? ''] ?? null
   const urgencyColor = URGENCY_COLORS[email.urgency] ?? null
 
+  const navigate = useNavigate()
   const handleSelectCategory = (newCategory: string) => {
     setShowPicker(false)
     if (newCategory === category) return
@@ -724,9 +726,13 @@ function EmailRow({
 
         {/* Contenido */}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-slate-900 truncate">
+          <button
+            onClick={() => navigate(`/emails/${email.id}`)}
+            className="text-sm font-medium text-slate-900 truncate text-left hover:text-sky-600 transition-colors cursor-pointer"
+            title="Ver detalle del correo"
+          >
             {email.subject ?? '(sin asunto)'}
-          </p>
+          </button>
           <p className="text-xs text-slate-500 truncate">
             {email.sender_name ?? email.sender_email}
             {email.action_required && (
