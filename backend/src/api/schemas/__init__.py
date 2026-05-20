@@ -6,7 +6,7 @@ Uso:
 
 from src.api.schemas.auth import LoginRequest, TokenResponse, UserResponse
 from src.api.schemas.account import AccountCreate, AccountResponse
-from src.api.schemas.email import EmailResponse, EmailList
+from src.api.schemas.email import EmailResponse, EmailList, EmailDetailResponse, ClassificationHistoryItem
 from src.api.schemas.contact import ContactResponse, ContactUpdate
 from src.api.schemas.opportunity import (
     OpportunityCreate,
@@ -33,6 +33,8 @@ __all__ = [
     "AccountResponse",
     "EmailResponse",
     "EmailList",
+    "EmailDetailResponse",
+    "ClassificationHistoryItem",
     "ContactResponse",
     "ContactUpdate",
     "OpportunityCreate",

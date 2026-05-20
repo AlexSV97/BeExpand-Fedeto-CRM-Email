@@ -79,4 +79,8 @@ class TimeSeriesResponse(BaseModel):
     by_category: list[CategoryTimeSeriesPoint]
     avg_confidence: list[TimeSeriesPoint]
     contacts_cumulative: list[TimeSeriesPoint]
+    volume_forecast: list[TimeSeriesPoint] = []
+    by_category_forecast: list[CategoryTimeSeriesPoint] = []
+    avg_confidence_forecast: list[TimeSeriesPoint] = []
+    contacts_forecast: list[TimeSeriesPoint] = []
     forecasts: list[ForecastData]

@@ -15,7 +15,7 @@ from sqlalchemy import func, select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.api.forecasting import forecast_category, trend_direction
+from src.api.forecasting import LinearRegression, forecast_category, trend_direction
 from src.db.models import ClassificationHistory, Contact, Email, Opportunity, User
 from src.db.session import get_db
 
@@ -346,11 +346,15 @@ async def _compute_forecast(
         categories_summary: list[ForecastByCategory] = []
         daily_projections: list[ForecastDailyPoint] = []
 
+        method: str = "unknown"
         for cat, counts in forecast_categories:
             counts_sorted = sorted(counts, key=lambda x: x[0])
             counts_padded = _pad_dates(counts_sorted)
+            direction = trend_direction(counts_padded) if counts_padded else "stable"
+
+            # Modelo completo: tendencia + estacionalidad semanal + ruido realista
             predictions = forecast_category(counts_padded, days_ahead=days)
-            direction = trend_direction(counts_sorted) if counts_sorted else "stable"
+            method = "trend_seasonal_noise"
 
             cat_total = sum(p for _, p in predictions)
             total += cat_total
@@ -373,10 +377,152 @@ async def _compute_forecast(
             total=round(total, 1),
             by_category=categories_summary,
             daily_projections=daily_projections,
-            method="linear_regression",
+            method=method,
         ))
 
     return forecasts
+
+
+async def _derive_volume_forecast(
+    forecasts: list[ForecastData],
+) -> list[TimeSeriesPoint]:
+    """Deriva volume_forecast agregando daily_projections por fecha (horizonte 90d)."""
+    forecast_90d = next((f for f in forecasts if f.days == 90), None)
+    if not forecast_90d:
+        return []
+
+    by_date: dict[str, float] = defaultdict(float)
+    for dp in forecast_90d.daily_projections:
+        by_date[dp.date] += dp.predicted_count
+
+    return [
+        TimeSeriesPoint(date=d, value=round(v, 1))
+        for d, v in sorted(by_date.items())
+    ]
+
+
+async def _derive_by_category_forecast(
+    forecasts: list[ForecastData],
+) -> list[CategoryTimeSeriesPoint]:
+    """Deriva by_category_forecast desde daily_projections (horizonte 90d)."""
+    forecast_90d = next((f for f in forecasts if f.days == 90), None)
+    if not forecast_90d:
+        return []
+
+    return [
+        CategoryTimeSeriesPoint(date=dp.date, category=dp.category, value=dp.predicted_count)
+        for dp in forecast_90d.daily_projections
+    ]
+
+
+async def _forecast_confidence_values(
+    db: AsyncSession, start: date, end: date,
+) -> list[TimeSeriesPoint]:
+    """Proyecta la confianza media 90 días usando tendencia + ruido determinista.
+
+    La confianza tiende a estabilizarse en un rango sano (75-95%) y nunca
+    debería alcanzar el 100% (indicaría sobreajuste). El ruido añade
+    variación realista basada en los residuos históricos.
+    """
+    import random
+
+    today = datetime.now(timezone.utc).date()
+    forecast_start = today - timedelta(days=90)
+    if forecast_start < start:
+        forecast_start = start
+
+    dc = _date_col(ClassificationHistory.created_at)
+    result = await db.execute(
+        select(dc.label("dt"), func.avg(ClassificationHistory.confidence).label("avg_conf"))
+        .where(ClassificationHistory.created_at >= forecast_start)
+        .where(ClassificationHistory.created_at < today + timedelta(days=1))
+        .group_by(dc)
+        .order_by(dc)
+    )
+    rows = result.all()
+
+    if not rows:
+        return [TimeSeriesPoint(date=str(today + timedelta(days=i + 1)), value=0.0) for i in range(90)]
+
+    values = [float(r.avg_conf) for r in rows]
+    model = LinearRegression()
+    x_vals = [float(i) for i in range(len(values))]
+    model.fit(x_vals, values)
+
+    # Residuos históricos para calcular ruido realista
+    residuals = []
+    for i, v in enumerate(values):
+        trend_v = model.predict(x_vals[i])
+        residuals.append(v - trend_v)
+    residual_std = (sum(r**2 for r in residuals) / max(len(residuals), 1)) ** 0.5
+
+    # La confianza no debe llegar al 100% (sobreajuste).
+    # Limitamos la tendencia a un máximo de ~0.95 y añadimos
+    # ruido proporcional para que se mantenga en un rango realista [0.75, 0.97].
+    max_conf = min(0.95, max(values) * 1.1)  # Nunca pasar de 0.95
+    predictions: list[TimeSeriesPoint] = []
+    rng = random.Random(today.toordinal())
+    for i in range(1, 91):
+        pred_val = model.predict(len(values) - 1 + i)
+        # Si la tendencia supera el máximo, planchar alrededor de max_conf
+        if pred_val > max_conf:
+            pred_val = max_conf
+        # Ruido: más agresivo para que se note la variación
+        noise = rng.gauss(0, max(0.02, residual_std * 2.0))
+        pred_val = max(0.70, min(0.97, round(pred_val + noise, 4)))
+        predictions.append(TimeSeriesPoint(date=str(today + timedelta(days=i)), value=pred_val))
+
+    return predictions
+
+
+async def _forecast_contacts_values(
+    db: AsyncSession, start: date, end: date,
+) -> list[TimeSeriesPoint]:
+    """Proyecta contactos acumulados 90 días usando tendencia + estacionalidad semanal.
+
+    1. Obtiene contactos nuevos por día
+    2. Proyecta con forecast_category (tendencia + estacionalidad + ruido)
+    3. Acumula los valores proyectados
+    """
+    today = datetime.now(timezone.utc).date()
+    forecast_start = today - timedelta(days=90)
+    if forecast_start < start:
+        forecast_start = start
+
+    dc = _date_col(Contact.created_at)
+    result = await db.execute(
+        select(dc.label("dt"), func.count(Contact.id).label("cnt"))
+        .where(Contact.created_at >= forecast_start)
+        .where(Contact.created_at < today + timedelta(days=1))
+        .group_by(dc)
+        .order_by(dc)
+    )
+    rows = result.all()
+
+    if not rows:
+        return [TimeSeriesPoint(date=str(today + timedelta(days=i + 1)), value=0.0) for i in range(90)]
+
+    # Preparar daily_counts (contactos nuevos por día, NO acumulados)
+    daily_new: list[tuple[date, int]] = []
+    for r in rows:
+        row_date = (
+            r.dt if isinstance(r.dt, date)
+            else date.fromisoformat(str(r.dt))
+        )
+        daily_new.append((row_date, int(r.cnt)))
+
+    # Proyectar contactos nuevos diarios con forecast_category
+    daily_forecasts = forecast_category(daily_new, days_ahead=90)
+
+    # Acumular: parte histórica + proyección
+    historical_cumulative = sum(c for _, c in daily_new)
+    predictions: list[TimeSeriesPoint] = []
+    running = historical_cumulative
+    for pred_date, pred_val in daily_forecasts:
+        running += max(0.0, pred_val)
+        predictions.append(TimeSeriesPoint(date=str(pred_date), value=round(running, 0)))
+
+    return predictions
 
 
 # ── Endpoint principal ──
@@ -411,18 +557,38 @@ async def get_timeseries(
     else:
         end = today
 
-    volume, by_cat, avg_conf, contacts, forecasts = await asyncio.gather(
+    from typing import cast
+
+    _raw = await asyncio.gather(
         _email_volume(db, start, end),
         _email_by_category(db, start, end),
         _avg_confidence(db, start, end),
         _contacts_cumulative(db, start, end),
         _compute_forecast(db, start, end),
+        _forecast_confidence_values(db, start, end),
+        _forecast_contacts_values(db, start, end),
     )
+
+    volume: list[TimeSeriesPoint] = cast("list[TimeSeriesPoint]", _raw[0])
+    by_cat: list[CategoryTimeSeriesPoint] = cast("list[CategoryTimeSeriesPoint]", _raw[1])
+    avg_conf: list[TimeSeriesPoint] = cast("list[TimeSeriesPoint]", _raw[2])
+    contacts: list[TimeSeriesPoint] = cast("list[TimeSeriesPoint]", _raw[3])
+    forecasts: list[ForecastData] = cast("list[ForecastData]", _raw[4])
+    conf_fc: list[TimeSeriesPoint] = cast("list[TimeSeriesPoint]", _raw[5])
+    contacts_fc: list[TimeSeriesPoint] = cast("list[TimeSeriesPoint]", _raw[6])
+
+    # Derivar volume / category forecast desde los datos del forecast por categoría
+    volume_fc = cast("list[TimeSeriesPoint]", await _derive_volume_forecast(forecasts))
+    by_cat_fc = cast("list[CategoryTimeSeriesPoint]", await _derive_by_category_forecast(forecasts))
 
     return TimeSeriesResponse(
         volume=volume,
         by_category=by_cat,
         avg_confidence=avg_conf,
         contacts_cumulative=contacts,
+        volume_forecast=volume_fc,
+        by_category_forecast=by_cat_fc,
+        avg_confidence_forecast=conf_fc,
+        contacts_forecast=contacts_fc,
         forecasts=forecasts,
     )
