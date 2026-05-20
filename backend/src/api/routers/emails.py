@@ -19,7 +19,7 @@ from src.db.models import ClassificationHistory, Contact, Email, User
 from src.db.session import get_db
 
 from src.api.deps import get_current_user, pagination_params
-from src.api.schemas import EmailList, EmailResponse
+from src.api.schemas import EmailDetailResponse, EmailList, EmailResponse
 from src.email_processor import sync_emails
 
 router = APIRouter(tags=["emails"])
@@ -86,13 +86,13 @@ async def list_emails(
     return EmailList(items=emails, total=total, skip=skip, limit=limit)
 
 
-@router.get("/{email_id}")
+@router.get("/{email_id}", response_model=EmailDetailResponse)
 async def get_email(
     email_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Obtiene detalle de un correo, incluyendo classification_history."""
+    """Obtiene detalle de un correo, incluyendo body, extra_data y classification_history."""
     result = await db.execute(
         select(Email)
         .where(Email.id == email_id)
@@ -104,25 +104,7 @@ async def get_email(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Email not found",
         )
-
-    # Build base response and augment with classification_history
-    email_data = EmailResponse.model_validate(email).model_dump()
-    email_data["classification_history"] = [
-        {
-            "id": ch.id,
-            "email_id": ch.email_id,
-            "category": ch.category,
-            "confidence": ch.confidence,
-            "method": ch.method,
-            "details": ch.details,
-            "reviewed": ch.reviewed,
-            "reviewed_by": ch.reviewed_by,
-            "reviewed_at": ch.reviewed_at,
-            "created_at": ch.created_at,
-        }
-        for ch in email.classification_history
-    ]
-    return email_data
+    return email
 
 
 @router.patch("/{email_id}/review", response_model=EmailResponse)
