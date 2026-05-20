@@ -241,7 +241,7 @@ def _make_body(category: str, idx: int) -> tuple[str, dict]:
         analyzer["urgency"] = random.choices(
             ["alta", "media", "baja"], weights=[0.35, 0.45, 0.20]
         )[0]
-        analyzer["action_required"] = True
+        analyzer["action_required"] = random.choice(["soporte", "revision", "migracion", "renovacion", "pago"])
         analyzer["entities"] = random.sample(
             ["incidencia", "facturación", "soporte", "migración", "contrato", "usuarios"],
             k=random.randint(1, 3),
@@ -252,7 +252,7 @@ def _make_body(category: str, idx: int) -> tuple[str, dict]:
         analyzer["urgency"] = random.choices(
             ["alta", "media", "baja"], weights=[0.15, 0.50, 0.35]
         )[0]
-        analyzer["action_required"] = True
+        analyzer["action_required"] = random.choice(["presupuesto", "demo", "consulta", "llamada"])
         analyzer["entities"] = random.sample(
             ["presupuesto", "demo", "crm", "cloud", "ciberseguridad", "formación"],
             k=random.randint(1, 3),
@@ -263,7 +263,7 @@ def _make_body(category: str, idx: int) -> tuple[str, dict]:
         analyzer["urgency"] = random.choices(
             ["alta", "media", "baja"], weights=[0.10, 0.35, 0.55]
         )[0]
-        analyzer["action_required"] = False
+        analyzer["action_required"] = None
         analyzer["entities"] = random.sample(
             ["pedido", "factura", "catálogo", "mantenimiento", "precios", "garantía"],
             k=random.randint(1, 2),
@@ -271,7 +271,7 @@ def _make_body(category: str, idx: int) -> tuple[str, dict]:
     elif category == "nulo":
         analyzer["company"] = ""
         analyzer["urgency"] = "baja"
-        analyzer["action_required"] = False
+        analyzer["action_required"] = None
         analyzer["entities"] = []
 
     return body, analyzer
@@ -309,6 +309,37 @@ async def main():
 
         # ── 1. Limpiar simulaciones previas ──
         print("\n--- Limpiando simulaciones previas...")
+
+        # 1a. Oportunidades (tienen FK a contactos)
+        all_opps = (
+            await session.execute(
+                select(Opportunity).options(selectinload(Opportunity.contact))
+            )
+        ).scalars().all()
+        sim_opps = [
+            o for o in all_opps
+            if o.description and "[SIMULACIÓN]" in o.description
+        ]
+        for o in sim_opps:
+            await session.delete(o)
+        if sim_opps:
+            await session.commit()
+            print(f"  [OK] Eliminadas {len(sim_opps)} oportunidades simuladas")
+
+        # 1b. Contactos (referenciados por oportunidades)
+        all_contacts = (await session.execute(select(Contact))).scalars().all()
+        sim_contacts = [
+            c for c in all_contacts
+            if c.extra_data and isinstance(c.extra_data, dict)
+            and c.extra_data.get("source") == "simulation"
+        ]
+        for c in sim_contacts:
+            await session.delete(c)
+        if sim_contacts:
+            await session.commit()
+            print(f"  [OK] Eliminados {len(sim_contacts)} contactos simulados")
+
+        # 1c. Emails (tienen clasificaciones)
         all_emails = (
             (await session.execute(
                 select(Email).options(selectinload(Email.classification_history))
@@ -332,35 +363,6 @@ async def main():
             print(f"  [OK] Eliminados {len(sim_email_ids)} emails simulados")
         else:
             print("  [i]  No hay simulaciones previas")
-
-        # Limpiar contactos de simulación
-        all_contacts = (await session.execute(select(Contact))).scalars().all()
-        sim_contacts = [
-            c for c in all_contacts
-            if c.extra_data and isinstance(c.extra_data, dict)
-            and c.extra_data.get("source") == "simulation"
-        ]
-        for c in sim_contacts:
-            await session.delete(c)
-        if sim_contacts:
-            await session.commit()
-            print(f"  [OK] Eliminados {len(sim_contacts)} contactos simulados")
-
-        # Limpiar oportunidades de simulación
-        all_opps = (
-            await session.execute(
-                select(Opportunity).options(selectinload(Opportunity.contact))
-            )
-        ).scalars().all()
-        sim_opps = [
-            o for o in all_opps
-            if o.description and "[SIMULACIÓN]" in o.description
-        ]
-        for o in sim_opps:
-            await session.delete(o)
-        if sim_opps:
-            await session.commit()
-            print(f"  [OK] Eliminados {len(sim_opps)} oportunidades simuladas")
 
         # ── 2. Contar emails existentes ──
         result = await session.execute(
