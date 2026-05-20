@@ -1,0 +1,33 @@
+# Dependencias — se instalan en el build
+node_modules/
+
+# Entorno
+.env
+*.env.*
+
+# Build local
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Tests
+tests/
+.test-results/
+coverage/
+
+# Documentación
+docs/
+*.md
+
+# OS
+.DS_Store
+Thumbs.db
