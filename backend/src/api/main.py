@@ -72,10 +72,20 @@ app.include_router(classification.router, prefix="/api/v1/classification-history
 app.include_router(crm.router, prefix="/api/v1/crm")
 app.include_router(dashboard.router, prefix="/api/v1/dashboard")
 
-# CORS: permitir que el frontend (React en otro puerto) llame al API
+# CORS: en Docker el frontend (nginx) sirve en localhost:5173, en dev Vite en :5173
+_cors_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+# Si hay variable de entorno CORS_ORIGINS, añadir las que vengan
+import os
+_env_origins = os.getenv("CORS_ORIGINS", "")
+if _env_origins:
+    _cors_origins.extend(_env_origins.split(","))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Puerto de Vite
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -95,7 +105,10 @@ async def root():
 @app.get("/api/v1/health")
 async def health():
     """Health check detallado."""
+    from src.config import get_settings
+    db_url = get_settings().database_url
+    db_type = "postgresql" if "postgresql" in db_url else "sqlite"
     return {
         "status": "healthy",
-        "database": "sqlite (dev)",
+        "database": db_type,
     }
