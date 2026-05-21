@@ -85,7 +85,7 @@ export default function Contacts() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-slate-900 mb-6">Contactos</h2>
+      <h2 className="text-2xl font-bold text-foreground mb-6">Contactos</h2>
 
       {/* Filtros */}
       <div className="flex gap-3 items-center mb-6">
@@ -94,56 +94,56 @@ export default function Contacts() {
           placeholder="Buscar por nombre o email..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="w-64 px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-sky-500"
+          className="w-64 px-3 py-2 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-sky-500"
         />
         <select
           value={category}
           onChange={e => setCategory(e.target.value)}
-          className="px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm"
+          className="px-3 py-2 border border-border rounded-lg outline-none text-sm"
         >
-          <option value="">Todas las categorías</option>
+          <option value="" style={{ color: 'black' }}>Todas las categorías</option>
           {CATEGORIES.map(c => (
-            <option key={c} value={c}>
+            <option key={c} value={c} style={{ color: 'black' }}>
               {c.charAt(0).toUpperCase() + c.slice(1)}
             </option>
           ))}
         </select>
-        <span className="text-sm text-slate-500">
+        <span className="text-sm text-muted-foreground">
           {total} contacto{total !== 1 ? 's' : ''}
         </span>
       </div>
 
       {/* Tabla */}
       {loading ? (
-        <p className="text-slate-500">Cargando...</p>
+        <p className="text-muted-foreground">Cargando...</p>
       ) : error ? (
         <p className="text-red-500">{error}</p>
       ) : contacts.length === 0 ? (
         <EmptyState message="No se encontraron contactos" />
       ) : (
         <>
-          <table className="w-full bg-white rounded-xl shadow-sm overflow-hidden">
+          <table className="w-full bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
             <thead>
               <tr>
-                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 border-b-2 border-slate-200">Nombre</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 border-b-2 border-slate-200">Email</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 border-b-2 border-slate-200">Empresa</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 border-b-2 border-slate-200">Categoría</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 border-b-2 border-slate-200">Correos</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 border-b-2 border-slate-200"></th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b-2 border-border/50">Nombre</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b-2 border-border/50">Email</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b-2 border-border/50">Empresa</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b-2 border-border/50">Categoría</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b-2 border-border/50">Correos</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b-2 border-border/50"></th>
               </tr>
             </thead>
             <tbody>
               {contacts.map(c => (
                 <tr key={c.id}>
-                  <td className="px-4 py-3 text-sm text-slate-700 border-b border-slate-100">{c.name}</td>
-                  <td className="px-4 py-3 text-sm text-slate-700 border-b border-slate-100">{c.email}</td>
-                  <td className="px-4 py-3 text-sm text-slate-700 border-b border-slate-100">{c.company || '-'}</td>
-                  <td className="px-4 py-3 text-sm text-slate-700 border-b border-slate-100">
+                  <td className="px-4 py-3 text-sm text-foreground/80 border-b border-border/50">{c.name}</td>
+                  <td className="px-4 py-3 text-sm text-foreground/80 border-b border-border/50">{c.email}</td>
+                  <td className="px-4 py-3 text-sm text-foreground/80 border-b border-border/50">{c.company || '-'}</td>
+                  <td className="px-4 py-3 text-sm text-foreground/80 border-b border-border/50">
                     <CategoryBadge category={c.category} />
                   </td>
-                  <td className="px-4 py-3 text-sm text-slate-700 border-b border-slate-100">{c.email_count}</td>
-                  <td className="px-4 py-3 text-sm text-slate-700 border-b border-slate-100">
+                  <td className="px-4 py-3 text-sm text-foreground/80 border-b border-border/50">{c.email_count}</td>
+                  <td className="px-4 py-3 text-sm text-foreground/80 border-b border-border/50">
                     <button onClick={() => openDetail(c.id)} className="bg-transparent border-none text-sky-500 cursor-pointer underline text-sm hover:text-sky-600">
                       Ver
                     </button>
@@ -159,17 +159,17 @@ export default function Contacts() {
               <button
                 disabled={page === 0}
                 onClick={() => setPage(p => p - 1)}
-                className="px-3 py-1.5 border border-slate-300 rounded-lg bg-white cursor-pointer text-sm hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                className="px-3 py-1.5 border border-border rounded-lg bg-card cursor-pointer text-sm hover:bg-secondary/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:border-border/50 disabled:text-muted-foreground"
               >
                 ← Anterior
               </button>
-              <span className="px-2 py-1.5 text-slate-500 text-sm">
+              <span className="px-2 py-1.5 text-muted-foreground text-sm">
                 {page + 1} / {totalPages}
               </span>
               <button
                 disabled={page >= totalPages - 1}
                 onClick={() => setPage(p => p + 1)}
-                className="px-3 py-1.5 border border-slate-300 rounded-lg bg-white cursor-pointer text-sm hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                className="px-3 py-1.5 border border-border rounded-lg bg-card cursor-pointer text-sm hover:bg-secondary/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:border-border/50 disabled:text-muted-foreground"
               >
                 Siguiente →
               </button>
@@ -185,11 +185,11 @@ export default function Contacts() {
           onClick={() => setDetailId(null)}
         >
           <div
-            className="bg-white rounded-xl p-6 w-[420px] max-w-[90vw] max-h-[80vh] overflow-y-auto shadow-2xl"
+            className="bg-card rounded-2xl p-6 w-[420px] max-w-[90vw] max-h-[80vh] overflow-y-auto border border-border/50 shadow-2xl"
             onClick={e => e.stopPropagation()}
           >
-            <h3 className="m-0 mb-2 text-lg font-semibold text-slate-900">{detail.name}</h3>
-            <p className="m-0 mb-4 text-sm text-slate-500">{detail.email}</p>
+            <h3 className="m-0 mb-2 text-lg font-semibold text-foreground">{detail.name}</h3>
+            <p className="m-0 mb-4 text-sm text-muted-foreground">{detail.email}</p>
 
             <div className="mb-4">
               <InfoRow label="Empresa" value={detail.company} />
@@ -201,23 +201,23 @@ export default function Contacts() {
             </div>
 
             <div className="mb-4">
-              <label className="block mb-1 text-sm font-semibold text-slate-600">
+              <label className="block mb-1 text-sm font-semibold text-muted-foreground">
                 Categoría
               </label>
               <select
                 value={detail.category}
                 onChange={e => changeCategory(detail.id, e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm"
+                className="w-full px-3 py-2 border border-border rounded-lg outline-none text-sm"
               >
                 {CATEGORIES.map(c => (
-                  <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                  <option key={c} value={c} style={{ color: 'black' }}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
                 ))}
               </select>
             </div>
 
             <button
               onClick={() => setDetailId(null)}
-              className="mt-6 px-4 py-2 bg-slate-100 border-none rounded-lg cursor-pointer text-sm hover:bg-slate-200 text-slate-700"
+              className="mt-6 px-4 py-2 bg-secondary/50 border-none rounded-lg cursor-pointer text-sm hover:bg-secondary text-foreground/80"
             >
               Cerrar
             </button>
@@ -230,25 +230,25 @@ export default function Contacts() {
 
 function CategoryBadge({ category }: { category: string }) {
   const colors: Record<string, string> = {
-    cliente: '#e3f2fd',
-    lead: '#e8f5e9',
-    proveedor: '#fff3e0',
-    otro: '#f3e5f5',
-    pendiente: '#f5f5f5',
+    cliente: 'rgba(20,184,166,0.12)',
+    lead: 'rgba(251,191,36,0.12)',
+    proveedor: 'rgba(99,102,241,0.12)',
+    otro: 'rgba(148,163,184,0.12)',
+    pendiente: 'rgba(148,163,184,0.06)',
   }
   const textColors: Record<string, string> = {
-    cliente: '#1565c0',
-    lead: '#2e7d32',
-    proveedor: '#e65100',
-    otro: '#6a1b9a',
-    pendiente: '#888',
+    cliente: '#5eead4',
+    lead: '#fbbf24',
+    proveedor: '#a5b4fc',
+    otro: '#94a3b8',
+    pendiente: '#64748b',
   }
   return (
     <span
       className="inline-flex px-3 py-1 rounded-full text-xs font-semibold"
       style={{
-        background: colors[category] || '#f5f5f5',
-        color: textColors[category] || '#888',
+        background: colors[category] || 'rgba(148,163,184,0.08)',
+        color: textColors[category] || '#94a3b8',
       }}
     >
       {category}
@@ -258,13 +258,13 @@ function CategoryBadge({ category }: { category: string }) {
 
 function InfoRow({ label, value }: { label: string; value: string | null }) {
   return (
-    <div className="flex justify-between py-1.5 border-b border-slate-100">
-      <span className="text-slate-500 text-sm">{label}</span>
-      <span className="text-sm text-slate-700">{value || '-'}</span>
+    <div className="flex justify-between py-1.5 border-b border-border/50">
+      <span className="text-muted-foreground text-sm">{label}</span>
+      <span className="text-sm text-foreground/80">{value || '-'}</span>
     </div>
   )
 }
 
 function EmptyState({ message }: { message: string }) {
-  return <p className="text-slate-400 text-center py-12">{message}</p>
+  return <p className="text-muted-foreground text-center py-12">{message}</p>
 }

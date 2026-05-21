@@ -107,7 +107,7 @@ export default function Opportunities() {
     setCreating(true)
   }
 
-  if (loading) return <p className="text-slate-500">Cargando pipeline...</p>
+  if (loading) return <p className="text-muted-foreground">Cargando pipeline...</p>
   if (error) return <p className="text-red-500">Error: {error}</p>
 
   const totalOpps = Object.values(byStage).reduce((sum, arr) => sum + arr.length, 0)
@@ -115,14 +115,14 @@ export default function Opportunities() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="m-0 text-2xl font-bold text-slate-900">Pipeline de Oportunidades</h2>
-        <button onClick={openCreateForm} className="bg-slate-800 text-white px-4 py-2 rounded-lg hover:bg-slate-700 text-sm font-medium cursor-pointer">
+        <h2 className="m-0 text-2xl font-bold text-foreground">Pipeline de Oportunidades</h2>
+        <button onClick={openCreateForm} className="bg-chart-1 text-white px-4 py-2 rounded-lg hover:bg-chart-1/80 text-sm font-medium cursor-pointer">
           + Nueva oportunidad
         </button>
       </div>
 
       {totalOpps === 0 ? (
-        <p className="text-slate-400 text-center py-12">
+        <p className="text-muted-foreground text-center py-12">
           No hay oportunidades todavía. ¡Crea la primera!
         </p>
       ) : (
@@ -130,7 +130,7 @@ export default function Opportunities() {
           {STAGES.map(stage => {
             const items = byStage[stage.key] || []
             return (
-              <div key={stage.key} className="bg-slate-100 rounded-xl p-3 min-h-[200px]">
+              <div key={stage.key} className="bg-secondary/30 rounded-xl p-3 min-h-[200px]">
                 <div
                   className="flex justify-between items-center mb-2 px-3 py-2 rounded-lg text-white text-sm font-semibold"
                   style={{ background: stage.color }}
@@ -143,10 +143,10 @@ export default function Opportunities() {
                   <div
                     key={opp.id}
                     onClick={() => openEditForm(opp)}
-                    className="bg-white rounded-lg p-3 mb-2 shadow-sm cursor-pointer border-l-4 hover:shadow-md transition-shadow"
+                    className="bg-card rounded-xl p-4 mb-2 border border-border/50 shadow-sm cursor-pointer border-l-4 hover:shadow-md transition-shadow"
                     style={{ borderLeftColor: stage.color }}
                   >
-                    <div className="font-semibold text-sm text-slate-900 mb-1">
+                    <div className="font-semibold text-sm text-foreground mb-1">
                       {opp.title}
                     </div>
                     {opp.value && (
@@ -155,7 +155,7 @@ export default function Opportunities() {
                       </div>
                     )}
                     {opp.probability && (
-                      <div className="text-xs text-slate-500">
+                      <div className="text-xs text-muted-foreground">
                         {opp.probability}% probabilidad
                       </div>
                     )}
@@ -250,17 +250,17 @@ function OppFormModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white rounded-xl p-6 w-[480px] max-w-[90vw] max-h-[85vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
-        <h3 className="m-0 mb-4 text-lg font-semibold text-slate-900">{title}</h3>
+      <div className="bg-card rounded-2xl p-6 w-[480px] max-w-[90vw] max-h-[85vh] overflow-y-auto border border-border/50 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <h3 className="m-0 mb-4 text-lg font-semibold text-foreground">{title}</h3>
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Título *</label>
-            <input value={titleVal} onChange={e => setTitleVal(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500" required />
+            <label className="block text-xs font-semibold text-muted-foreground mb-1">Título *</label>
+            <input value={titleVal} onChange={e => setTitleVal(e.target.value)} className="w-full px-3 py-2 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-chart-1/50 focus:border-chart-1" required />
           </div>
 
           <div className="mb-3">
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Contacto *</label>
-            <select value={contactId} onChange={e => setContactId(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500" required>
+            <label className="block text-xs font-semibold text-muted-foreground mb-1">Contacto *</label>
+            <select value={contactId} onChange={e => setContactId(e.target.value)} className="w-full px-3 py-2 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-chart-1/50 focus:border-chart-1" required>
               <option value="">Seleccionar contacto</option>
               {contacts.map(c => (
                 <option key={c.id} value={c.id}>{c.name} ({c.email})</option>
@@ -270,8 +270,8 @@ function OppFormModal({
 
           {stages && (
             <div className="mb-3">
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Etapa</label>
-              <select value={stage} onChange={e => { setStage(e.target.value); onStageChange?.(e.target.value) }} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500">
+              <label className="block text-xs font-semibold text-muted-foreground mb-1">Etapa</label>
+              <select value={stage} onChange={e => { setStage(e.target.value); onStageChange?.(e.target.value) }} className="w-full px-3 py-2 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-chart-1/50 focus:border-chart-1">
                 {stages.map(s => (
                   <option key={s.key} value={s.key}>{s.label}</option>
                 ))}
@@ -280,41 +280,41 @@ function OppFormModal({
           )}
 
           <div className="mb-3">
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Descripción</label>
-            <textarea value={description} onChange={e => setDescription(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 min-h-[60px] resize-y" />
+            <label className="block text-xs font-semibold text-muted-foreground mb-1">Descripción</label>
+            <textarea value={description} onChange={e => setDescription(e.target.value)} className="w-full px-3 py-2 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-chart-1/50 focus:border-chart-1 min-h-[60px] resize-y" />
           </div>
 
           <div className="grid grid-cols-2 gap-3 mb-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Valor ($)</label>
-              <input type="number" value={value} onChange={e => setValue(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500" />
+              <label className="block text-xs font-semibold text-muted-foreground mb-1">Valor ($)</label>
+              <input type="number" value={value} onChange={e => setValue(e.target.value)} className="w-full px-3 py-2 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-chart-1/50 focus:border-chart-1" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Probabilidad (%)</label>
-              <input type="number" value={probability} onChange={e => setProbability(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500" min={0} max={100} />
+              <label className="block text-xs font-semibold text-muted-foreground mb-1">Probabilidad (%)</label>
+              <input type="number" value={probability} onChange={e => setProbability(e.target.value)} className="w-full px-3 py-2 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-chart-1/50 focus:border-chart-1" min={0} max={100} />
             </div>
           </div>
 
           <div className="mb-3">
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Cierre estimado</label>
-            <input type="date" value={expectedClose} onChange={e => setExpectedClose(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500" />
+            <label className="block text-xs font-semibold text-muted-foreground mb-1">Cierre estimado</label>
+            <input type="date" value={expectedClose} onChange={e => setExpectedClose(e.target.value)} className="w-full px-3 py-2 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-chart-1/50 focus:border-chart-1" />
           </div>
 
           <div className="mb-4">
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Notas</label>
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 min-h-[60px] resize-y" />
+            <label className="block text-xs font-semibold text-muted-foreground mb-1">Notas</label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} className="w-full px-3 py-2 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-chart-1/50 focus:border-chart-1 min-h-[60px] resize-y" />
           </div>
 
           <div className="flex gap-2 justify-end">
             {onDelete && (
-              <button type="button" onClick={onDelete} className="px-4 py-2 bg-white text-red-500 border border-red-500 rounded-lg cursor-pointer text-sm hover:bg-red-50">
+              <button type="button" onClick={onDelete} className="px-4 py-2 bg-card text-destructive border border-destructive/50 rounded-lg cursor-pointer text-sm hover:bg-destructive/10">
                 Eliminar
               </button>
             )}
-            <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-100 border-none rounded-lg cursor-pointer text-sm hover:bg-slate-200 text-slate-700">
+            <button type="button" onClick={onClose} className="px-4 py-2 bg-secondary/50 border-none rounded-lg cursor-pointer text-sm hover:bg-secondary text-muted-foreground">
               Cancelar
             </button>
-            <button type="submit" disabled={saving} className="px-4 py-2 bg-slate-800 text-white border-none rounded-lg cursor-pointer text-sm font-medium hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">
+            <button type="submit" disabled={saving} className="px-4 py-2 bg-chart-1 text-white border-none rounded-lg cursor-pointer text-sm font-medium hover:bg-chart-1/80 disabled:opacity-50 disabled:cursor-not-allowed">
               {saving ? 'Guardando...' : 'Guardar'}
             </button>
           </div>

@@ -159,7 +159,7 @@ export default function EmailDetail() {
         <button
           onClick={() => navigate('/dashboard')}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
-            text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+            text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors cursor-pointer"
         >
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M19 12H5" />
@@ -170,19 +170,19 @@ export default function EmailDetail() {
       </div>
 
       {/* Header del correo */}
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100">
+      <div className="bg-card rounded-2xl p-6 border border-border/50 shadow-sm">
         <div className="flex items-start gap-3 mb-4">
           <span
             className="shrink-0 w-3 h-3 rounded-full mt-1.5"
             style={{ backgroundColor: catColor }}
           />
           <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-bold text-slate-900 leading-snug">
+            <h1 className="text-lg font-bold text-foreground leading-snug">
               {email.subject ?? '(sin asunto)'}
             </h1>
-            <p className="text-sm text-slate-500 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               {email.sender_name ?? email.sender_email}
-              {email.sender_name && <span className="text-slate-400"> &lt;{email.sender_email}&gt;</span>}
+              {email.sender_name && <span className="text-muted-foreground"> &lt;{email.sender_email}&gt;</span>}
             </p>
           </div>
           <span
@@ -197,22 +197,22 @@ export default function EmailDetail() {
         </div>
 
         {/* Metadatos en grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-lg text-sm">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-secondary/30 rounded-lg text-sm">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Recibido</p>
-            <p className="mt-0.5 text-slate-700">{formatDateTime(email.received_at)}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Recibido</p>
+            <p className="mt-0.5 text-foreground/80">{formatDateTime(email.received_at)}</p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Procesado</p>
-            <p className="mt-0.5 text-slate-700">{formatDateTime(email.processed_at)}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Procesado</p>
+            <p className="mt-0.5 text-foreground/80">{formatDateTime(email.processed_at)}</p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Relevancia</p>
-            <p className="mt-0.5 text-slate-700 capitalize">{email.relevance ?? 'media'}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Relevancia</p>
+            <p className="mt-0.5 text-foreground/80 capitalize">{email.relevance ?? 'media'}</p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Estado</p>
-            <p className="mt-0.5 text-slate-700 capitalize">{email.status ?? 'pendiente'}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Estado</p>
+            <p className="mt-0.5 text-foreground/80 capitalize">{email.status ?? 'pendiente'}</p>
           </div>
         </div>
 
@@ -252,37 +252,37 @@ export default function EmailDetail() {
             <p className="text-xs font-semibold uppercase tracking-wider text-sky-600 mb-1">
               Resumen IA
             </p>
-            <p className="text-sm text-slate-700 leading-relaxed">{email.summary}</p>
+            <p className="text-sm text-black leading-relaxed">{email.summary}</p>
           </div>
         )}
       </div>
 
       {/* Cuerpo del correo */}
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100">
-        <h2 className="text-sm font-bold text-slate-900 mb-3">Contenido del correo</h2>
+      <div className="bg-card rounded-2xl p-6 border border-border/50 shadow-sm">
+        <h2 className="text-sm font-bold text-foreground mb-3">Contenido del correo</h2>
         {email.body_plain ? (
-          <pre className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap font-sans">
+          <pre className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap font-sans">
             {email.body_plain}
           </pre>
         ) : (
-          <p className="text-sm text-slate-400 italic">No hay contenido disponible</p>
+          <p className="text-sm text-muted-foreground italic">No hay contenido disponible</p>
         )}
       </div>
 
       {/* Clasificación multi-agente */}
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100">
-        <h2 className="text-sm font-bold text-slate-900 mb-3">Clasificación multi-agente</h2>
+      <div className="bg-card rounded-2xl p-6 border border-border/50 shadow-sm">
+        <h2 className="text-sm font-bold text-foreground mb-3">Clasificación multi-agente</h2>
 
         {votes && (
           <div className="space-y-2 mb-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Votos de los agentes</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Votos de los agentes</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {votes.map((vote) => (
                 <div
                   key={vote.agent}
-                  className="flex items-center justify-between p-3 rounded-lg bg-slate-50"
+                  className="flex items-center justify-between p-3 rounded-lg bg-secondary/30"
                 >
-                  <span className="text-xs font-semibold text-slate-500 uppercase">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase">
                     {METHOD_LABELS[vote.agent] ?? vote.agent}
                   </span>
                   <div className="flex items-center gap-2">
@@ -290,10 +290,10 @@ export default function EmailDetail() {
                       className="w-2 h-2 rounded-full"
                       style={{ backgroundColor: CATEGORY_COLORS[vote.category] ?? '#94a3b8' }}
                     />
-                    <span className="text-xs font-medium text-slate-700">
+                    <span className="text-xs font-medium text-foreground/80">
                       {CATEGORY_LABELS[vote.category] ?? vote.category}
                     </span>
-                    <span className="text-xs text-slate-400 font-mono">
+                    <span className="text-xs text-muted-foreground font-mono">
                       {formatConfidence(vote.confidence)}
                     </span>
                   </div>
@@ -316,8 +316,8 @@ export default function EmailDetail() {
 
       {/* Historial de clasificaciones */}
       {email.classification_history.length > 0 && (
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100">
-          <h2 className="text-sm font-bold text-slate-900 mb-3">Historial de clasificaciones</h2>
+        <div className="bg-card rounded-2xl p-6 border border-border/50 shadow-sm">
+          <h2 className="text-sm font-bold text-foreground mb-3">Historial de clasificaciones</h2>
           <div className="space-y-2">
             {[...email.classification_history]
               .sort((a, b) => {
@@ -342,7 +342,7 @@ function ChRow({ entry }: { entry: ClassificationHistoryItem }) {
   const catColor = CATEGORY_COLORS[entry.category] ?? '#94a3b8'
 
   return (
-    <div className="flex items-center justify-between px-4 py-2.5 rounded-lg bg-slate-50">
+    <div className="flex items-center justify-between px-4 py-2.5 rounded-lg bg-secondary/30">
       <div className="flex items-center gap-3">
         <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: catColor }} />
         <div>
@@ -359,12 +359,12 @@ function ChRow({ entry }: { entry: ClassificationHistoryItem }) {
             <span className="ml-1.5 text-[10px] font-semibold text-amber-600">Revisado</span>
           )}
         </div>
-        <span className="text-xs font-medium text-slate-700 capitalize">
+        <span className="text-xs font-medium text-foreground/80 capitalize">
           {CATEGORY_LABELS[entry.category] ?? entry.category}
         </span>
-        <span className="text-xs font-mono text-slate-400">{formatConfidence(entry.confidence)}</span>
+        <span className="text-xs font-mono text-muted-foreground">{formatConfidence(entry.confidence)}</span>
       </div>
-      <span className="text-[10px] text-slate-400">
+      <span className="text-[10px] text-muted-foreground">
         {entry.created_at ? formatDateTime(entry.created_at) : ''}
       </span>
     </div>
@@ -376,7 +376,7 @@ function LoadingState() {
     <div className="flex items-center justify-center py-20">
       <div className="text-center">
         <div className="w-8 h-8 border-4 border-sky-200 border-t-sky-500 rounded-full animate-spin mx-auto" />
-        <p className="mt-4 text-sm text-slate-500">Cargando correo...</p>
+        <p className="mt-4 text-sm text-muted-foreground">Cargando correo...</p>
       </div>
     </div>
   )
@@ -387,7 +387,7 @@ function ErrorState({ message }: { message: string }) {
     <div className="flex items-center justify-center py-20">
       <div className="text-center">
         <p className="text-red-500 font-semibold">Error al cargar</p>
-        <p className="text-sm text-slate-500 mt-1">{message}</p>
+        <p className="text-sm text-muted-foreground mt-1">{message}</p>
       </div>
     </div>
   )
