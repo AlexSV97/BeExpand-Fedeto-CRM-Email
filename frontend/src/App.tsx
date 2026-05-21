@@ -12,6 +12,7 @@
  *   *                → Redirige a /dashboard
  */
 
+import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Layout from './components/Layout'
@@ -49,10 +50,19 @@ function AppRoutes() {
   )
 }
 
+function DarkModeDetector() {
+  useEffect(() => {
+    // Siempre dark mode — como el diseño original de v0
+    document.documentElement.classList.add("dark");
+  }, []);
+  return null;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <DarkModeDetector />
         <AppRoutes />
       </AuthProvider>
     </BrowserRouter>

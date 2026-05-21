@@ -1,71 +1,232 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-/* ── Design System ── */
+@custom-variant dark (&:is(.dark *));
 
-@theme {
-  --color-primary: #1e293b;
-  --color-primary-light: #334155;
-  --color-accent: #0ea5e9;
-  --color-accent-hover: #0284c7;
-  --color-success: #22c55e;
-  --color-warning: #f59e0b;
-  --color-danger: #ef4444;
-  --color-surface: #f8fafc;
-  --color-card: #ffffff;
-  --color-text: #0f172a;
-  --color-text-secondary: #64748b;
-  --color-border: #e2e8f0;
-  --color-sidebar: #0f172a;
-  --color-sidebar-hover: #1e293b;
-  --color-sidebar-text: #94a3b8;
-  --color-sidebar-active: #ffffff;
+/* ═══════════════════════════════════════════
+   BeConnect — Premium Neutral Design System
+   Inspirado en Apple: clean, minimal, premium
+   ═══════════════════════════════════════════ */
+
+:root {
+  /* Premium neutral palette - Apple inspired */
+  --background: oklch(0.985 0.002 90);
+  --foreground: oklch(0.145 0.005 285);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0.005 285);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0.005 285);
+  --primary: oklch(0.205 0.01 285);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.96 0.002 90);
+  --secondary-foreground: oklch(0.205 0.01 285);
+  --muted: oklch(0.95 0.002 90);
+  --muted-foreground: oklch(0.45 0.01 285);
+  --accent: oklch(0.96 0.002 90);
+  --accent-foreground: oklch(0.205 0.01 285);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.9 0.002 90);
+  --input: oklch(0.9 0.002 90);
+  --ring: oklch(0.708 0.01 285);
+
+  /* Chart colors - refined */
+  --chart-1: oklch(0.55 0.15 250);
+  --chart-2: oklch(0.65 0.12 160);
+  --chart-3: oklch(0.6 0.14 30);
+  --chart-4: oklch(0.7 0.1 80);
+  --chart-5: oklch(0.5 0.12 300);
+
+  --radius: 0.75rem;
+
+  /* Glass effect */
+  --glass: oklch(1 0 0 / 0.7);
+  --glass-border: oklch(1 0 0 / 0.2);
+
+  /* Success/Warning colors */
+  --success: oklch(0.65 0.17 145);
+  --warning: oklch(0.75 0.15 65);
 }
 
-/* ── Base ── */
+.dark {
+  --background: oklch(0.12 0.005 285);
+  --foreground: oklch(0.95 0.002 90);
+  --card: oklch(0.16 0.005 285);
+  --card-foreground: oklch(0.95 0.002 90);
+  --popover: oklch(0.16 0.005 285);
+  --popover-foreground: oklch(0.95 0.002 90);
+  --primary: oklch(0.95 0 0);
+  --primary-foreground: oklch(0.15 0.005 285);
+  --secondary: oklch(0.22 0.005 285);
+  --secondary-foreground: oklch(0.95 0.002 90);
+  --muted: oklch(0.22 0.005 285);
+  --muted-foreground: oklch(0.65 0.005 285);
+  --accent: oklch(0.22 0.005 285);
+  --accent-foreground: oklch(0.95 0.002 90);
+  --destructive: oklch(0.5 0.2 25);
+  --destructive-foreground: oklch(0.95 0 0);
+  --border: oklch(0.25 0.005 285);
+  --input: oklch(0.25 0.005 285);
+  --ring: oklch(0.5 0.01 285);
 
-body {
-  margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: var(--color-surface);
-  color: var(--color-text);
-  -webkit-font-smoothing: antialiased;
+  /* Chart colors - dark mode */
+  --chart-1: oklch(0.65 0.18 250);
+  --chart-2: oklch(0.7 0.14 160);
+  --chart-3: oklch(0.7 0.16 30);
+  --chart-4: oklch(0.75 0.12 80);
+  --chart-5: oklch(0.6 0.14 300);
+
+  --glass: oklch(0.16 0.005 285 / 0.8);
+  --glass-border: oklch(1 0 0 / 0.1);
+
+  --success: oklch(0.7 0.18 145);
+  --warning: oklch(0.8 0.16 65);
 }
 
-/* ── Scrollbar ── */
+/* ============================================
+   Alias retrocompatibles para componentes
+   que aún usan las variables CSS antiguas
+   (TimeSeriesCharts, etc.)
+   ============================================ */
+:root, .dark {
+  --color-text-primary: var(--foreground);
+  --color-text-secondary: var(--muted-foreground);
+  --color-text-tertiary: var(--muted-foreground);
+  --color-bg-card: var(--card);
+  --color-bg-subtle: var(--secondary);
+  --color-bg-base: var(--background);
+  --color-bg-surface: var(--card);
+  --color-accent: var(--chart-1);
+  --color-accent-hover: var(--chart-1);
+  --color-accent-light: oklch(from var(--chart-1) l c h / 0.1);
+  --color-accent-mid: oklch(from var(--chart-1) l c h / 0.2);
+  --color-border-subtle: var(--border);
+  --color-border-default: var(--border);
+  --color-danger: var(--destructive);
+  --color-surface-elevated: var(--card);
+  --color-cat-cliente: var(--chart-1);
+  --color-cat-lead: var(--chart-2);
+  --color-cat-proveedor: var(--chart-3);
+  --color-cat-nulo: var(--muted-foreground);
+}
 
+@theme inline {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-glass: var(--glass);
+  --color-glass-border: var(--glass-border);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
+  height: 8px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
+  background: oklch(0.7 0 0 / 0.3);
+  border-radius: 4px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: oklch(0.6 0 0 / 0.4);
 }
 
-/* ── Animations ── */
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.dark ::-webkit-scrollbar-thumb {
+  background: oklch(0.4 0 0 / 0.4);
 }
 
-.animate-fadeIn {
-  animation: fadeIn 0.2s ease-out;
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.5 0 0 / 0.5);
 }
 
-/* ── Utilities ── */
+/* ── Animaciones ambientales ── */
 
-* {
-  box-sizing: border-box;
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient-shift 15s ease infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  25% { transform: translateY(-20px) translateX(10px); }
+  50% { transform: translateY(-10px) translateX(-10px); }
+  75% { transform: translateY(-30px) translateX(5px); }
+}
+
+.animate-float {
+  animation: float 20s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float 25s ease-in-out infinite;
+  animation-delay: -5s;
+}
+
+.animate-float-slow {
+  animation: float 30s ease-in-out infinite;
+  animation-delay: -10s;
+}
+
+/* ── Tabular numbers ── */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
