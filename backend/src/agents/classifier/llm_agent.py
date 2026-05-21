@@ -33,27 +33,27 @@ EJEMPLOS:
 
 Asunto: Incidencia con plataforma de facturación
 Cuerpo: Buenos días, desde ayer no podemos acceder al sistema de facturación. Necesitamos que lo revisen urgente. Gracias.
-RESPUESTA: {"category": "cliente", "confidence": 0.92, "reason": "Reporta incidencia con servicio que ya usa, tono de urgencia. Cliente existente."}
+RESPUESTA: {{"category": "cliente", "confidence": 0.92, "reason": "Reporta incidencia con servicio que ya usa, tono de urgencia. Cliente existente."}}
 
 Asunto: Solicitud de presupuesto servicios consultoría
 Cuerpo: Buenos días, nos gustaría recibir información detallada y precios sobre sus servicios de consultoría TI para valorar una posible contratación. Quedamos a la espera.
-RESPUESTA: {"category": "lead", "confidence": 0.90, "reason": "Solicita presupuesto sin ser cliente aún, tono consultivo. Potencial cliente."}
+RESPUESTA: {{"category": "lead", "confidence": 0.90, "reason": "Solicita presupuesto sin ser cliente aún, tono consultivo. Potencial cliente."}}
 
 Asunto: Oferta especial software gestión empresarial
 Cuerpo: Estimados, les escribimos para presentarles nuestra solución de gestión empresarial con descuento por lanzamiento este mes. ¿Les interesa una demo?
-RESPUESTA: {"category": "proveedor", "confidence": 0.88, "reason": "Oferta entrante de producto externo no solicitada. Proveedor contactando."}
+RESPUESTA: {{"category": "proveedor", "confidence": 0.88, "reason": "Oferta entrante de producto externo no solicitada. Proveedor contactando."}}
 
 Asunto: Newsletter semanal de tecnología
 Cuerpo: Descubre las últimas novedades en tecnología para tu negocio. Este mes te traemos los mejores consejos para digitalizar tu empresa.
-RESPUESTA: {"category": "nulo", "confidence": 0.95, "reason": "Newsletter genérico sin relación comercial directa. Correo masivo."}
+RESPUESTA: {{"category": "nulo", "confidence": 0.95, "reason": "Newsletter genérico sin relación comercial directa. Correo masivo."}}
 
 Asunto: Reunión de seguimiento proyecto Q2
 Cuerpo: Hola, tal como acordamos te envío la agenda para la reunión de seguimiento del próximo martes. Adjunto el informe de avance del proyecto.
-RESPUESTA: {"category": "cliente", "confidence": 0.85, "reason": "Reunión de seguimiento con cliente existente. Proyecto en curso."}
+RESPUESTA: {{"category": "cliente", "confidence": 0.85, "reason": "Reunión de seguimiento con cliente existente. Proyecto en curso."}}
 
 Asunto: Consulta sobre precios de planes
 Cuerpo: Estoy interesado en sus servicios pero me gustaría saber si tienen planes para pymes. Agradecería me llamaran para comentarlo.
-RESPUESTA: {"category": "lead", "confidence": 0.93, "reason": "Consulta comercial sin ser cliente. Potencial lead interesado."}
+RESPUESTA: {{"category": "lead", "confidence": 0.93, "reason": "Consulta comercial sin ser cliente. Potencial lead interesado."}}
 
 Reglas IMPORTANTES:
 - Si hay dudas entre cliente y lead, prioriza lead (mejor pecar de optimista para no perder oportunidades).
@@ -62,7 +62,7 @@ Reglas IMPORTANTES:
 - La confianza debe reflejar tu seguridad: 0.95+ para casos claros, 0.60-0.75 para dudosos.
 
 Responde ÚNICAMENTE con un JSON válido en este formato exacto, sin markdown, sin explicaciones adicionales:
-{"category": "cliente", "confidence": 0.85, "reason": "explicación breve"}
+{{"category": "cliente", "confidence": 0.85, "reason": "explicación breve"}}
 
 Asunto: {subject}
 Cuerpo: {body}"""
