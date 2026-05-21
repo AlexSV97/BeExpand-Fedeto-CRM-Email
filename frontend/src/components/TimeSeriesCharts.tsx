@@ -31,11 +31,11 @@ import {
 // ── Constantes ──
 
 const CATEGORY_COLORS: Record<string, string> = {
-  cliente: '#0ea5e9',
+  cliente: '#14b8a6',
   lead: '#f59e0b',
-  proveedor: '#22c55e',
-  nulo: '#94a3b8',
-  sin_categoria: '#94a3b8',
+  proveedor: '#6366f1',
+  nulo: '#475569',
+  sin_categoria: '#475569',
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -183,10 +183,10 @@ export default function TimeSeriesCharts() {
       {/* Cabecera */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-bold text-slate-900">
+          <h3 className="text-lg font-bold font-display" style={{ color: 'var(--color-text-primary)' }}>
             Predicción de Correos
           </h3>
-          <p className="text-sm text-slate-500 mt-0.5">
+          <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
             Proyecciones a {forecastDays} días basadas en el histórico del sistema
           </p>
         </div>
@@ -209,21 +209,28 @@ export default function TimeSeriesCharts() {
                 <AreaChart data={volumeForecastData}>
                   <defs>
                     <linearGradient id="volFcGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.02} />
+                      <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#14b8a6" stopOpacity={0.02} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#94a3b8' }} interval="preserveStartEnd" />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} />
                   <Tooltip
                     labelFormatter={(label) => `Fecha: ${label}`}
                     formatter={(value: unknown) => [`${Math.round(Number(value) || 0)} correos`, 'Pronóstico']}
+                    contentStyle={{
+                      backgroundColor: '#1e293b',
+                      border: '1px solid #334155',
+                      borderRadius: '8px',
+                      color: '#f1f5f9',
+                      fontSize: '12px',
+                    }}
                   />
                   <Area
                     type="monotone"
                     dataKey="valor"
-                    stroke="#0ea5e9"
+                    stroke="#14b8a6"
                     strokeWidth={2}
                     fill="url(#volFcGrad)"
                     name="Pronóstico"
@@ -244,11 +251,19 @@ export default function TimeSeriesCharts() {
                       </linearGradient>
                     ))}
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                  <Tooltip />
-                  <Legend />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#94a3b8' }} interval="preserveStartEnd" />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#1e293b',
+                      border: '1px solid #334155',
+                      borderRadius: '8px',
+                      color: '#f1f5f9',
+                      fontSize: '12px',
+                    }}
+                  />
+                  <Legend wrapperStyle={{ color: '#94a3b8', fontSize: '11px' }} />
                   {forecastCategories.map((cat) => (
                     <Area
                       key={cat}
@@ -268,16 +283,23 @@ export default function TimeSeriesCharts() {
             <ChartCard title="Precisión media del modelo">
               <ResponsiveContainer width="100%" height={240}>
                 <LineChart data={confidenceForecastData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#94a3b8' }} interval="preserveStartEnd" />
                   <YAxis
                     domain={[0, 1]}
-                    tick={{ fontSize: 11 }}
+                    tick={{ fontSize: 11, fill: '#64748b' }}
                     tickFormatter={(v: number) => `${(v * 100).toFixed(0)}%`}
                   />
                   <Tooltip
                     labelFormatter={(label) => `Fecha: ${label}`}
                     formatter={(value: unknown) => [formatConfidence(Number(value) || 0), 'Precisión']}
+                    contentStyle={{
+                      backgroundColor: '#1e293b',
+                      border: '1px solid #334155',
+                      borderRadius: '8px',
+                      color: '#f1f5f9',
+                      fontSize: '12px',
+                    }}
                   />
                   <Line
                     type="monotone"
@@ -301,12 +323,19 @@ export default function TimeSeriesCharts() {
                       <stop offset="95%" stopColor="#22c55e" stopOpacity={0.02} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#94a3b8' }} interval="preserveStartEnd" />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} />
                   <Tooltip
                     labelFormatter={(label) => `Fecha: ${label}`}
                     formatter={(value: unknown) => [`${Math.round(Number(value) || 0)} contactos`, 'Pronóstico']}
+                    contentStyle={{
+                      backgroundColor: '#1e293b',
+                      border: '1px solid #334155',
+                      borderRadius: '8px',
+                      color: '#f1f5f9',
+                      fontSize: '12px',
+                    }}
                   />
                   <Area
                     type="monotone"
@@ -348,16 +377,21 @@ function ForecastHorizonSelector({
   onChange: (d: number) => void
 }) {
   return (
-    <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+    <div className="inline-flex items-center gap-1 rounded-lg p-1"
+      style={{ backgroundColor: 'rgba(255,255,255,0.04)' }}
+    >
       {horizons.map((d) => (
         <button
           key={d}
           onClick={() => onChange(d)}
-          className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-150 cursor-pointer
-            ${selected === d
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-500 hover:text-slate-700'
-            }`}
+          className="px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-150 cursor-pointer"
+          style={{
+            backgroundColor: selected === d ? 'var(--color-bg-card)' : 'transparent',
+            color: selected === d ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+            boxShadow: selected === d ? '0 1px 3px rgba(0,0,0,0.3)' : 'none',
+          }}
+          onMouseEnter={e => { if (selected !== d) e.currentTarget.style.color = 'var(--color-text-secondary)'; }}
+          onMouseLeave={e => { if (selected !== d) e.currentTarget.style.color = 'var(--color-text-tertiary)'; }}
         >
           {d} días
         </button>
@@ -391,20 +425,20 @@ function ForecastSection({
   )
 
   return (
-    <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+    <div className="card-solid p-5">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h4 className="text-sm font-bold text-slate-900">
+          <h4 className="text-sm font-bold font-display" style={{ color: 'var(--color-text-primary)' }}>
             Predicción — Próximos {forecastDays} días
           </h4>
           {summary && (
-            <p className="text-sm text-slate-600 mt-0.5">
-              Se esperan <strong className="text-slate-900">~{summary.total} correos</strong> en los próximos {forecastDays} días,
+            <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+              Se esperan <strong style={{ color: 'var(--color-text-primary)' }}>~{summary.total} correos</strong> en los próximos {forecastDays} días,
               con mayoría de{' '}
               {summary.top.slice(0, 2).map((c, i) => (
                 <span key={c.category}>
                   {i > 0 ? ' y ' : ''}
-                  <strong className="text-slate-900">{c.category.toLowerCase()} ({Math.round(c.predicted_count)})</strong>
+                  <strong style={{ color: 'var(--color-text-primary)' }}>{c.category.toLowerCase()} ({Math.round(c.predicted_count)})</strong>
                 </span>
               ))}
               .
@@ -413,22 +447,27 @@ function ForecastSection({
         </div>
         <div className="flex items-center gap-2">
           {/* Selector de horizonte */}
-          <div className="inline-flex items-center gap-0.5 bg-slate-50 rounded-md p-0.5">
+          <div className="inline-flex items-center gap-0.5 rounded-md p-0.5"
+            style={{ backgroundColor: 'rgba(255,255,255,0.04)' }}
+          >
             {FORECAST_HORIZONS.map((d) => (
               <button
                 key={d}
                 onClick={() => onForecastDaysChange(d)}
-                className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all duration-150 cursor-pointer
-                  ${forecastDays === d
-                    ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
-                    : 'text-slate-500 hover:text-slate-700'
-                  }`}
+                className="px-2.5 py-1 rounded text-[11px] font-semibold transition-all duration-150 cursor-pointer"
+                style={{
+                  backgroundColor: forecastDays === d ? 'var(--color-bg-card)' : 'transparent',
+                  color: forecastDays === d ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+                  boxShadow: forecastDays === d ? '0 1px 3px rgba(0,0,0,0.3)' : 'none',
+                }}
               >
                 {d}d
               </button>
             ))}
           </div>
-          <span className="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-mono font-semibold bg-slate-100 text-slate-500">
+          <span className="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-mono font-semibold"
+            style={{ backgroundColor: 'rgba(255,255,255,0.04)', color: 'var(--color-text-tertiary)' }}
+          >
             {forecast.method}
           </span>
         </div>
@@ -439,11 +478,19 @@ function ForecastSection({
         <div>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={barData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="category" tick={{ fontSize: 12 }} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Bar dataKey="predicted" radius={[6, 6, 0, 0]} name="Correos estimados">
+              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+<XAxis dataKey="category" tick={{ fontSize: 12, fill: '#94a3b8' }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#1e293b',
+                      border: '1px solid #334155',
+                      borderRadius: '8px',
+                      color: '#f1f5f9',
+                      fontSize: '12px',
+                    }}
+                  />
+                  <Bar dataKey="predicted" radius={[6, 6, 0, 0]} name="Correos estimados">
                 {barData.map((entry, i) => (
                   <Cell key={i} fill={entry.fill} />
                 ))}
@@ -454,7 +501,7 @@ function ForecastSection({
 
         {/* Tabla de tendencias */}
         <div className="flex flex-col justify-center">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">
+          <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--color-text-tertiary)' }}>
             Tendencia por categoría
           </p>
           <div className="space-y-2">
@@ -463,19 +510,20 @@ function ForecastSection({
               return (
                 <div
                   key={c.category}
-                  className="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50"
+                  className="flex items-center justify-between px-3 py-2 rounded-lg"
+                  style={{ backgroundColor: 'var(--color-bg-subtle)' }}
                 >
                   <div className="flex items-center gap-2">
                     <span
                       className="w-2.5 h-2.5 rounded-full shrink-0"
                       style={{ backgroundColor: CATEGORY_COLORS[c.category] ?? '#94a3b8' }}
                     />
-                    <span className="text-sm font-medium text-slate-700">
+                    <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
                       {CATEGORY_LABELS[c.category] ?? c.category}
                     </span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-bold text-slate-900 tabular-nums">
+                    <span className="text-sm font-bold tabular-nums" style={{ color: 'var(--color-text-primary)' }}>
                       ~{Math.round(c.predicted_count)}
                     </span>
                     <span
@@ -505,8 +553,8 @@ function ChartCard({
   children: React.ReactNode
 }) {
   return (
-    <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
-      <h4 className="text-sm font-semibold text-slate-700 mb-3">{title}</h4>
+    <div className="card-solid p-5">
+      <h4 className="text-sm font-semibold mb-3" style={{ color: 'var(--color-text-primary)' }}>{title}</h4>
       {children}
     </div>
   )
@@ -516,8 +564,10 @@ function LoadingState() {
   return (
     <div className="flex items-center justify-center py-12">
       <div className="text-center">
-        <div className="w-6 h-6 border-3 border-sky-200 border-t-sky-500 rounded-full animate-spin mx-auto" />
-        <p className="mt-3 text-sm text-slate-500">Cargando predicciones...</p>
+        <div className="w-6 h-6 border-3 rounded-full animate-spin mx-auto"
+          style={{ borderColor: 'rgba(255,255,255,0.08)', borderTopColor: 'var(--color-accent)' }}
+        />
+        <p className="mt-3 text-sm" style={{ color: 'var(--color-text-secondary)' }}>Cargando predicciones...</p>
       </div>
     </div>
   )
@@ -525,7 +575,7 @@ function LoadingState() {
 
 function ErrorState({ message }: { message: string }) {
   return (
-    <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">
+    <div className="p-4 rounded-xl text-sm" style={{ backgroundColor: '#450a0a', border: '1px solid #991b1b', color: '#fca5a5' }}>
       Error al cargar predicciones: {message}
     </div>
   )
@@ -533,9 +583,10 @@ function ErrorState({ message }: { message: string }) {
 
 function EmptyState() {
   return (
-    <div className="bg-white rounded-xl p-8 shadow-sm border border-slate-100 text-center">
+    <div className="card-solid p-8 text-center">
       <svg
-        className="w-10 h-10 mx-auto text-slate-300 mb-3"
+        className="w-10 h-10 mx-auto mb-3"
+        style={{ color: 'var(--color-text-tertiary)' }}
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -546,10 +597,10 @@ function EmptyState() {
         <path d="M3 3v18h18" />
         <path d="M7 16l4-8 4 4 4-6" />
       </svg>
-      <p className="text-sm text-slate-500">
+      <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
         No hay suficientes datos para generar predicciones.
       </p>
-      <p className="text-xs text-slate-400 mt-1">
+      <p className="text-xs mt-1" style={{ color: 'var(--color-text-tertiary)' }}>
         Las predicciones aparecerán cuando el sistema tenga al menos 2 días de datos históricos.
       </p>
     </div>
