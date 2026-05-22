@@ -1,5 +1,6 @@
 from . import accounts
 from . import auth
+from . import chat
 from . import classification
 from . import contacts
 from . import crm
