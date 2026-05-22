@@ -238,6 +238,7 @@ class ActionExecutor:
                     "company": ctx.extracted.company if ctx.extracted else None,
                 },
                 "processing_time_ms": ctx.processing_time_ms,
+                "suggested_reply": ctx.suggested_reply or "",
             },
         )
         self.db.add(email)

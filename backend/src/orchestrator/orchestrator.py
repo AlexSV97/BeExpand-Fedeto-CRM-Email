@@ -25,6 +25,7 @@ from src.agents import (
     AnalyzerAgent,
     BertClassifierAgent,
     LLMClassifierAgent,
+    ReplySuggesterAgent,
     RouterAgent,
     RuleClassifierAgent,
 )
@@ -46,6 +47,7 @@ class Orchestrator:
         llm_classifier: LLMClassifierAgent | None = None,
         resolver: VoteResolver | None = None,
         router: RouterAgent | None = None,
+        reply_suggester: ReplySuggesterAgent | None = None,
     ):
         self.db = db
         self.analyzer = analyzer or AnalyzerAgent()
@@ -54,6 +56,7 @@ class Orchestrator:
         self.llm_classifier = llm_classifier or LLMClassifierAgent()
         self.resolver = resolver or VoteResolver()
         self.router = router or RouterAgent()
+        self.reply_suggester = reply_suggester or ReplySuggesterAgent()
 
     async def process(
         self,
@@ -141,7 +144,15 @@ class Orchestrator:
                 ctx.routing = None
                 logger.info("🚫 Email nulo — sin enrutamiento")
 
-            # ── Paso 5: Action Executor (persistir + reenviar) ──
+            # ── Paso 5: Reply Suggester (borrador de respuesta) ──
+            if category != "nulo":
+                logger.info("✍️  ReplySuggester: generando borrador...")
+                suggested_reply = await self.reply_suggester.generate(ctx)
+            else:
+                suggested_reply = ""
+            ctx.suggested_reply = suggested_reply
+
+            # ── Paso 6: Action Executor (persistir + reenviar) ──
             logger.info("💾 Action Executor: guardando en BD y reenviando...")
             executor = ActionExecutor(db=session)
             await executor.execute_all(ctx)

@@ -176,6 +176,9 @@ class EmailContext:
     # Fase 6: Acciones ejecutadas (lo escribe el Action Executor)
     actions: list[ActionResult] = field(default_factory=list)
 
+    # Fase 6b: Borrador de respuesta (lo escribe el ReplySuggesterAgent)
+    suggested_reply: str = ""
+
     # Metadatos del proceso
     processing_start: datetime | None = None
     processing_end: datetime | None = None
