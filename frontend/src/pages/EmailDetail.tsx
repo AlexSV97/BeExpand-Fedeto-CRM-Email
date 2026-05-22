@@ -123,6 +123,11 @@ function extractVotes(extra: Record<string, unknown> | null) {
   return (extra.votes as { agent: string; category: string; confidence: number }[]) ?? null
 }
 
+function extractSuggestedReply(extra: Record<string, unknown> | null): string | null {
+  if (!extra) return null
+  return (extra.suggested_reply as string) || null
+}
+
 // ── Componente principal ──
 
 export default function EmailDetail() {
@@ -151,6 +156,7 @@ export default function EmailDetail() {
   const routing = extractRouting(email.extra_data)
   const votes = extractVotes(email.extra_data)
   const resolution = email.extra_data?.resolution_method as string | null
+  const suggestedReply = extractSuggestedReply(email.extra_data)
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -269,6 +275,9 @@ export default function EmailDetail() {
         )}
       </div>
 
+      {/* Borrador de respuesta IA */}
+      {suggestedReply && <SuggestedReplyCard reply={suggestedReply} />}
+
       {/* Clasificación multi-agente */}
       <div className="bg-card rounded-2xl p-6 border border-border/50 shadow-sm">
         <h2 className="text-sm font-bold text-foreground mb-3">Clasificación multi-agente</h2>
@@ -367,6 +376,51 @@ function ChRow({ entry }: { entry: ClassificationHistoryItem }) {
       <span className="text-[10px] text-muted-foreground">
         {entry.created_at ? formatDateTime(entry.created_at) : ''}
       </span>
+    </div>
+  )
+}
+
+function SuggestedReplyCard({ reply }: { reply: string }) {
+  const [copied, setCopied] = useState(false)
+
+  function handleCopy() {
+    navigator.clipboard.writeText(reply).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  return (
+    <div className="bg-card rounded-2xl p-6 border border-border/50 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-bold text-foreground">Borrador de respuesta IA</h2>
+        <button
+          onClick={handleCopy}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
+            bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200
+            transition-all cursor-pointer"
+        >
+          {copied ? (
+            <>✓ Copiado</>
+          ) : (
+            <>
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+              Copiar
+            </>
+          )}
+        </button>
+      </div>
+      <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-lg">
+        <pre className="text-sm text-emerald-900 leading-relaxed whitespace-pre-wrap font-sans">
+          {reply}
+        </pre>
+      </div>
+      <p className="mt-2 text-[11px] text-muted-foreground">
+        Este borrador fue generado automáticamente por IA. Revísalo antes de enviar.
+      </p>
     </div>
   )
 }
