@@ -413,3 +413,19 @@ export async function getTimeSeries(
 ): Promise<TimeSeriesResponse> {
   return request<TimeSeriesResponse>('GET', `/dashboard/timeseries?period=${period}`)
 }
+
+// ── Chat ──
+
+export interface ChatRequest {
+  message: string
+  conversation_id?: string | null
+}
+
+export interface ChatResponse {
+  response: string
+  conversation_id: string
+}
+
+export async function sendChatMessage(data: ChatRequest): Promise<ChatResponse> {
+  return request<ChatResponse>('POST', '/chat', data)
+}

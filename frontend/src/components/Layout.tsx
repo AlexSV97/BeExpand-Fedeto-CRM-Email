@@ -8,6 +8,7 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { motion } from 'framer-motion'
+import ChatWidget from './ChatWidget'
 
 // ── Iconos inline ──
 
@@ -135,6 +136,7 @@ export default function Layout() {
       <main className="pt-16">
         <Outlet />
       </main>
+      <ChatWidget />
     </div>
   )
 }
