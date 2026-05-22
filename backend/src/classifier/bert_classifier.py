@@ -20,9 +20,12 @@ from typing import Optional
 
 import numpy as np
 
+from src.config import get_settings
+
 logger = logging.getLogger(__name__)
 
-MODEL_DIR = Path(__file__).resolve().parent / "model"
+_DEFAULT_MODEL_DIR = Path(__file__).resolve().parent / "model"
+MODEL_DIR = Path(get_settings().bert_model_path) if get_settings().bert_model_path else _DEFAULT_MODEL_DIR
 
 
 class BertClassifier:

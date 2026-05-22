@@ -32,7 +32,8 @@ from transformers import (
 # ── Config ──
 
 MODEL_NAME = "distilbert-base-multilingual-cased"
-MODEL_OUTPUT_DIR = Path(__file__).resolve().parent.parent / "src" / "classifier" / "model"
+_DEFAULT_MODEL_OUTPUT_DIR = Path(__file__).resolve().parent.parent / "src" / "classifier" / "model"
+MODEL_OUTPUT_DIR = Path(os.getenv("BERT_MODEL_PATH", str(_DEFAULT_MODEL_OUTPUT_DIR)))
 NUM_LABELS = 4
 LABEL_MAP = {"cliente": 0, "lead": 1, "proveedor": 2, "pendiente": 3}
 ID2LABEL = {v: k for k, v in LABEL_MAP.items()}

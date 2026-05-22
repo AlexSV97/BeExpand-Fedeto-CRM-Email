@@ -4,6 +4,11 @@ BertClassifierAgent — sub-agente de clasificación basado en DistilBERT fine-t
 Vota usando el modelo de ML local (~50ms/inferencia).
 El modelo debe estar entrenado en scripts/train_bert_hybrid.py.
 Si el modelo no está disponible, vota con confianza 0 (se ignora).
+
+La ruta del modelo se resuelve en este orden:
+1. Parámetro explícito `model_dir`
+2. Variable de entorno BERT_MODEL_PATH
+3. Ruta por defecto: backend/src/classifier/model/
 """
 
 import asyncio
@@ -13,18 +18,29 @@ from pathlib import Path
 from typing import Optional
 
 from src.agents.classifier.base import BaseClassifierAgent
+from src.config import get_settings
 from src.orchestrator.context import ClassifierVote
 
 logger = logging.getLogger(__name__)
 
-MODEL_DIR = Path(__file__).resolve().parent.parent.parent / "classifier" / "model"
+_DEFAULT_MODEL_DIR = Path(__file__).resolve().parent.parent.parent / "classifier" / "model"
+
+
+def _resolve_model_dir(override: Optional[Path] = None) -> Path:
+    """Resuelve la ruta del modelo con prioridad: override > env > default."""
+    if override is not None:
+        return override
+    env_path = get_settings().bert_model_path
+    if env_path:
+        return Path(env_path)
+    return _DEFAULT_MODEL_DIR
 
 
 class BertClassifierAgent(BaseClassifierAgent):
     """Clasificador BERT que vota en el sistema multi-agente."""
 
     def __init__(self, model_dir: Optional[Path] = None):
-        self.model_dir = model_dir or MODEL_DIR
+        self.model_dir = _resolve_model_dir(model_dir)
         self.model = None
         self.tokenizer = None
         self.labels = {"cliente": 0, "lead": 1, "proveedor": 2, "nulo": 3}

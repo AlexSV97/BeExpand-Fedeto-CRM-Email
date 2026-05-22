@@ -35,12 +35,17 @@ from transformers import (
     TrainingArguments,
 )
 
+from src.config import get_settings
+
 logger = logging.getLogger(__name__)
 
 # ── Config ──
 
 MODEL_NAME = "distilbert-base-multilingual-cased"
-MODEL_OUTPUT_DIR = Path(__file__).resolve().parent.parent / "classifier" / "model"
+_MODEL_OUTPUT_DIR_DEFAULT = Path(__file__).resolve().parent.parent / "classifier" / "model"
+MODEL_OUTPUT_DIR = Path(
+    get_settings().bert_model_path
+) if get_settings().bert_model_path else _MODEL_OUTPUT_DIR_DEFAULT
 NUM_LABELS = 4
 LABEL_MAP = {"cliente": 0, "lead": 1, "proveedor": 2, "nulo": 3}
 ID2LABEL = {v: k for k, v in LABEL_MAP.items()}
