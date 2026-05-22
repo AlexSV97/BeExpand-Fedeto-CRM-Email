@@ -154,6 +154,42 @@ def parse_raw_email(raw_bytes: bytes) -> dict:
 # ── Sync con Orchestrator ──
 
 
+def _ensure_imap_folder(imap, folder_name: str) -> bool:
+    """
+    Crea una carpeta IMAP si no existe.
+    Gmail no distingue entre mayúsculas/minúsculas en nombres de carpeta.
+    """
+    try:
+        imap.create(folder_name)
+        logger.info("Carpeta IMAP creada: %s", folder_name)
+        return True
+    except imaplib.IMAP4.error:
+        # La carpeta ya existe — es esperado
+        return True
+    except Exception as e:
+        logger.warning("No se pudo crear carpeta IMAP '%s': %s", folder_name, e)
+        return False
+
+
+def _move_to_imap_folder(imap, msg_id: bytes, folder_name: str) -> bool:
+    """
+    Mueve un email a otra carpeta IMAP: copia + marca como borrado en origen.
+    
+    El borrado físico (EXPUNGE) se hace al final del ciclo de sync
+    para no alterar los IDs de mensaje durante la iteración.
+    """
+    try:
+        result = imap.copy(msg_id, folder_name)
+        if result[0] == "OK":
+            imap.store(msg_id, "+FLAGS", "\\Deleted")
+            return True
+        logger.warning("Copy a %s falló: %s", folder_name, result)
+        return False
+    except Exception as e:
+        logger.error("Error moviendo email %s a %s: %s", msg_id, folder_name, e)
+        return False
+
+
 async def sync_emails(db: Optional[AsyncSession] = None) -> dict:
     """
     Sincroniza correos desde Gmail vía IMAP y los procesa con el Orchestrator.
@@ -212,6 +248,9 @@ async def sync_emails(db: Optional[AsyncSession] = None) -> dict:
     from src.orchestrator.orchestrator import Orchestrator
     orchestrator = Orchestrator()
 
+    moved_count = 0
+    folder_map = settings.imap_folder_map or {}
+
     try:
         for msg_id in ids:
             try:
@@ -247,6 +286,14 @@ async def sync_emails(db: Optional[AsyncSession] = None) -> dict:
                 # Marcar como visto
                 imap.store(msg_id, "+FLAGS", "\\Seen")
 
+                # Mover a carpeta temática según categoría
+                if ctx.final_category and ctx.final_category in folder_map:
+                    target = folder_map[ctx.final_category]
+                    _ensure_imap_folder(imap, target)
+                    if _move_to_imap_folder(imap, msg_id, target):
+                        moved_count += 1
+                        logger.debug("Movido %s → %s", parsed.get("subject"), target)
+
                 logger.info(
                     "Procesado: %s → %s (%.0f%%) | ruta: %s | %s",
                     parsed.get("subject"),
@@ -280,6 +327,16 @@ async def sync_emails(db: Optional[AsyncSession] = None) -> dict:
     finally:
         if close_db:
             await session.close()
+        if moved_count > 0:
+            try:
+                imap.expunge()
+                logger.info("Expunged %d mensajes marcados como borrados", moved_count)
+            except Exception as e:
+                logger.warning("Error en EXPUNGE: %s", e)
         imap.logout()
+
+    if moved_count > 0:
+        summary["moved_to_folders"] = moved_count
+        logger.info("Movidos %d emails a carpetas IMAP temáticas", moved_count)
 
     return summary
