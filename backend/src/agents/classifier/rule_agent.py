@@ -69,6 +69,15 @@ KEYWORD_WEIGHTS: list[tuple[str, int, str]] = [
     ("purchase", 2, "proveedor"),
     ("materiales", 3, "proveedor"),
     ("suministro", 3, "proveedor"),
+    # ── Proveedor: outreach comercial (1-3) ──
+    ("ofertamos", 3, "proveedor"),
+    ("ofrecemos", 2, "proveedor"),
+    ("distribuidor", 2, "proveedor"),
+    ("suministrar", 3, "proveedor"),
+    ("fabricante", 2, "proveedor"),
+    # ── Proveedor: colaboración (1, baja para no chocar con lead) ──
+    ("representante", 1, "proveedor"),
+    ("propuesta comercial", 2, "proveedor"),
     # ── Spam/Nulo ──
     ("newsletter", 2, "nulo"),
     ("boletín", 2, "nulo"),

@@ -39,7 +39,8 @@ from transformers import (
 # ── Config ──
 
 MODEL_NAME = "distilbert-base-multilingual-cased"
-MODEL_OUTPUT_DIR = Path(__file__).resolve().parent.parent / "src" / "classifier" / "model"
+_DEFAULT_MODEL_OUTPUT_DIR = Path(__file__).resolve().parent.parent / "src" / "classifier" / "model"
+MODEL_OUTPUT_DIR = Path(os.getenv("BERT_MODEL_PATH", str(_DEFAULT_MODEL_OUTPUT_DIR)))
 NUM_LABELS = 4
 LABEL_MAP = {"cliente": 0, "lead": 1, "proveedor": 2, "nulo": 3}
 ID2LABEL = {v: k for k, v in LABEL_MAP.items()}
@@ -301,6 +302,15 @@ SUBJECT_PATTERNS = {
         "Resolución de incidencia",
         "Comunicado del proveedor",
         "Aviso de facturación",
+        # ── Proveedor: outreach comercial (nuevo) ──
+        "Presentación de nuestra empresa",
+        "Oferta de servicios de {servicio}",
+        "Propuesta de colaboración",
+        "Somos proveedores de {producto}",
+        "Nueva propuesta de valor",
+        "Catálogo de productos {ano}",
+        "¿Necesitan {servicio}?",
+        "Soluciones de {servicio} para su empresa",
     ],
     "nulo": [
         "Felicitaciones navidad",
@@ -363,6 +373,15 @@ BODY_TEMPLATES = {
         "Actualizamos nuestras condiciones comerciales para {ano}. Los nuevos precios entrarán en vigor el {fecha}.",
         "Buenos días, adjuntamos la factura del mes de {mes} por los suministros entregados. Importe total: {importe} EUR.",
         "Les recordamos que el pedido {num} está pendiente de pago. Por favor, regularicen la situación a la mayor brevedad.",
+        # ── Proveedor: outreach comercial (nuevo) ──
+        "Somos una empresa especializada en {servicio}. Nos gustaría presentarles nuestra propuesta y explorar posibles vías de colaboración.",
+        "Les ofrecemos nuestros servicios de {servicio}. Somos {tipo_empresa} con más de {anos} años de experiencia en el sector.",
+        "Estimados, nos ponemos en contacto para presentarles nuestra empresa. Ofrecemos soluciones de {servicio} que pueden ser de su interés.",
+        "Buenos días, somos proveedores de {producto} y nos gustaría enviarles información sobre nuestros productos y tarifas.",
+        "Les escribimos para ofrecerles nuestros servicios de {servicio}. Trabajamos con empresas como la suya para ayudarles a optimizar {tema}.",
+        "Nos presentamos: somos {tipo_empresa} y ofrecemos {servicio} a medida. Adjuntamos nuestro catálogo para su valoración.",
+        "Queremos ofrecerles nuestra solución de {servicio} que ayuda a empresas del sector a mejorar {tema}. ¿Les interesaría una demo gratuita?",
+        "Buenos días, somos distribuidores autorizados de {producto} y les ofrecemos condiciones especiales por lanzamiento.",
     ],
     "nulo": [
         "Gracias por su confianza durante este año. Les deseamos unas felices fiestas y un próspero año nuevo.",
@@ -404,6 +423,10 @@ ENGLISH_SUBJECTS = {
         "Price update",
         "Delivery notice",
         "Supply offer",
+        "Company presentation",
+        "Service offer",
+        "Partnership proposal",
+        "New product catalog",
     ],
     "nulo": [
         "Newsletter",
@@ -433,6 +456,9 @@ def fill_template(template: str) -> str:
         "{dias}": str(random.randint(1, 30)),
         "{sala}": random.choice(["A", "B", "C", "principal", "multiusos", "sala de juntas"]),
         "{detalles}": random.choice(["3% en materiales, 2% en mano de obra", "subida general del 4%", "precios congelados otro año", "incremento selectivo del 5% en algunos productos"]),
+        "{tipo_empresa}": random.choice(["consultora", "proveedora de servicios", "empresa de tecnología", "fabricante", "distribuidora", "compañía especializada"]),
+        "{producto}": random.choice(["material de oficina", "equipos informáticos", "software de gestión", "servicios cloud", "mobiliario", "material eléctrico", "productos de limpieza", "equipamiento industrial"]),
+        "{anos}": random.choice(["5", "10", "15", "20", "más de 25", "8", "12"]),
     }
     result = template
     for placeholder, value in replacements.items():
@@ -564,7 +590,16 @@ async def main():
     parser.add_argument("--augment-multiplier", type=int, default=5, help="Multiplicador de aumento (default: 5)")
     parser.add_argument("--synthetic-count", type=int, default=200, help="Muestras sintéticas (default: 200)")
     parser.add_argument("--learning-rate", type=float, default=5e-5, help="Learning rate (default: 5e-5)")
+    parser.add_argument("--output-dir", type=str, default=None,
+                        help="Directorio donde guardar el modelo. Default: BERT_MODEL_PATH env o ruta por defecto")
     args = parser.parse_args()
+
+    # Resolver directorio de salida: CLI > env > default
+    global MODEL_OUTPUT_DIR
+    if args.output_dir:
+        MODEL_OUTPUT_DIR = Path(args.output_dir)
+    elif os.getenv("BERT_MODEL_PATH"):
+        MODEL_OUTPUT_DIR = Path(os.getenv("BERT_MODEL_PATH"))
 
     print("=" * 60)
     print("ENTRENAMIENTO HÍBRIDO: BERT con datos reales + sintéticos")

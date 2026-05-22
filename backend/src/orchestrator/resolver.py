@@ -60,9 +60,12 @@ class VoteResolver:
 
     def __init__(self, model: str | None = None):
         settings = get_settings()
-        self.model = model or settings.ollama_model
+        # Usamos chat_model (qwen2.5:3b) para el juez también,
+        # hermes3:8b timeout en CPU. El juez necesita analizar
+        # 3 votos + contexto, tarea que qwen2.5:3b maneja bien.
+        self.model = model or settings.chat_model
         self.url = settings.ollama_url
-        self.timeout = settings.ollama_timeout
+        self.timeout = settings.chat_timeout
 
     async def resolve(self, ctx: EmailContext) -> tuple[str, float, str]:
         """

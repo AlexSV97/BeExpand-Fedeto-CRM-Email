@@ -29,6 +29,11 @@ CATEGORÍAS (elige solo una):
 
 Diferencia clave cliente vs lead: si YA USA tus servicios → cliente. Si está PREGUNTANDO o interesado en contratar → lead.
 
+Diferencia clave lead vs proveedor (MUY IMPORTANTE):
+- Si el remitente OFRECE sus productos/servicios (dice "ofrecemos", "ofertamos", "presentamos nuestra empresa", "somos proveedores") → proveedor.
+- Si el remitente SOLICITA presupuesto, información, o quiere contratar → lead.
+- Regla de oro: "Les ofrecemos" = proveedor. "Nos ofrecen" o "Queremos contratar" = lead.
+
 EJEMPLOS:
 
 Asunto: Incidencia con plataforma de facturación
@@ -73,10 +78,11 @@ class LLMClassifierAgent(BaseClassifierAgent):
 
     def __init__(self, model: str | None = None, timeout: int | None = None):
         settings = get_settings()
-        self.model = model or settings.ollama_model
+        # Usamos chat_model (qwen2.5:3b) porque hermes3:8b timeout en CPU.
+        # Clasificar es más simple que generar borradores — qwen2.5:3b sobra.
+        self.model = model or settings.chat_model
         self.url = settings.ollama_url
-        # Prompt con few-shot examples necesita más tiempo
-        self.timeout = timeout or settings.ollama_timeout * 2
+        self.timeout = timeout or settings.chat_timeout
 
     @property
     def agent_name(self) -> str:
