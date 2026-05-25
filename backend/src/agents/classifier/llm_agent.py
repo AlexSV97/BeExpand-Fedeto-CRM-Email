@@ -78,8 +78,8 @@ class LLMClassifierAgent(BaseClassifierAgent):
 
     def __init__(self, model: str | None = None, timeout: int | None = None):
         settings = get_settings()
-        # Usamos chat_model (qwen2.5:3b) porque hermes3:8b timeout en CPU.
-        # Clasificar es más simple que generar borradores — qwen2.5:3b sobra.
+        # qwen2.5:7b — equilibrio fiabilidad/velocidad para clasificación.
+        # Hermes3:8b timeout en CPU; qwen2.5:3b no era fiable con urgencias.
         self.model = model or settings.chat_model
         self.url = settings.ollama_url
         self.timeout = timeout or settings.chat_timeout

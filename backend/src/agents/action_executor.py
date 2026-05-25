@@ -5,8 +5,9 @@ Acciones que ejecuta:
 1. Guardar email en BD (con toda la metadata del orquestador)
 2. Actualizar/crear contacto
 3. Registrar historial de clasificación (votes + decisión final)
-4. Reenviar email a departamentos vía SMTP (si no es nulo)
-5. Registrar resultados de cada acción en el EmailContext
+4. Notificar por Telegram si el correo es urgente
+5. Reenviar email a departamentos vía SMTP (si no es nulo)
+6. Registrar resultados de cada acción en el EmailContext
 
 El dashboard consulta la BD directamente, así que al guardar aquí,
 el frontend ya ve los datos actualizados.
@@ -75,7 +76,18 @@ class ActionExecutor:
         if crm_action:
             actions.append(crm_action)
 
-        # 3. Reenviar email (solo si no es nulo/spam)
+        # 3. Notificar por Telegram si el correo es urgente
+        if ctx.final_category and ctx.final_category != Category.NULO.value and ctx.extracted:
+            alert_action = await self._notify_telegram(ctx)
+            actions.append(alert_action)
+        else:
+            actions.append(ActionResult(
+                action="telegram_alert",
+                success=True,
+                detail="Email nulo o sin análisis — no se notifica",
+            ))
+
+        # 4. Reenviar email (solo si no es nulo/spam)
         if ctx.final_category != Category.NULO.value and ctx.routing:
             forward_action = await self._forward_email(ctx)
             actions.append(forward_action)
@@ -419,6 +431,38 @@ class ActionExecutor:
             action="email_forward",
             success=result.get("success", False),
             detail=result.get("detail", ""),
+        )
+
+    async def _notify_telegram(self, ctx: EmailContext) -> ActionResult:
+        """Envía alerta a Telegram si el correo es urgente.
+
+        La decisión de notificar o no depende del TelegramNotifier,
+        que evalúa el umbral de urgencia configurado (telegram_min_urgency).
+        """
+        from src.notifiers.telegram import TelegramNotifier
+
+        notifier = TelegramNotifier()
+        if not notifier.enabled:
+            return ActionResult(
+                action="telegram_alert",
+                success=True,
+                detail="Telegram no configurado — omitido",
+            )
+
+        sent = await notifier.send_alert(
+            subject=ctx.raw.subject,
+            sender_name=ctx.raw.sender_name or "",
+            sender_email=ctx.raw.sender_email or "",
+            urgency=ctx.extracted.urgency if ctx.extracted else "media",
+            category=ctx.final_category or "desconocida",
+            summary=ctx.extracted.summary if ctx.extracted else None,
+            action_required=ctx.extracted.action_required if ctx.extracted else None,
+        )
+
+        return ActionResult(
+            action="telegram_alert",
+            success=sent,
+            detail="Alerta enviada a Telegram" if sent else "No se envió alerta",
         )
 
     def _determine_relevance(self, ctx: EmailContext) -> str:

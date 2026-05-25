@@ -44,15 +44,16 @@ class Settings(BaseSettings):
 
     # ── Ollama (IA local) ──
     ollama_url: str = "http://127.0.0.1:11434"
-    ollama_model: str = "hermes3:8b"
-    """Modelo usado por clasificadores y analizadores (precisión crítica)."""
-    ollama_timeout: int = 30
+    ollama_model: str = "qwen2.5:7b"
+    """Modelo usado por analizadores (extracción estructurada, precisión crítica).
+    qwen2.5:7b ofrece el mejor equilibrio fiabilidad/velocidad en CPU.
+    Reemplazó a hermes3:8b por mejor seguimiento de instrucciones y JSON."""
+    ollama_timeout: int = 180
 
-    # ── Chat contextual ──
-    chat_model: str = "qwen2.5:3b"
-    """Modelo usado por el chat de onboarding (prioriza velocidad en CPU).
-    qwen2.5:3b (~1.9 GB) es más rápido de cargar que phi4-mini (~2.5 GB)
-    y suficiente para respuestas guiadas."""
+    # ── Chat contextual y clasificador LLM ──
+    chat_model: str = "qwen2.5:7b"
+    """Modelo usado por el clasificador LLM y el chat de onboarding.
+    qwen2.5:7b proporciona clasificación fiable sin los timeouts de hermes3:8b."""
     chat_timeout: int = 120
 
     # ── BERT (modelo fine-tuned) ──
@@ -62,6 +63,14 @@ class Settings(BaseSettings):
     Útil para sincronizar el modelo vía Dropbox/OneDrive:
         BERT_MODEL_PATH=D:/Dropbox/BeExpand/bert-model
     """
+
+    # ── Telegram (alertas de correos urgentes) ──
+    telegram_bot_token: str = ""
+    """Token del bot de Telegram (de @BotFather). Vacío = desactivado."""
+    telegram_chat_id: str = ""
+    """Chat ID del destinatario de las alertas."""
+    telegram_min_urgency: str = "alta"
+    """Umbral mínimo de urgencia para notificar: alta | media | baja."""
 
     # ── Redis / Celery ──
     redis_url: str = "redis://localhost:6379/0"

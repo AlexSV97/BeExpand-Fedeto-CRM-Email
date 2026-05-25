@@ -31,7 +31,7 @@ Analiza el contenido y extrae:
 
 1. company: Nombre de la empresa del remitente (si se puede deducir del dominio email, firma o contenido). Si no, null.
 2. position: Cargo del remitente (si se deduce). Si no, null.
-3. urgency: Nivel de urgencia del mensaje. "alta" si contiene palabras como urgente, inmediato, ASAP, critical, deadline. "baja" si es informativo, newsletter, confirmación. "media" en el resto.
+3. urgency: Nivel de urgencia del mensaje. "alta" si el ASUNTO o el cuerpo contienen palabras como urgente, inmediato, ASAP, critical, deadline, urgencia. "baja" si es informativo, newsletter, confirmación. "media" en el resto. El asunto es el indicador MÁS importante.
 4. action_required: Tipo de acción que requiere el email. Una de: "pago", "soporte", "consulta", "reunion", "compra", "informativo", "otro".
 5. action_description: Descripción breve de la acción requerida (1 frase). Si es informativo, null.
 6. entities: Objeto con entidades clave encontradas:
@@ -111,10 +111,23 @@ class AnalyzerAgent:
 
                 result = json.loads(raw)
 
+                # Post-process: override urgente si el asunto contiene palabras clave
+                # El LLM pequeño (llama3.2:3b) a veces ignora "URGENTE" en el asunto
+                urgency = result.get("urgency", "media")
+                subject_lower = (subject or "").lower()
+                urgency_keywords = ["urgente", "asap", "inmediato", "critical", "deadline", "urge", "urgent"]
+                if any(kw in subject_lower for kw in urgency_keywords):
+                    if urgency != "alta":
+                        logger.info(
+                            "Analyzer urgency override: subject='%s' LLM said '%s' → forzado a 'alta'",
+                            subject[:50], urgency,
+                        )
+                    urgency = "alta"
+
                 extracted = ExtractedInfo(
                     company=result.get("company"),
                     position=result.get("position"),
-                    urgency=result.get("urgency", "media"),
+                    urgency=urgency,
                     action_required=result.get("action_required"),
                     action_description=result.get("action_description"),
                     entities=result.get("entities", {}),

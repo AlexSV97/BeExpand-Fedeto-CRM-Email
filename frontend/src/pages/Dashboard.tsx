@@ -784,6 +784,14 @@ function AccuracySection() {
 // RESUMEN DEL DASHBOARD (Sync / CRM / Retrain + feedback)
 // ============================================================================
 
+const REFRESH_OPTIONS = [
+  { label: '10s', value: 10000 },
+  { label: '30s', value: 30000 },
+  { label: '60s', value: 60000 },
+  { label: '5m', value: 300000 },
+  { label: 'Off', value: 0 },
+] as const;
+
 function ActionBar({
   syncing,
   onSync,
@@ -797,6 +805,8 @@ function ActionBar({
   onRetrain,
   retrainResult,
   retrainError,
+  refreshInterval,
+  onRefreshIntervalChange,
 }: {
   syncing: boolean;
   onSync: () => void;
@@ -810,6 +820,8 @@ function ActionBar({
   onRetrain: () => void;
   retrainResult: RetrainResponse | null;
   retrainError: string | null;
+  refreshInterval: number;
+  onRefreshIntervalChange: (ms: number) => void;
 }) {
   return (
     <section className="px-6">
@@ -866,6 +878,29 @@ function ActionBar({
                 </svg>
                 {syncing ? 'Sincronizando...' : 'Sync'}
               </button>
+            </div>
+          </div>
+
+          {/* Auto-refresh selector */}
+          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/10">
+            <svg className="w-3.5 h-3.5 text-muted-foreground shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span className="text-xs text-muted-foreground font-medium">Auto</span>
+            <div className="flex gap-1">
+              {REFRESH_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => onRefreshIntervalChange(opt.value)}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition-all ${
+                    refreshInterval === opt.value
+                      ? 'bg-chart-1/10 text-chart-1 border border-chart-1/20'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50 border border-transparent'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -1088,6 +1123,11 @@ export default function Dashboard() {
   const [retrainResult, setRetrainResult] = useState<RetrainResponse | null>(null);
   const [retrainError, setRetrainError] = useState<string | null>(null);
 
+  // ── Auto-refresh ──
+  const [refreshInterval, setRefreshInterval] = useState(0); // ms, 0 = off
+  const isOperatingRef = useRef(false);
+  isOperatingRef.current = syncing || syncingCrm || retraining;
+
   // ── Fetch data ──
   const fetchAll = useCallback(async () => {
     try {
@@ -1104,9 +1144,34 @@ export default function Dashboard() {
     }
   }, []);
 
+  // Silent refresh for auto-refresh (no loading/error on failure)
+  const silentRefresh = useCallback(async () => {
+    try {
+      const [summaryData, tsData] = await Promise.all([
+        getDashboardSummary(),
+        getTimeSeries('90d'),
+      ]);
+      setSummary(summaryData);
+      setTimeSeries(tsData);
+    } catch {
+      // Silent fail — don't disturb user
+    }
+  }, []);
+
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
+
+  // Auto-refresh interval
+  useEffect(() => {
+    if (refreshInterval <= 0) return;
+    const id = setInterval(() => {
+      if (!isOperatingRef.current) {
+        silentRefresh();
+      }
+    }, refreshInterval);
+    return () => clearInterval(id);
+  }, [refreshInterval, silentRefresh]);
 
   // ── Handlers ──
 
@@ -1252,6 +1317,8 @@ export default function Dashboard() {
         onRetrain={handleRetrain}
         retrainResult={retrainResult}
         retrainError={retrainError}
+        refreshInterval={refreshInterval}
+        onRefreshIntervalChange={setRefreshInterval}
       />
 
       <ChartsSection
