@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     chat_model: str = "qwen2.5:7b"
     """Modelo usado por el clasificador LLM y el chat de onboarding.
     qwen2.5:7b proporciona clasificación fiable sin los timeouts de hermes3:8b."""
-    chat_timeout: int = 120
+    chat_timeout: int = 300
 
     # ── BERT (modelo fine-tuned) ──
     bert_model_path: str = ""
@@ -74,6 +74,11 @@ class Settings(BaseSettings):
 
     # ── Redis / Celery ──
     redis_url: str = "redis://localhost:6379/0"
+
+    # ── Auto-sync ──
+    sync_interval_seconds: int = 60
+    """Intervalo en segundos entre sincronizaciones automáticas de IMAP.
+    60 = cada minuto. 0 = desactivado."""
 
     # ── Entorno ──
     debug: bool = True
