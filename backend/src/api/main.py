@@ -8,6 +8,8 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
+logger = logging.getLogger(__name__)
+
 import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,8 +30,6 @@ from src.api.routers import (
 from src.config import get_settings
 from src.db.models import User
 from src.db.session import async_session_factory, init_db
-
-logger = logging.getLogger(__name__)
 
 _background_tasks: list[asyncio.Task[None]] = []
 
@@ -117,6 +117,9 @@ async def _warmup_chat_model():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Ciclo de vida: se ejecuta al arrancar y al cerrar la app."""
+    # Forzar logging INFO + handler para que se vean los logs del auto-sync
+    logging.basicConfig(level=logging.INFO, force=True)
+
     # Al arrancar: crear tablas si no existen + seed admin + warm-up chat
     await init_db()
     await seed_admin()
