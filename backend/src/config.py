@@ -47,12 +47,11 @@ class Settings(BaseSettings):
     """API key de OpenRouter.
     Vacío = usa Ollama local como fallback."""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    openrouter_model: str = "google/gemma-4-31b-it:free"
+    openrouter_model: str = "openrouter/owl-alpha"
     """Modelo por defecto para analizadores en OpenRouter.
-    google/gemma-4-31b-it:free — gratuito, buena calidad multilingüe.
-    Otros gratuitos viables: meta-llama/llama-3.3-70b-instruct:free,
-    deepseek/deepseek-v4-flash:free, qwen/qwen3-coder:free."""
-    openrouter_chat_model: str = "google/gemma-4-31b-it:free"
+    openrouter/owl-alpha — gratuito, servido por OpenRouter, sin rate limits de terceros.
+    Alternativas: google/gemma-4-31b-it:free, meta-llama/llama-3.3-70b-instruct:free."""
+    openrouter_chat_model: str = "openrouter/owl-alpha"
     """Modelo para chat contextual y onboarding."""
     openrouter_timeout: int = 120
     """Timeout para llamadas a OpenRouter (segundos)."""
