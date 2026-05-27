@@ -1,7 +1,7 @@
 """
 ReplySuggesterAgent — genera un borrador de respuesta contextual para un email.
 
-Se ejecuta tras el Router, antes del ActionExecutor. Usa Ollama para
+Se ejecuta tras el Router, antes del ActionExecutor. Usa LLM (OpenRouter/Ollama) para
 redactar una respuesta profesional adaptada al contenido del email,
 su categoría y la información extraída por el Analyzer.
 
@@ -11,9 +11,8 @@ El borrador se guarda en extra_data["suggested_reply"] del email.
 import logging
 import time
 
-import httpx
-
 from src.config import get_settings
+from src.llm_client import LLMClient
 from src.orchestrator.context import EmailContext, ExtractedInfo
 
 logger = logging.getLogger(__name__)
@@ -50,19 +49,10 @@ Responde SOLO con el borrador, sin explicaciones adicionales."""
 
 
 class ReplySuggesterAgent:
-    """Genera borradores de respuesta contextual usando Ollama.
-
-    Usa el modelo de chat (qwen2.5:3b / phi4-mini) porque:
-    - Es más rápido en CPU
-    - Ya está caliente en memoria (keep_alive desde chat_service)
-    - Es un modelo conversacional, ideal para generar borradores
-    """
+    """Genera borradores de respuesta contextual usando LLM."""
 
     def __init__(self, model: str | None = None, timeout: int | None = None):
-        settings = get_settings()
-        self.model = model or settings.chat_model
-        self.url = settings.ollama_url
-        self.timeout = timeout or settings.chat_timeout
+        self._client = LLMClient(model=model, timeout=timeout, use_chat_model=True)
 
     async def generate(
         self,
@@ -103,21 +93,11 @@ class ReplySuggesterAgent:
         )
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                resp = await client.post(
-                    f"{self.url}/api/generate",
-                    json={
-                        "model": self.model,
-                        "prompt": prompt,
-                        "stream": False,
-                        "temperature": 0.3,
-                        "max_tokens": 512,
-                        "keep_alive": -1,
-                    },
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                reply = data.get("response", "").strip()
+            reply = await self._client.generate(
+                prompt=prompt,
+                temperature=0.3,
+                max_tokens=512,
+            )
 
             elapsed = (time.time() - start) * 1000
             logger.info(

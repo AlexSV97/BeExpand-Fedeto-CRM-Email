@@ -11,9 +11,8 @@ Estrategias de resolución:
 import json
 import logging
 
-import httpx
-
 from src.config import get_settings
+from src.llm_client import LLMClient
 from src.orchestrator.context import ClassifierVote, EmailContext
 
 logger = logging.getLogger(__name__)
@@ -59,13 +58,7 @@ class VoteResolver:
     """Resuelve los votos de los sub-agentes del clasificador."""
 
     def __init__(self, model: str | None = None):
-        settings = get_settings()
-        # Usamos chat_model (qwen2.5:3b) para el juez también,
-        # hermes3:8b timeout en CPU. El juez necesita analizar
-        # 3 votos + contexto, tarea que qwen2.5:3b maneja bien.
-        self.model = model or settings.chat_model
-        self.url = settings.ollama_url
-        self.timeout = settings.chat_timeout
+        self._client = LLMClient(model=model, use_chat_model=True)
 
     async def resolve(self, ctx: EmailContext) -> tuple[str, float, str]:
         """
@@ -152,42 +145,33 @@ class VoteResolver:
         )
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                resp = await client.post(
-                    f"{self.url}/api/generate",
-                    json={
-                        "model": self.model,
-                        "prompt": prompt,
-                        "stream": False,
-                        "temperature": 0.1,
-                        "max_tokens": 256,
-                    },
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                raw = data.get("response", "").strip()
+            raw = await self._client.generate(
+                prompt=prompt,
+                temperature=0.1,
+                max_tokens=256,
+            )
 
-                if "```json" in raw:
-                    raw = raw.split("```json")[1].split("```")[0].strip()
-                elif "```" in raw:
-                    raw = raw.split("```")[1].split("```")[0].strip()
+            if "```json" in raw:
+                raw = raw.split("```json")[1].split("```")[0].strip()
+            elif "```" in raw:
+                raw = raw.split("```")[1].split("```")[0].strip()
 
-                result = json.loads(raw)
-                category = result.get("category", "nulo").lower()
-                confidence = float(result.get("confidence", 0.5))
-                reasoning = result.get("reasoning", "")
+            result = json.loads(raw)
+            category = result.get("category", "nulo").lower()
+            confidence = float(result.get("confidence", 0.5))
+            reasoning = result.get("reasoning", "")
 
-                logger.info(
-                    "LLM_JUDGE: %s (%.0f%%) — %s",
-                    category,
-                    confidence * 100,
-                    reasoning[:100],
-                )
+            logger.info(
+                "LLM_JUDGE: %s (%.0f%%) — %s",
+                category,
+                confidence * 100,
+                reasoning[:100],
+            )
 
-                if category not in ("cliente", "lead", "proveedor", "nulo"):
-                    category = "nulo"
+            if category not in ("cliente", "lead", "proveedor", "nulo"):
+                category = "nulo"
 
-                return category, round(confidence, 2), "llm_judge"
+            return category, round(confidence, 2), "llm_judge"
 
         except Exception as e:
             logger.warning("Juez LLM falló: %s → fallback a mejor voto", e)

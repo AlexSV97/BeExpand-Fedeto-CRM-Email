@@ -1,0 +1,14 @@
+{
+  "services": [
+    {
+      "name": "backend",
+      "path": "backend",
+      "plan": "starter"
+    },
+    {
+      "name": "frontend",
+      "path": "frontend",
+      "plan": "starter"
+    }
+  ]
+}

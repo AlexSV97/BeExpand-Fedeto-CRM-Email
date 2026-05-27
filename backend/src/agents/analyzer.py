@@ -1,5 +1,5 @@
 """
-AnalyzerAgent — extrae información estructurada del email usando Ollama.
+AnalyzerAgent — extrae información estructurada del email usando LLM (OpenRouter/Ollama).
 
 Este agente es el primero en ejecutarse. Analiza el email y extrae:
 - Empresa del remitente
@@ -18,9 +18,8 @@ import json
 import logging
 import time
 
-import httpx
-
 from src.config import get_settings
+from src.llm_client import LLMClient
 from src.orchestrator.context import AnalyzerResult, ExtractedInfo
 
 logger = logging.getLogger(__name__)
@@ -50,14 +49,13 @@ Cuerpo: {body}"""
 
 
 class AnalyzerAgent:
-    """Agente que extrae información estructurada del email usando Ollama."""
+    """Agente que extrae información estructurada del email usando LLM."""
 
     def __init__(self, model: str | None = None, timeout: int | None = None):
         settings = get_settings()
-        self.model = model or settings.ollama_model
-        self.url = settings.ollama_url
         # Analyzer prompt es más grande → necesita más tiempo
-        self.timeout = timeout or settings.ollama_timeout * 2
+        timeout_val = timeout or settings.openrouter_timeout * 2
+        self._client = LLMClient(model=model, timeout=timeout_val)
 
     async def analyze(
         self,
@@ -88,67 +86,58 @@ class AnalyzerAgent:
         )
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                resp = await client.post(
-                    f"{self.url}/api/generate",
-                    json={
-                        "model": self.model,
-                        "prompt": prompt,
-                        "stream": False,
-                        "temperature": 0.1,
-                        "max_tokens": 256,
-                    },
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                raw = data.get("response", "").strip()
+            raw = await self._client.generate(
+                prompt=prompt,
+                temperature=0.1,
+                max_tokens=256,
+            )
 
-                # Extraer JSON
-                if "```json" in raw:
-                    raw = raw.split("```json")[1].split("```")[0].strip()
-                elif "```" in raw:
-                    raw = raw.split("```")[1].split("```")[0].strip()
+            # Extraer JSON
+            if "```json" in raw:
+                raw = raw.split("```json")[1].split("```")[0].strip()
+            elif "```" in raw:
+                raw = raw.split("```")[1].split("```")[0].strip()
 
-                result = json.loads(raw)
+            result = json.loads(raw)
 
-                # Post-process: override urgente si el asunto contiene palabras clave
-                # El LLM pequeño (llama3.2:3b) a veces ignora "URGENTE" en el asunto
-                urgency = result.get("urgency", "media")
-                subject_lower = (subject or "").lower()
-                urgency_keywords = ["urgente", "asap", "inmediato", "critical", "deadline", "urge", "urgent"]
-                if any(kw in subject_lower for kw in urgency_keywords):
-                    if urgency != "alta":
-                        logger.info(
-                            "Analyzer urgency override: subject='%s' LLM said '%s' → forzado a 'alta'",
-                            subject[:50], urgency,
-                        )
-                    urgency = "alta"
+            # Post-process: override urgente si el asunto contiene palabras clave
+            # El LLM pequeño (llama3.2:3b) a veces ignora "URGENTE" en el asunto
+            urgency = result.get("urgency", "media")
+            subject_lower = (subject or "").lower()
+            urgency_keywords = ["urgente", "asap", "inmediato", "critical", "deadline", "urge", "urgent"]
+            if any(kw in subject_lower for kw in urgency_keywords):
+                if urgency != "alta":
+                    logger.info(
+                        "Analyzer urgency override: subject='%s' LLM said '%s' → forzado a 'alta'",
+                        subject[:50], urgency,
+                    )
+                urgency = "alta"
 
-                extracted = ExtractedInfo(
-                    company=result.get("company"),
-                    position=result.get("position"),
-                    urgency=urgency,
-                    action_required=result.get("action_required"),
-                    action_description=result.get("action_description"),
-                    entities=result.get("entities", {}),
-                    tone=result.get("tone"),
-                    summary=result.get("summary"),
-                )
+            extracted = ExtractedInfo(
+                company=result.get("company"),
+                position=result.get("position"),
+                urgency=urgency,
+                action_required=result.get("action_required"),
+                action_description=result.get("action_description"),
+                entities=result.get("entities", {}),
+                tone=result.get("tone"),
+                summary=result.get("summary"),
+            )
 
-                elapsed = (time.time() - start) * 1000
-                logger.info(
-                    "Analyzer: %s | urgency=%s action=%s (%.0fms)",
-                    subject[:50] if subject else "",
-                    extracted.urgency,
-                    extracted.action_required,
-                    elapsed,
-                )
+            elapsed = (time.time() - start) * 1000
+            logger.info(
+                "Analyzer: %s | urgency=%s action=%s (%.0fms)",
+                subject[:50] if subject else "",
+                extracted.urgency,
+                extracted.action_required,
+                elapsed,
+            )
 
-                return AnalyzerResult(
-                    success=True,
-                    extracted=extracted,
-                    processing_time_ms=round(elapsed, 1),
-                )
+            return AnalyzerResult(
+                success=True,
+                extracted=extracted,
+                processing_time_ms=round(elapsed, 1),
+            )
 
         except json.JSONDecodeError as e:
             elapsed = (time.time() - start) * 1000

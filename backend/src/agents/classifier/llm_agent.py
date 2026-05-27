@@ -1,8 +1,8 @@
 """
-LLMClassifierAgent — sub-agente de clasificación basado en Ollama (LLM local).
+LLMClassifierAgent — sub-agente de clasificación basado en LLM (OpenRouter/Ollama).
 
-Vota usando análisis semántico profundo con qwen2.5:7b.
-Es el más lento (~1-3s) pero el que mejor entiende contexto.
+Vota usando análisis semántico profundo con modelos cloud.
+Es el más lento pero el que mejor entiende contexto.
 Se usa como voto de referencia en el sistema de votación.
 """
 
@@ -11,10 +11,9 @@ import logging
 import re
 import time
 
-import httpx
-
 from src.agents.classifier.base import BaseClassifierAgent
 from src.config import get_settings
+from src.llm_client import LLMClient
 from src.orchestrator.context import ClassifierVote
 
 logger = logging.getLogger(__name__)
@@ -74,22 +73,18 @@ Cuerpo: {body}"""
 
 
 class LLMClassifierAgent(BaseClassifierAgent):
-    """Clasificador por LLM (Ollama) que vota en el sistema multi-agente."""
+    """Clasificador por LLM (OpenRouter/Ollama) que vota en el sistema multi-agente."""
 
     def __init__(self, model: str | None = None, timeout: int | None = None):
-        settings = get_settings()
-        # qwen2.5:7b — equilibrio fiabilidad/velocidad para clasificación.
-        # Hermes3:8b timeout en CPU; qwen2.5:3b no era fiable con urgencias.
-        self.model = model or settings.chat_model
-        self.url = settings.ollama_url
-        self.timeout = timeout or settings.chat_timeout
+        # Para clasificación usamos el modelo de análisis con fallback a chat_model local
+        self._client = LLMClient(model=model, timeout=timeout, use_chat_model=True)
 
     @property
     def agent_name(self) -> str:
         return "llm"
 
     async def classify(self, subject: str, body: str) -> ClassifierVote:
-        """Clasifica usando Ollama. Retorna un voto."""
+        """Clasifica usando LLM. Retorna un voto."""
         start = time.time()
 
         prompt = CLASSIFY_PROMPT.format(
@@ -98,61 +93,52 @@ class LLMClassifierAgent(BaseClassifierAgent):
         )
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                resp = await client.post(
-                    f"{self.url}/api/generate",
-                    json={
-                        "model": self.model,
-                        "prompt": prompt,
-                        "stream": False,
-                        "temperature": 0.1,
-                        "max_tokens": 256,
-                    },
+            raw = await self._client.generate(
+                prompt=prompt,
+                temperature=0.1,
+                max_tokens=256,
+            )
+
+            # Extraer JSON robusto: probar parsing directo, luego regex
+            result = self._extract_json(raw)
+
+            category = result.get("category", "nulo").lower()
+            confidence = float(result.get("confidence", 0.5))
+            reason = result.get("reason", "")
+
+            # Validar categoría
+            valid_categories = ("cliente", "lead", "proveedor", "nulo")
+            if category not in valid_categories:
+                logger.warning(
+                    "LLM categoría inválida '%s', forzando nulo. Raw: %s",
+                    category, raw[:100],
                 )
-                resp.raise_for_status()
-                data = resp.json()
-                raw = data.get("response", "").strip()
+                category = "nulo"
 
-                # Extraer JSON robusto: probar parsing directo, luego regex
-                result = self._extract_json(raw)
+            # Acotar confianza
+            confidence = max(0.0, min(1.0, confidence))
 
-                category = result.get("category", "nulo").lower()
-                confidence = float(result.get("confidence", 0.5))
-                reason = result.get("reason", "")
+            elapsed = (time.time() - start) * 1000
+            logger.info(
+                "LLM votó: %s -> %s (%.0f%%) en %.0fms | razón: %s",
+                subject[:50] if subject else "",
+                category,
+                confidence * 100,
+                elapsed,
+                reason[:80],
+            )
 
-                # Validar categoría
-                valid_categories = ("cliente", "lead", "proveedor", "nulo")
-                if category not in valid_categories:
-                    logger.warning(
-                        "LLM categoría inválida '%s', forzando nulo. Raw: %s",
-                        category, raw[:100],
-                    )
-                    category = "nulo"
-
-                # Acotar confianza
-                confidence = max(0.0, min(1.0, confidence))
-
-                elapsed = (time.time() - start) * 1000
-                logger.info(
-                    "LLM votó: %s -> %s (%.0f%%) en %.0fms | razón: %s",
-                    subject[:50] if subject else "",
-                    category,
-                    confidence * 100,
-                    elapsed,
-                    reason[:80],
-                )
-
-                return ClassifierVote(
-                    agent_name=self.agent_name,
-                    category=category,
-                    confidence=round(confidence, 2),
-                    reason=reason or "análisis LLM",
-                    details={
-                        "model": self.model,
-                        "raw_response": raw,
-                        "processing_ms": round(elapsed, 1),
-                    },
-                )
+            return ClassifierVote(
+                agent_name=self.agent_name,
+                category=category,
+                confidence=round(confidence, 2),
+                reason=reason or "análisis LLM",
+                details={
+                    "model": self.model,
+                    "raw_response": raw,
+                    "processing_ms": round(elapsed, 1),
+                },
+            )
 
         except Exception as e:
             err_msg = str(e) or f"{type(e).__name__} (sin mensaje)"

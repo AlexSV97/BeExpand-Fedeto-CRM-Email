@@ -39,5 +39,5 @@ EXPOSE 8000
 USER beexpand
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
-# Por defecto: lanzar API
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Por defecto: lanzar API (usa $PORT de Render, por defecto 8000 localmente)
+CMD uvicorn src.api.main:app --host 0.0.0.0 --port ${PORT:-8000}

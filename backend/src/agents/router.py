@@ -3,7 +3,7 @@ RouterAgent — determina a qué departamento(s) y persona(s) debe ir el email.
 
 Usa un enfoque híbrido:
 1. Primero aplica reglas de enrutamiento por keywords (rápido, determinista)
-2. Si las reglas no son suficientes, consulta al LLM (Ollama) para decisión contextual
+2. Si las reglas no son suficientes, consulta al LLM (OpenRouter/Ollama) para decisión contextual
 
 El resultado se usa en el Action Executor para reenviar el email.
 """
@@ -12,9 +12,8 @@ import json
 import logging
 import time
 
-import httpx
-
 from src.config import get_settings
+from src.llm_client import LLMClient
 from src.orchestrator.context import (
     ExtractedInfo,
     RoutingDecision,
@@ -110,10 +109,7 @@ class RouterAgent:
     """Agente que determina el enrutamiento del email a departamentos."""
 
     def __init__(self, model: str | None = None):
-        settings = get_settings()
-        self.model = model or settings.ollama_model
-        self.url = settings.ollama_url
-        self.timeout = settings.ollama_timeout
+        self._client = LLMClient(model=model)
 
     async def route(
         self,
@@ -214,42 +210,33 @@ class RouterAgent:
         )
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                resp = await client.post(
-                    f"{self.url}/api/generate",
-                    json={
-                        "model": self.model,
-                        "prompt": prompt,
-                        "stream": False,
-                        "temperature": 0.1,
-                        "max_tokens": 256,
-                    },
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                raw = data.get("response", "").strip()
+            raw = await self._client.generate(
+                prompt=prompt,
+                temperature=0.1,
+                max_tokens=256,
+            )
 
-                if "```json" in raw:
-                    raw = raw.split("```json")[1].split("```")[0].strip()
-                elif "```" in raw:
-                    raw = raw.split("```")[1].split("```")[0].strip()
+            if "```json" in raw:
+                raw = raw.split("```json")[1].split("```")[0].strip()
+            elif "```" in raw:
+                raw = raw.split("```")[1].split("```")[0].strip()
 
-                result = json.loads(raw)
+            result = json.loads(raw)
 
-                elapsed = (time.time() - start) * 1000
-                logger.info(
-                    "Router LLM: %s -> %s (%.0fms)",
-                    subject[:50] if subject else "",
-                    result.get("departments", []),
-                    elapsed,
-                )
+            elapsed = (time.time() - start) * 1000
+            logger.info(
+                "Router LLM: %s -> %s (%.0fms)",
+                subject[:50] if subject else "",
+                result.get("departments", []),
+                elapsed,
+            )
 
-                return RoutingDecision(
-                    departments=result.get("departments", ["otro"]),
-                    persons=result.get("persons", []),
-                    rationale=result.get("rationale", ""),
-                    priority=urgency,
-                )
+            return RoutingDecision(
+                departments=result.get("departments", ["otro"]),
+                persons=result.get("persons", []),
+                rationale=result.get("rationale", ""),
+                priority=urgency,
+            )
 
         except Exception as e:
             elapsed = (time.time() - start) * 1000

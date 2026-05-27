@@ -1,9 +1,7 @@
 """
 ChatService — servicio de chat contextual con memoria de conversación.
 
-Usa el mismo Ollama (hermes3:8b) que el clasificador, pero con el endpoint
-/api/chat (no /api/generate) para mantener el historial de la conversación.
-
+Usa LLM cloud (OpenRouter) o local (Ollama) según configuración.
 Antes de cada respuesta, fetchea datos actuales del sistema (stats, últimos
 correos, contactos) y los inyecta en el system prompt para que el LLM pueda
 responder preguntas sobre datos reales.
@@ -14,12 +12,12 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-import httpx
 from sqlalchemy import func, select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import get_settings
 from src.db.models import Email
+from src.llm_client import LLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +57,7 @@ class ChatService:
     def __init__(self) -> None:
         self._conversations: dict[str, list[dict]] = {}
         self._max_history = 20
+        self._client = LLMClient(use_chat_model=True)
 
     async def _get_system_context(self, db: AsyncSession) -> str:
         """Obtiene datos actuales del sistema para contextualizar las respuestas."""
@@ -159,41 +158,23 @@ class ChatService:
         response_text: str = ""
 
         try:
-            async with httpx.AsyncClient(timeout=settings.chat_timeout) as client:
-                resp = await client.post(
-                    f"{settings.ollama_url}/api/chat",
-                    json={
-                        "model": settings.chat_model,
-                        "messages": messages,
-                        "stream": False,
-                        "temperature": 0.3,
-                        "max_tokens": 512,
-                        "keep_alive": -1,  # mantener en memoria entre requests
-                    },
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                response_text = data.get("message", {}).get("content", "").strip()
-
-                if not response_text:
-                    response_text = (
-                        "Lo siento, no pude generar una respuesta. "
-                        "¿Puedes reformular tu pregunta?"
-                    )
-
-        except httpx.TimeoutException:
-            response_text = (
-                "Lo siento, el servicio está tardando demasiado. "
-                "¿Puedes intentarlo de nuevo?"
+            response_text = await self._client.chat(
+                messages=messages,
+                temperature=0.3,
+                max_tokens=512,
             )
-            logger.warning("Chat timeout conv=%s", conversation_id)
+
+            if not response_text:
+                response_text = (
+                    "Lo siento, no pude generar una respuesta. "
+                    "¿Puedes reformular tu pregunta?"
+                )
+
         except Exception as e:
             response_text = (
                 "Ocurrió un error al procesar tu mensaje. Inténtalo de nuevo más tarde."
             )
             logger.error("Chat error conv=%s: %s", conversation_id, e)
-            if hasattr(e, "response") and e.response is not None:
-                logger.error("Chat response body: %s", e.response.text[:500])
 
         # Guardar en historial
         self._conversations[conversation_id].append({"role": "user", "content": message})

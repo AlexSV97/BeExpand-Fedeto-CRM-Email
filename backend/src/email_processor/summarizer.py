@@ -1,5 +1,5 @@
 """
-Generador de resúmenes de correos usando Ollama (LLM local).
+Generador de resúmenes de correos usando LLM (OpenRouter/Ollama).
 
 Se ejecuta después de la clasificación para producir un resumen conciso
 que ayude a:
@@ -16,9 +16,8 @@ Uso:
 import json
 import logging
 
-import httpx
-
 from src.config import get_settings
+from src.llm_client import LLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -68,42 +67,34 @@ async def generate_summary(subject: str, body: str) -> dict:
     )
 
     try:
-        async with httpx.AsyncClient(timeout=settings.ollama_timeout) as client:
-            resp = await client.post(
-                f"{settings.ollama_url}/api/generate",
-                json={
-                    "model": settings.ollama_model,
-                    "prompt": prompt,
-                    "stream": False,
-                    "temperature": 0.1,
-                    "max_tokens": 256,
-                },
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            raw = data.get("response", "").strip()
+        client = LLMClient()
+        raw = await client.generate(
+            prompt=prompt,
+            temperature=0.1,
+            max_tokens=256,
+        )
 
-            # Extraer JSON de la respuesta (puede venir con markdown)
-            if "```json" in raw:
-                raw = raw.split("```json")[1].split("```")[0].strip()
-            elif "```" in raw:
-                raw = raw.split("```")[1].split("```")[0].strip()
+        # Extraer JSON de la respuesta (puede venir con markdown)
+        if "```json" in raw:
+            raw = raw.split("```json")[1].split("```")[0].strip()
+        elif "```" in raw:
+            raw = raw.split("```")[1].split("```")[0].strip()
 
-            result = json.loads(raw)
-            summary = result.get("summary", "")
-            action_required = result.get("action_required", False)
-            action_description = result.get("action_description", "")
+        result = json.loads(raw)
+        summary = result.get("summary", "")
+        action_required = result.get("action_required", False)
+        action_description = result.get("action_description", "")
 
-            logger.info(
-                "Resumen generado (%d chars) | acción=%s",
-                len(summary),
-                action_required,
-            )
-            return {
-                "summary": summary,
-                "action_required": action_required,
-                "action_description": action_description,
-            }
+        logger.info(
+            "Resumen generado (%d chars) | acción=%s",
+            len(summary),
+            action_required,
+        )
+        return {
+            "summary": summary,
+            "action_required": action_required,
+            "action_description": action_description,
+        }
 
     except Exception as e:
         logger.warning("Error generando resumen con Ollama: %s", e)

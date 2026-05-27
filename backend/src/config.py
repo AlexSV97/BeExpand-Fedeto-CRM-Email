@@ -42,19 +42,23 @@ class Settings(BaseSettings):
     vtiger_token: str = ""
     vtiger_username: str = ""
 
-    # ── Ollama (IA local) ──
+    # ── OpenRouter (IA cloud vía InsForge AI Gateway) ──
+    openrouter_api_key: str = ""
+    """API key de OpenRouter (gestionada desde InsForge Cloud).
+    Vacío = usa Ollama local como fallback."""
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    openrouter_model: str = "qwen/qwen2.5-7b-instruct"
+    """Modelo por defecto para analizadores y clasificadores en OpenRouter.
+    qwen2.5-7b-instruct — excelente relación calidad/precio en OpenRouter."""
+    openrouter_chat_model: str = "qwen/qwen2.5-7b-instruct"
+    """Modelo para chat contextual y onboarding."""
+    openrouter_timeout: int = 120
+    """Timeout para llamadas a OpenRouter (segundos)."""
+
+    # ── Ollama (IA local) — FALLBACK si no hay OpenRouter ──
     ollama_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "qwen2.5:7b"
-    """Modelo usado por analizadores (extracción estructurada, precisión crítica).
-    qwen2.5:7b ofrece el mejor equilibrio fiabilidad/velocidad en CPU.
-    Reemplazó a hermes3:8b por mejor seguimiento de instrucciones y JSON."""
     ollama_timeout: int = 180
-
-    # ── Chat contextual y clasificador LLM ──
-    chat_model: str = "qwen2.5:7b"
-    """Modelo usado por el clasificador LLM y el chat de onboarding.
-    qwen2.5:7b proporciona clasificación fiable sin los timeouts de hermes3:8b."""
-    chat_timeout: int = 120
 
     # ── BERT (modelo fine-tuned) ──
     bert_model_path: str = ""

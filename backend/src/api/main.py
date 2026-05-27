@@ -7,7 +7,6 @@ Arranque: uvicorn src.api.main:app --reload
 import logging
 from contextlib import asynccontextmanager
 
-import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from passlib.hash import bcrypt
@@ -50,38 +49,12 @@ async def seed_admin():
             await session.commit()
 
 
-async def _warmup_chat_model():
-    """Precarga el modelo de chat en Ollama para que la 1ª respuesta sea rápida."""
-    settings = get_settings()
-    try:
-        async with httpx.AsyncClient(timeout=settings.chat_timeout) as client:
-            await client.post(
-                f"{settings.ollama_url}/api/chat",
-                json={
-                    "model": settings.chat_model,
-                    "messages": [{"role": "user", "content": "warmup"}],
-                    "stream": False,
-                    "keep_alive": -1,
-                },
-            )
-        logger.info(
-            "Chat model %s warm-up OK", settings.chat_model
-        )
-    except Exception as exc:
-        logger.warning(
-            "Chat model %s warm-up failed (non-critical): %s",
-            settings.chat_model,
-            exc,
-        )
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Ciclo de vida: se ejecuta al arrancar y al cerrar la app."""
-    # Al arrancar: crear tablas si no existen + seed admin + warm-up chat
+    # Al arrancar: crear tablas si no existen + seed admin
     await init_db()
     await seed_admin()
-    await _warmup_chat_model()
     yield
     # Al cerrar: limpiar si es necesario
 
