@@ -5,7 +5,7 @@
  * En producción (Render) usa VITE_API_URL si está configurada.
  */
 
-const API_BASE = (import.meta.env.VITE_API_URL ?? '/api/v1') + '/api/v1'
+const API_BASE = import.meta.env.VITE_API_URL || '/api/v1'
 
 let _token: string | null = null
 
