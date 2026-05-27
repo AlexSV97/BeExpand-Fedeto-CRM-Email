@@ -60,8 +60,8 @@ Desarrollo de un sistema que:
                               │
                               ▼
                     ┌──────────────────────┐
-                    │  IMAP Poller         │
-                    │  (Celery Beat)       │
+                    │  Auto-Sync Loop      │
+                    │  (asyncio, cada 60s) │
                     └─────────┬────────────┘
                               │
                               ▼
@@ -162,7 +162,7 @@ BeExpand-Fedeto-CRM-Email/
 │   │   ├── simulate_data.py    # Genera 30 días de datos de prueba
 │   │   ├── train_bert_hybrid.py# Reentrenar clasificador BERT
 │   │   └── test_classifier.py  # Test del pipeline de clasificación
-│   ├── tests/                  # ~94 tests (pytest-asyncio)
+│   ├── tests/                  # ~113 tests (pytest-asyncio)
 │   ├── alembic/                # Migraciones de base de datos
 │   ├── requirements.txt
 │   └── Dockerfile
@@ -260,15 +260,17 @@ npm run dev
 1. Abre http://localhost:5173 en el navegador
 2. Inicia sesión con `admin` / `admin123`
 3. El dashboard muestra el resumen de correos procesados, contactos y oportunidades
-4. Usa el botón "Sincronizar" para forzar la clasificación de correos pendientes
+4. El sistema sincroniza correos automáticamente cada 60 segundos (auto-sync integrado en FastAPI, no requiere Celery en producción)
+5. Opcional: en el Panel de Control del Dashboard, selecciona auto-refresh (10s, 30s, 60s) para ver los nuevos correos sin recargar
 
 ### Páginas del dashboard
 
 | Página | Ruta | Descripción |
 |--------|------|-------------|
-| Dashboard | `/` | Resumen general, gráficos de volumen, forecast, confianza |
+| Dashboard | `/dashboard` | Resumen general, gráficos de volumen, forecast, confianza |
 | Contactos | `/contacts` | Listado y filtrado de contactos clasificados |
 | Oportunidades | `/opportunities` | Pipeline de oportunidades por etapa |
+| Ajustes | `/settings` | Configuración IMAP, notificaciones Telegram, cambio de contraseña, estado del sistema |
 | Detalle Email | `/emails/:id` | Clasificaciones individuales y resolución del voto |
 
 ## Comandos útiles
