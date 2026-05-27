@@ -48,10 +48,13 @@ class Settings(BaseSettings):
     Vacío = usa Ollama local como fallback."""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_model: str = "openrouter/owl-alpha"
-    """Modelo por defecto para analizadores en OpenRouter.
+    """Modelo para el Analyzer (extracción estructurada).
     openrouter/owl-alpha — gratuito, servido por OpenRouter, sin rate limits de terceros.
-    Alternativas: google/gemma-4-31b-it:free, meta-llama/llama-3.3-70b-instruct:free."""
-    openrouter_chat_model: str = "openrouter/owl-alpha"
+    Necesita más capacidad → modelo grande (1.33T MoE)."""
+    openrouter_chat_model: str = "openai/gpt-oss-20b:free"
+    """Modelo para LLMClassifier y chat (debe ser RÁPIDO y DISTINTO proveedor).
+    gpt-oss-20b: OpenInference, proveedor distinto a Owl Alpha (Stealth).
+    Evita contención de rate limits con el Analyzer."""
     """Modelo para chat contextual y onboarding."""
     openrouter_timeout: int = 120
     """Timeout para llamadas a OpenRouter (segundos)."""
