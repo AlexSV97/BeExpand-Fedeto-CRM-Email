@@ -4,8 +4,11 @@ Punto de entrada de la API REST.
 Arranque: uvicorn src.api.main:app --reload
 """
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
+
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,7 +30,43 @@ from src.config import get_settings
 from src.db.models import User
 from src.db.session import async_session_factory, init_db
 
-logger = logging.getLogger(__name__)
+_background_tasks: list[asyncio.Task[None]] = []
+
+
+async def _auto_sync_loop():
+    """Bucle infinito que sincroniza correos cada N segundos.
+
+    Se ejecuta como background task y se cancela limpiamente al apagar.
+    """
+    settings = get_settings()
+    interval = settings.sync_interval_seconds
+    if interval <= 0:
+        logger.info("Auto-sync desactivado (sync_interval_seconds=%d)", interval)
+        return
+
+    logger.info("Auto-sync iniciado — cada %d segundos", interval)
+    while True:
+        try:
+            await asyncio.sleep(interval)
+            if not settings.imap_email or not settings.imap_password:
+                logger.debug("Auto-sync: IMAP no configurado, esperando...")
+                continue
+            logger.info("Auto-sync: sincronizando correos...")
+            from src.email_processor.fetcher import sync_emails
+            result = await sync_emails()
+            if result.get("error"):
+                logger.warning("Auto-sync: %s", result["error"])
+            elif result.get("processed", 0) > 0:
+                logger.info(
+                    "Auto-sync: %d procesados, %d errores",
+                    result["processed"],
+                    result["errors"],
+                )
+        except asyncio.CancelledError:
+            logger.info("Auto-sync: bucle cancelado")
+            break
+        except Exception as exc:
+            logger.error("Auto-sync: error inesperado: %s", exc)
 
 
 async def seed_admin():
@@ -52,11 +91,24 @@ async def seed_admin():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Ciclo de vida: se ejecuta al arrancar y al cerrar la app."""
+    # Forzar logging INFO + handler para que se vean los logs del auto-sync
+    logging.basicConfig(level=logging.INFO, force=True)
+
     # Al arrancar: crear tablas si no existen + seed admin
     await init_db()
     await seed_admin()
+
+    # Arrancar auto-sync en background
+    task = asyncio.create_task(_auto_sync_loop())
+    _background_tasks.append(task)
     yield
-    # Al cerrar: limpiar si es necesario
+
+    # Al cerrar: cancelar background tasks
+    for t in _background_tasks:
+        t.cancel()
+    if _background_tasks:
+        await asyncio.gather(*_background_tasks, return_exceptions=True)
+        _background_tasks.clear()
 
 
 app = FastAPI(

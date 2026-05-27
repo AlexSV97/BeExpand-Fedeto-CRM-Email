@@ -60,6 +60,11 @@ class Settings(BaseSettings):
     ollama_model: str = "qwen2.5:7b"
     ollama_timeout: int = 180
 
+    # ── Chat contextual y clasificador LLM ──
+    chat_model: str = "qwen2.5:7b"
+    """Modelo usado por el clasificador LLM y el chat de onboarding.
+    qwen2.5:7b proporciona clasificación fiable sin los timeouts de hermes3:8b."""
+    chat_timeout: int = 300
     # ── BERT (modelo fine-tuned) ──
     bert_model_path: str = ""
     """Ruta al directorio del modelo BERT fine-tuneado.
@@ -78,6 +83,11 @@ class Settings(BaseSettings):
 
     # ── Redis / Celery ──
     redis_url: str = "redis://localhost:6379/0"
+
+    # ── Auto-sync ──
+    sync_interval_seconds: int = 60
+    """Intervalo en segundos entre sincronizaciones automáticas de IMAP.
+    60 = cada minuto. 0 = desactivado."""
 
     # ── Entorno ──
     debug: bool = True
