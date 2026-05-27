@@ -6,6 +6,7 @@ Cuando OPENROUTER_API_KEY está configurada, usa OpenRouter.
 Si no, usa Ollama local como fallback (desarrollo local).
 """
 
+import asyncio
 import json
 import logging
 from typing import Any
@@ -111,7 +112,7 @@ class LLMClient:
         temperature: float,
         max_tokens: int,
     ) -> str:
-        """OpenRouter API (OpenAI-compatible)."""
+        """OpenRouter API (OpenAI-compatible) con reintentos ante rate limits."""
         headers = {
             "Authorization": f"Bearer {self._settings.openrouter_api_key}",
             "Content-Type": "application/json",
@@ -124,20 +125,59 @@ class LLMClient:
             "max_tokens": max_tokens,
         }
 
-        try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                resp = await client.post(
-                    f"{self._settings.openrouter_base_url}/chat/completions",
-                    headers=headers,
-                    json=payload,
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                content = data["choices"][0]["message"]["content"]
-                return content.strip() if content else ""
-        except Exception:
-            logger.exception("OpenRouter call failed")
-            raise
+        max_retries = 3
+        base_delay = 2.0  # segundos
+
+        for attempt in range(max_retries):
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                    resp = await client.post(
+                        f"{self._settings.openrouter_base_url}/chat/completions",
+                        headers=headers,
+                        json=payload,
+                    )
+
+                    # Rate limit → reintentar con backoff
+                    if resp.status_code == 429:
+                        retry_after = 0.0
+                        try:
+                            meta = resp.json().get("metadata", {})
+                            retry_after = float(meta.get("retry_after_seconds_raw", 0))
+                        except Exception:
+                            pass
+
+                        delay = max(retry_after, base_delay * (2**attempt))
+                        logger.warning(
+                            "OpenRouter rate limited (429), retry %d/%d in %.1fs",
+                            attempt + 1, max_retries, delay,
+                        )
+                        await asyncio.sleep(delay)
+                        continue
+
+                    resp.raise_for_status()
+                    data = resp.json()
+                    content = data["choices"][0]["message"]["content"]
+                    return content.strip() if content else ""
+
+            except httpx.TimeoutException:
+                if attempt < max_retries - 1:
+                    delay = base_delay * (2**attempt)
+                    logger.warning(
+                        "OpenRouter timeout, retry %d/%d in %.1fs",
+                        attempt + 1, max_retries, delay,
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                logger.exception("OpenRouter timeout after %d retries", max_retries)
+                raise
+            except Exception:
+                logger.exception("OpenRouter call failed")
+                raise
+
+        # Si llegamos aquí, agotamos reintentos
+        raise RuntimeError(
+            f"OpenRouter rate limited after {max_retries} retries"
+        )
 
     async def _call_ollama(
         self,
