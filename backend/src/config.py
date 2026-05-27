@@ -42,15 +42,17 @@ class Settings(BaseSettings):
     vtiger_token: str = ""
     vtiger_username: str = ""
 
-    # ── OpenRouter (IA cloud vía InsForge AI Gateway) ──
+    # ── OpenRouter (IA cloud) ──
     openrouter_api_key: str = ""
-    """API key de OpenRouter (gestionada desde InsForge Cloud).
+    """API key de OpenRouter.
     Vacío = usa Ollama local como fallback."""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    openrouter_model: str = "qwen/qwen2.5-7b-instruct"
-    """Modelo por defecto para analizadores y clasificadores en OpenRouter.
-    qwen2.5-7b-instruct — excelente relación calidad/precio en OpenRouter."""
-    openrouter_chat_model: str = "qwen/qwen2.5-7b-instruct"
+    openrouter_model: str = "google/gemma-4-31b-it:free"
+    """Modelo por defecto para analizadores en OpenRouter.
+    google/gemma-4-31b-it:free — gratuito, buena calidad multilingüe.
+    Otros gratuitos viables: meta-llama/llama-3.3-70b-instruct:free,
+    deepseek/deepseek-v4-flash:free, qwen/qwen3-coder:free."""
+    openrouter_chat_model: str = "google/gemma-4-31b-it:free"
     """Modelo para chat contextual y onboarding."""
     openrouter_timeout: int = 120
     """Timeout para llamadas a OpenRouter (segundos)."""
