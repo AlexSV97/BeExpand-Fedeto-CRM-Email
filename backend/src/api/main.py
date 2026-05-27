@@ -129,10 +129,11 @@ app.include_router(crm.router, prefix="/api/v1/crm")
 app.include_router(dashboard.router, prefix="/api/v1/dashboard")
 app.include_router(chat.router, prefix="/api/v1")
 
-# CORS: en Docker el frontend (nginx) sirve en localhost:5173, en dev Vite en :5173
+# CORS: en Docker localhost:5173, en Render la URL del frontend
 _cors_origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "https://beconnect-frontend.onrender.com",
 ]
 # Si hay variable de entorno CORS_ORIGINS, añadir las que vengan
 import os

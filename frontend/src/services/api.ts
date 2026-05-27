@@ -1,11 +1,11 @@
 /**
  * API client — comunicación con el backend FastAPI.
  *
- * Todas las llamadas pasan por el proxy de Vite (/api → localhost:8000).
- * Los endpoints protegidos incluyen automáticamente el token JWT.
+ * En desarrollo usa el proxy de Vite (/api/v1 → localhost:8000).
+ * En producción (Render) usa VITE_API_URL si está configurada.
  */
 
-const API_BASE = '/api/v1'
+const API_BASE = (import.meta.env.VITE_API_URL ?? '/api/v1') + '/api/v1'
 
 let _token: string | null = null
 
