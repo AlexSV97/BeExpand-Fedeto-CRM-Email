@@ -134,7 +134,7 @@ class LLMClassifierAgent(BaseClassifierAgent):
                 confidence=round(confidence, 2),
                 reason=reason or "análisis LLM",
                 details={
-                    "model": self.model,
+                    "model": self._client.model,
                     "raw_response": raw,
                     "processing_ms": round(elapsed, 1),
                 },
