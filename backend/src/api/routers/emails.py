@@ -3,9 +3,11 @@ Router de correos electrónicos.
 
 GET list con filtros: category, status, date_from/to, skip, limit.
 GET /{id} detail que incluye classification_history.
+POST /{id}/reprocess — re-clasifica un email existente con el pipeline actual.
 PATCH /{id}/review — revisión manual de categoría por un usuario.
 """
 
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -21,6 +23,10 @@ from src.db.session import get_db
 from src.api.deps import get_current_user, pagination_params
 from src.api.schemas import EmailDetailResponse, EmailList, EmailResponse
 from src.email_processor import sync_emails
+from src.orchestrator.context import EmailData
+from src.orchestrator.orchestrator import Orchestrator
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["emails"])
 
@@ -43,6 +49,111 @@ async def sync_imap_emails(
     """
     result = await sync_emails(db=db)
     return result
+
+
+@router.post("/{email_id}/reprocess")
+async def reprocess_email(
+    email_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Re-clasifica un email existente con el pipeline actual del Orchestrator.
+
+    Vuelve a ejecutar Analyzer → 3 clasificadores paralelo → VoteResolver
+    → Router → ActionExecutor.
+    El email y contacto existentes se actualizan con los nuevos resultados.
+    El historial de clasificaciones anteriores se conserva (append).
+    """
+    # 1. Cargar email existente
+    result = await db.execute(
+        select(Email).where(Email.id == email_id)
+    )
+    email = result.scalar_one_or_none()
+    if email is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Email not found",
+        )
+
+    # 2. Construir EmailData desde el registro existente
+    email_data = EmailData(
+        message_id=email.message_id,
+        subject=email.subject or "",
+        body_plain=email.body_plain or "",
+        body_html=email.body_html,
+        sender_name=email.sender_name or email.sender_email.split("@")[0],
+        sender_email=email.sender_email,
+        recipients=email.recipients or [],
+        has_attachments=email.has_attachments,
+        received_at=email.received_at,
+    )
+
+    # 3. Ejecutar pipeline completo del Orchestrator
+    # El ActionExecutor detecta duplicado por message_id y añade
+    # nuevos registros de classification_history (append al historial).
+    orchestrator = Orchestrator(db=db)
+    ctx = await orchestrator.process(email_data, db=db)
+
+    # 4. Actualizar el email existente con los nuevos resultados
+    email.category = ctx.final_category or email.category
+    email.status = "pendiente"
+    email.summary = ctx.extracted.summary if ctx.extracted else email.summary
+    email.extra_data = {
+        "resolution_method": ctx.resolution_method,
+        "confidence": ctx.final_confidence,
+        "votes": [
+            {"agent": v.agent_name, "category": v.category, "confidence": v.confidence}
+            for v in ctx.votes
+        ],
+        "routing": {
+            "departments": ctx.routing.departments if ctx.routing else [],
+            "persons": ctx.routing.persons if ctx.routing else [],
+            "rationale": ctx.routing.rationale if ctx.routing else None,
+        },
+        "analyzer": {
+            "urgency": ctx.extracted.urgency if ctx.extracted else "media",
+            "action_required": ctx.extracted.action_required if ctx.extracted else None,
+            "tone": ctx.extracted.tone if ctx.extracted else None,
+            "company": ctx.extracted.company if ctx.extracted else None,
+        },
+        "processing_time_ms": ctx.processing_time_ms,
+        "suggested_reply": ctx.suggested_reply or "",
+    }
+    # Relevancia
+    if ctx.final_category in ("lead",):
+        email.relevance = "alta"
+    elif ctx.final_category == "nulo":
+        email.relevance = "baja"
+    elif ctx.extracted and ctx.extracted.urgency == "alta":
+        email.relevance = "alta"
+    else:
+        email.relevance = "media"
+
+    await db.commit()
+    await db.refresh(email)
+
+    logger.info(
+        "Email %s re-clasificado: %s (%.0f%%) via %s | %d votos",
+        email_id[:8],
+        ctx.final_category,
+        (ctx.final_confidence or 0) * 100,
+        ctx.resolution_method,
+        len(ctx.votes),
+    )
+
+    return {
+        "status": "ok",
+        "category": ctx.final_category,
+        "confidence": ctx.final_confidence,
+        "resolution": ctx.resolution_method,
+        "votes": [
+            {"agent": v.agent_name, "category": v.category, "confidence": v.confidence, "reason": v.reason}
+            for v in ctx.votes
+        ],
+        "processing_time_ms": ctx.processing_time_ms,
+        "email_id": email.id,
+    }
 
 
 @router.get("", response_model=EmailList)

@@ -21,6 +21,7 @@ import Dashboard from './pages/Dashboard'
 import EmailDetail from './pages/EmailDetail'
 import Contacts from './pages/Contacts'
 import Opportunities from './pages/Opportunities'
+import Settings from './pages/Settings'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -44,6 +45,7 @@ function AppRoutes() {
         <Route path="/emails/:id" element={<EmailDetail />} />
         <Route path="/contacts" element={<Contacts />} />
         <Route path="/opportunities" element={<Opportunities />} />
+        <Route path="/settings" element={<Settings />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

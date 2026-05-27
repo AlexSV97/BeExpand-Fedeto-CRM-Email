@@ -25,6 +25,7 @@ from src.api.routers import (
     dashboard,
     emails,
     opportunities,
+    settings,
 )
 from src.config import get_settings
 from src.db.models import User
@@ -128,6 +129,7 @@ app.include_router(classification.router, prefix="/api/v1/classification-history
 app.include_router(crm.router, prefix="/api/v1/crm")
 app.include_router(dashboard.router, prefix="/api/v1/dashboard")
 app.include_router(chat.router, prefix="/api/v1")
+app.include_router(settings.router, prefix="/api/v1")
 
 # CORS: en Docker localhost:5173, en Render la URL del frontend
 _cors_origins = [

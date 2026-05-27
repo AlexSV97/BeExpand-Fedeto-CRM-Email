@@ -203,6 +203,19 @@ class Opportunity(Base):
     contact: Mapped["Contact"] = relationship("Contact", back_populates="opportunities")
 
 
+class Setting(Base):
+    """Configuración persistida en BD (key-value).
+    
+    Permite sobreescribir valores del .env sin modificar el archivo.
+    Las claves siguen el mismo nombre que en Settings (ej: imap_server).
+    """
+    __tablename__ = "settings"
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class User(Base):
     """Usuario del sistema interno."""
     __tablename__ = "users"

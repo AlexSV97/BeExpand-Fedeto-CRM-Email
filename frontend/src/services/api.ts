@@ -408,6 +408,29 @@ export async function getEmail(id: string): Promise<EmailDetail> {
   return request<EmailDetail>('GET', `/emails/${id}`)
 }
 
+// ── Reprocess ──
+
+export interface ReprocessVote {
+  agent: string
+  category: string
+  confidence: number
+  reason?: string | null
+}
+
+export interface ReprocessResponse {
+  status: string
+  category: string
+  confidence: number
+  resolution: string
+  votes: ReprocessVote[]
+  processing_time_ms: number
+  email_id: string
+}
+
+export async function reprocessEmail(emailId: string): Promise<ReprocessResponse> {
+  return request<ReprocessResponse>('POST', `/emails/${emailId}/reprocess`)
+}
+
 export async function getTimeSeries(
   period: string = '30d',
 ): Promise<TimeSeriesResponse> {
@@ -428,4 +451,105 @@ export interface ChatResponse {
 
 export async function sendChatMessage(data: ChatRequest): Promise<ChatResponse> {
   return request<ChatResponse>('POST', '/chat', data)
+}
+
+// ── Settings ──
+
+export interface ImapSettings {
+  server: string
+  port: number
+  email: string
+  password: string
+  poll_interval_minutes: number
+  folder_map: Record<string, string>
+}
+
+export interface ImapUpdate {
+  server?: string
+  port?: number
+  email?: string
+  password?: string
+  poll_interval_minutes?: number
+  folder_map?: Record<string, string>
+}
+
+export interface NotificationSettings {
+  telegram_bot_token: string
+  telegram_chat_id: string
+  telegram_min_urgency: string
+}
+
+export interface NotificationUpdate {
+  telegram_bot_token?: string
+  telegram_chat_id?: string
+  telegram_min_urgency?: string
+}
+
+export interface PasswordUpdate {
+  current_password: string
+  new_password: string
+}
+
+export interface TestImapRequest {
+  server: string
+  port: number
+  email: string
+  password: string
+}
+
+export interface TestImapResponse {
+  success: boolean
+  message: string
+  folders: string[]
+}
+
+export interface TestTelegramResponse {
+  success: boolean
+  message: string
+}
+
+export interface SystemStatus {
+  imap_configured: boolean
+  telegram_configured: boolean
+  openrouter_configured: boolean
+  ollama_reachable: boolean
+  crm_configured: boolean
+  last_sync_at: string | null
+  last_retrain_at: string | null
+  last_retrain_accuracy: number | null
+  uptime_seconds: number | null
+  database: string
+  version: string
+}
+
+export async function getImapSettings(): Promise<ImapSettings> {
+  return request<ImapSettings>('GET', '/settings/imap')
+}
+
+export async function updateImapSettings(data: ImapUpdate): Promise<ImapSettings> {
+  return request<ImapSettings>('PUT', '/settings/imap', data)
+}
+
+export async function getNotificationSettings(): Promise<NotificationSettings> {
+  return request<NotificationSettings>('GET', '/settings/notifications')
+}
+
+export async function updateNotificationSettings(data: NotificationUpdate): Promise<NotificationSettings> {
+  return request<NotificationSettings>('PUT', '/settings/notifications', data)
+}
+
+export async function changePassword(data: PasswordUpdate): Promise<void> {
+  return request<void>('PUT', '/settings/password', data)
+}
+
+export async function testImapConnection(data: TestImapRequest): Promise<TestImapResponse> {
+  return request<TestImapResponse>('POST', '/settings/test-imap', data)
+}
+
+export async function testTelegram(): Promise<TestTelegramResponse> {
+  return request<TestTelegramResponse>('POST', '/settings/test-telegram')
+}
+
+export async function getSystemStatus(): Promise<SystemStatus> {
+  return request<SystemStatus>('GET', '/settings/status')
 }

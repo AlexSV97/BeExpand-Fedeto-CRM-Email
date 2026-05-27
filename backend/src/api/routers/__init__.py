@@ -7,3 +7,4 @@ from . import crm
 from . import dashboard
 from . import emails
 from . import opportunities
+from . import settings
