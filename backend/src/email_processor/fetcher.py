@@ -14,7 +14,7 @@ import email.message
 import email.utils
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.header import decode_header
 from typing import Optional
 
@@ -23,7 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import get_settings
-from src.db.models import Account
+from src.db.models import Account, Email
 from src.db.session import async_session_factory
 from src.orchestrator.context import EmailData
 
@@ -194,7 +194,9 @@ async def sync_emails(db: Optional[AsyncSession] = None) -> dict:
     """
     Sincroniza correos desde Gmail vía IMAP y los procesa con el Orchestrator.
 
-    - Conecta vía IMAP, busca UNSEEN, parsea cada correo.
+    - Conecta vía IMAP, busca correos desde hace 48h (SINCE, no UNSEEN).
+    - Gmail a veces marca como VISTO al auto-categorizar, por eso SINCE es más fiable.
+    - Deduplica por message_id contra BD para no reprocesar.
     - Delega cada email al Orchestrator (analyzer → classifier → router → executor).
     - Marca como VISTO en Gmail tras procesar.
 
@@ -227,12 +229,15 @@ async def sync_emails(db: Optional[AsyncSession] = None) -> dict:
         logger.error("Error IMAP connect: %s", e)
         return summary
 
-    # Buscar no leídos
+    # Buscar correos de los últimos 2 días (vistos y no vistos)
+    # Gmail a veces marca como VISTO al aplicar categorías automáticas,
+    # por lo que UNSEEN no es fiable. Buscar por fecha es más robusto.
     try:
-        _, message_ids = imap.search(None, "UNSEEN")
+        since_date = (datetime.now(timezone.utc) - timedelta(hours=48)).strftime("%d-%b-%Y")
+        _, message_ids = imap.search(None, f'(SINCE "{since_date}")')
         ids = message_ids[0].split() if message_ids[0] else []
         summary["fetched"] = len(ids)
-        logger.info("Correos UNSEEN encontrados: %d", len(ids))
+        logger.info("Correos encontrados desde %s: %d", since_date, len(ids))
     except Exception as e:
         summary["error"] = f"Error searching IMAP: {e}"
         imap.logout()
@@ -258,12 +263,22 @@ async def sync_emails(db: Optional[AsyncSession] = None) -> dict:
                 raw_bytes = data[0][1]
                 parsed = parse_raw_email(raw_bytes)
 
-                # Saltar correos que ya pasaron por el pipeline (el forwarder
-                # añade cabeceras X-BeExpand-* al reenviar)
+                # Dedup 1: saltar correos reenviados por nuestro pipeline (X-BeExpand)
                 if parsed.get("is_beexpand_forwarded"):
                     logger.info("Saltando email ya procesado (X-BeExpand): %s", parsed.get("subject"))
                     imap.store(msg_id, "+FLAGS", "\\Seen")
                     continue
+
+                # Dedup 2: saltar si el message_id ya existe en BD
+                # (cubre el caso de Gmail marcando como VISTO antes del sync)
+                if parsed.get("message_id"):
+                    existing = await session.execute(
+                        select(Email).where(Email.message_id == parsed["message_id"])
+                    )
+                    if existing.scalar_one_or_none():
+                        logger.info("Saltando email duplicado (message_id): %s", parsed.get("subject"))
+                        imap.store(msg_id, "+FLAGS", "\\Seen")
+                        continue
 
                 # Construir EmailData y procesar con Orchestrator
                 email_data = EmailData(
