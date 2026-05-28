@@ -3,10 +3,12 @@ IMAP Fetcher — Conexión con Gmail vía IMAP + App Password.
 
 Flujo SIMPLIFICADO (sin lógica de clasificación — ahora en el Orchestrator):
 1. Conecta al servidor IMAP (imap.gmail.com:993)
-2. Busca correos NO VISTOS (UNSEEN)
-3. Descarga y parsea cada correo
-4. Delega el procesamiento al Orchestrator (clasificación multi-agente)
-5. Marca como VISTO en Gmail
+2. Busca correos por fecha (SINCE, últimos 2 días) — más fiable que UNSEEN
+3. Fallback a [Gmail]/All Mail si INBOX está vacío
+4. Dedup por message_id antes de procesar
+5. Descarga y parsea cada correo
+6. Delega el procesamiento al Orchestrator (clasificación multi-agente)
+7. Marca como VISTO y mueve a carpeta temática
 """
 
 import email
@@ -17,6 +19,12 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from email.header import decode_header
 from typing import Optional
+
+# IMAP SINCE search necesita nombres de mes en INGLÉS independientemente del locale
+_IMAP_MONTHS = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+]
 
 import imaplib
 from sqlalchemy import select
@@ -229,15 +237,39 @@ async def sync_emails(db: Optional[AsyncSession] = None) -> dict:
         logger.error("Error IMAP connect: %s", e)
         return summary
 
-    # Buscar correos de los últimos 2 días (vistos y no vistos)
-    # Gmail a veces marca como VISTO al aplicar categorías automáticas,
-    # por lo que UNSEEN no es fiable. Buscar por fecha es más robusto.
+    # Buscar correos recientes con búsqueda escalonada:
+    # 1. SINCE por fecha (no depende de UNSEEN, que es poco fiable en Gmail)
+    # 2. Fallback: COUNT INBOX (para detectar si INBOX está vacío)
+    # 3. Fallback: búsqueda en [Gmail]/All Mail (si Gmail auto-archivó)
     try:
-        since_date = (datetime.now(timezone.utc) - timedelta(hours=48)).strftime("%d-%b-%Y")
-        _, message_ids = imap.search(None, f'(SINCE "{since_date}")')
+        since_date = datetime.now(timezone.utc) - timedelta(hours=48)
+        imap_date = f"{since_date.day:02d}-{_IMAP_MONTHS[since_date.month - 1]}-{since_date.year}"
+
+        # Paso 1: SINCE en INBOX
+        _, message_ids = imap.search(None, f'SINCE {imap_date}')
         ids = message_ids[0].split() if message_ids[0] else []
         summary["fetched"] = len(ids)
-        logger.info("Correos encontrados desde %s: %d", since_date, len(ids))
+        logger.info("INBOX: %d correos desde %s", len(ids), imap_date)
+
+        # Paso 2: si INBOX está vacío, verificar con ALL si INBOX tiene mensajes
+        if not ids:
+            _, all_ids = imap.search(None, 'ALL')
+            all_count = len(all_ids[0].split()) if all_ids[0] else 0
+            logger.info("INBOX total (ALL): %d mensajes", all_count)
+
+            if all_count == 0:
+                # Paso 3: probar en [Gmail]/All Mail por si auto-archivó
+                logger.info("INBOX vacío — probando en [Gmail]/All Mail...")
+                try:
+                    imap.select('[Gmail]/All Mail')
+                    _, all_ids = imap.search(None, f'SINCE {imap_date}')
+                    ids = all_ids[0].split() if all_ids[0] else []
+                    summary["fetched"] = len(ids)
+                    logger.info("All Mail: %d correos desde %s", len(ids), imap_date)
+                except Exception:
+                    logger.warning("No se pudo acceder a [Gmail]/All Mail")
+                    # Re-seleccionar INBOX para no dejar el estado inconsistente
+                    imap.select('INBOX')
     except Exception as e:
         summary["error"] = f"Error searching IMAP: {e}"
         imap.logout()
