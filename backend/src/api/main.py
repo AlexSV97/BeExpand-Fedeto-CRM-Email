@@ -6,6 +6,7 @@ Arranque: uvicorn src.api.main:app --reload
 
 import asyncio
 import logging
+from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ from src.api.routers import (
     settings,
 )
 from src.config import get_settings
-from src.db.models import User
+from src.db.models import ReprocessTask, User
 from src.db.session import async_session_factory, init_db
 
 _background_tasks: list[asyncio.Task[None]] = []
@@ -89,15 +90,49 @@ async def seed_admin():
             await session.commit()
 
 
+async def _recover_orphan_tasks() -> None:
+    """Resetea tareas de reprocess que quedaron 'processing' tras un reinicio.
+
+    En Render el servicio puede reiniciarse en cualquier momento (cold start,
+    deploy, idle timeout, etc.). Las asyncio.create_task se pierden, pero la DB
+    queda marcada como 'processing' para siempre. Esta función recupera esas
+    tareas huérfanas marcándolas como 'failed'.
+    """
+    try:
+        async with async_session_factory() as db:
+            result = await db.execute(
+                select(ReprocessTask).where(ReprocessTask.status == "processing")
+            )
+            orphaned = result.scalars().all()
+            if not orphaned:
+                return
+            now = datetime.now(timezone.utc)
+            for t in orphaned:
+                t.status = "failed"
+                t.error = (
+                    "Tarea huérfana por reinicio del servicio. "
+                    "Crea un nuevo reprocess para reintentar."
+                )
+                t.completed_at = now
+            await db.commit()
+            logger.warning(
+                "Recuperadas %d tareas de reprocess huérfanas (processing→failed)",
+                len(orphaned),
+            )
+    except Exception as exc:
+        logger.error("Error recuperando tareas huérfanas: %s", exc)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Ciclo de vida: se ejecuta al arrancar y al cerrar la app."""
     # Forzar logging INFO + handler para que se vean los logs del auto-sync
     logging.basicConfig(level=logging.INFO, force=True)
 
-    # Al arrancar: crear tablas si no existen + seed admin
+    # Al arrancar: crear tablas si no existen + seed admin + recuperar tareas
     await init_db()
     await seed_admin()
+    await _recover_orphan_tasks()
 
     # Arrancar auto-sync en background
     task = asyncio.create_task(_auto_sync_loop())
