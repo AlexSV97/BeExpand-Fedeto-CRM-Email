@@ -27,8 +27,14 @@ celery>=5.4.0
 redis>=5.2.0
 
 # ML / NLP
+# transformers para tokenizer, onnxruntime para inferencia (sin torch)
+# El modelo fine-tuneado se descarga de HuggingFace Hub como ONNX INT8
 transformers>=4.30.0
-torch>=2.0.0  # Instalado con --index-url https://download.pytorch.org/whl/cpu en Dockerfile
+onnxruntime>=1.15.0  # Reemplaza a torch: ~130MB RAM, sin GPU
+numpy>=1.24.0  # Para softmax manual en inferencia ONNX
+
+# HuggingFace Hub (descarga modelo ONNX)
+huggingface_hub>=0.20.0
 
 # Development
 pytest>=8.3.0

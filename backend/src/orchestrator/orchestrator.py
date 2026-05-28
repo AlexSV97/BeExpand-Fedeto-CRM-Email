@@ -85,34 +85,33 @@ class Orchestrator:
             )
 
         try:
-            # ── Paso 1: Analyzer (extracción estructurada) ──
-            logger.info("🔍 Analyzer: extrayendo info de %s", email_data.subject)
-            analyzer_result = await self.analyzer.analyze(
+            # ── Paso 1: Analyzer + 3 Classifiers en PARALELO ──
+            # Analyzer extrae info estructurada; los 3 clasificadores votan.
+            # Todo es independiente: ninguno necesita el resultado del otro.
+            logger.info("⚡ Pipeline paralelo: Analyzer + 3 classifiers...")
+            analyzer_coro = self.analyzer.analyze(
                 subject=email_data.subject or "",
                 body=email_data.body_plain or "",
                 sender_name=email_data.sender_name,
                 sender_email=email_data.sender_email,
             )
+            rule_coro = self.rule_classifier.classify(
+                email_data.subject or "", email_data.body_plain or "",
+            )
+            bert_coro = self.bert_classifier.classify(
+                email_data.subject or "", email_data.body_plain or "",
+            )
+            llm_coro = self.llm_classifier.classify(
+                email_data.subject or "", email_data.body_plain or "",
+            )
+
+            analyzer_result, vote_rule, vote_bert, vote_llm = await asyncio.gather(
+                analyzer_coro, rule_coro, bert_coro, llm_coro,
+            )
+
             ctx.analyzer_result = analyzer_result
             ctx.extracted = analyzer_result.extracted
-
-            # ── Paso 2: Classifier sub-agentes (3 votos en paralelo) ──
-            logger.info("🗳️  Classifier: 3 sub-agentes votando en paralelo...")
-            votes = await asyncio.gather(
-                self.rule_classifier.classify(
-                    email_data.subject or "",
-                    email_data.body_plain or "",
-                ),
-                self.bert_classifier.classify(
-                    email_data.subject or "",
-                    email_data.body_plain or "",
-                ),
-                self.llm_classifier.classify(
-                    email_data.subject or "",
-                    email_data.body_plain or "",
-                ),
-            )
-            ctx.votes = list(votes)
+            ctx.votes = [vote_rule, vote_bert, vote_llm]
 
             # ── Paso 3: VoteResolver (decide categoría final) ──
             logger.info("⚖️  Resolver: resolviendo %d votos...", len(votes))

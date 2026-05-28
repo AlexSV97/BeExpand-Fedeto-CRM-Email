@@ -59,43 +59,26 @@ class Settings(BaseSettings):
     openrouter_timeout: int = 120
     """Timeout para llamadas a OpenRouter (segundos)."""
 
-    # ── Ollama (IA local) — FALLBACK si no hay OpenRouter ──
-    ollama_url: str = "http://127.0.0.1:11434"
-    ollama_model: str = "qwen2.5:7b"
-    ollama_timeout: int = 10
-    """Timeout para Ollama (segundos). Reducido a 10s porque en producción
-    (Render) no hay Ollama corriendo. Si falla, el LLMClassifier y Analyzer
-    votan confianza 0 y el sistema sigue funcionando."""
-
-    # ── Chat contextual y clasificador LLM ──
-    chat_model: str = "qwen2.5:7b"
-    """Modelo usado por el clasificador LLM y el chat de onboarding.
-    qwen2.5:7b proporciona clasificación fiable sin los timeouts de hermes3:8b."""
-    chat_timeout: int = 300
-    # ── BERT (modelo fine-tuned) ──
+    # ── BERT fine-tuneado (DistilBERT + ONNX Runtime) ──
     bert_model_path: str = ""
-    """Ruta al directorio del modelo BERT fine-tuneado.
-    Vacío = usar ruta por defecto (backend/src/classifier/model/).
+    """Ruta al directorio del modelo BERT fine-tuneado local.
+    Vacío = usar ruta por defecto (backend/src/classifier/model-onnx/).
     Útil para sincronizar el modelo vía Dropbox/OneDrive:
         BERT_MODEL_PATH=D:/Dropbox/BeExpand/bert-model
     """
+    bert_onnx_model_id: str = "AlexSV97/beexpand-bert-crm"
+    """Repo ID del modelo ONNX en HuggingFace Hub para descarga automática.
+    BERT ONNX se descarga desde hub si no hay modelo local.
+    Requiere HUGGINGFACE_TOKEN configurado.
+    El modelo se sirve desde: huggingface.co/AlexSV97/beexpand-bert-crm/tree/main/onnx/"""
 
-    # ── BERT (clasificador ML local) ──
-    bert_enabled: bool = True
-    """Desactiva BERT en entornos con memoria limitada (Render free tier: 512MB).
-    False = BertClassifierAgent vota confianza 0 sin cargar modelo.
-    El sistema funciona sin BERT (usa Rule + LLM + VoteResolver)."""
-
-    # ── HuggingFace Hub (modelo BERT fine-tuneado cloud) ──
+    # ── HuggingFace Hub (credenciales para descarga de modelos) ──
     huggingface_token: str = ""
-    """Token de HuggingFace para descargar modelo BERT fine-tuneado privado.
+    """Token de HuggingFace para descargar modelo BERT ONNX fine-tuneado privado.
     Necesario en producción (Render), donde el modelo local no está disponible.
     El modelo se descarga automáticamente al arrancar si no existe localmente.
     Token de solo lectura vale, se crea en: https://huggingface.co/settings/tokens
     """
-    huggingface_model_id: str = "AlexSV97/beexpand-bert-crm"
-    """Repo ID del modelo BERT fine-tuneado en HuggingFace Hub.
-    Modelo privado. Solo se usa si no existe el modelo local y hay token configurado."""
 
     # ── Telegram (alertas de correos urgentes) ──
     telegram_bot_token: str = ""

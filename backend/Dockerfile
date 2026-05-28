@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Instalar dependencias Python (global, no --user, para evitar problemas de
 # permisos al ejecutar con usuario no-root en la etapa runtime)
 COPY requirements.txt .
-RUN pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # ── Stage 2: Runtime ──
 FROM python:3.12-slim

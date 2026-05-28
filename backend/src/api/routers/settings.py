@@ -116,7 +116,6 @@ class SystemStatus(BaseModel):
     imap_configured: bool
     telegram_configured: bool
     openrouter_configured: bool
-    ollama_reachable: bool
     crm_configured: bool
     last_sync_at: Optional[str] = None
     last_retrain_at: Optional[str] = None
@@ -449,16 +448,6 @@ async def get_system_status(
     except Exception:
         pass
 
-    # Ollama reachable
-    ollama_ok = False
-    try:
-        import httpx
-        async with httpx.AsyncClient(timeout=3) as client:
-            r = await client.get(f"{settings.ollama_url}/api/tags")
-            ollama_ok = r.status_code == 200
-    except Exception:
-        ollama_ok = False
-
     return SystemStatus(
         imap_configured=bool(
             settings.imap_email
@@ -469,7 +458,6 @@ async def get_system_status(
             and settings.telegram_chat_id
         ),
         openrouter_configured=bool(settings.openrouter_api_key),
-        ollama_reachable=ollama_ok,
         crm_configured=bool(settings.vtiger_url),
         last_sync_at=last_sync,
         last_retrain_at=last_retrain,

@@ -1,30 +1,25 @@
 """
-BertClassifierAgent — sub-agente de clasificacion basado en DistilBERT fine-tuned.
+BertClassifierAgent — sub-agente de clasificación basado en DistilBERT fine-tuned.
 
-Vota usando el modelo de ML local (~50ms/inferencia).
-El modelo debe estar entrenado en scripts/train_bert_hybrid.py.
+Vota usando ONNX Runtime (sin PyTorch, ~130MB RAM en inferencia).
 
 Estrategia de carga (por orden de prioridad):
-1. Modelo fine-tuneado LOCAL (BEST, ~541MB, entrenado con datos reales)
-2. Modelo fine-tuneado desde HuggingFace Hub (BEST en produccion, ~541MB)
-3. DistilBERT base desde HuggingFace (FALLBACK, ~260MB, precision reducida)
-4. Si todo falla, vota con confianza 0 (el VoteResolver usa Rule + LLM)
+1. Modelo ONNX desde HuggingFace Hub (INT8, ~130MB, descarga bajo demanda)
+2. Modelo ONNX local (si existe en BERT_MODEL_PATH/onnx/)
+3. Si todo falla, vota con confianza 0 (el VoteResolver usa Rule + LLM)
 
-La ruta del modelo fine-tuneado local se resuelve asi:
-1. Parametro explicito `model_dir`
-2. Variable de entorno BERT_MODEL_PATH
-3. Ruta por defecto: backend/src/classifier/model/
-
-El fallback via HuggingFace Hub se usa SOLO si:
-- No existe modelo local
-- Hay token configurado en settings.huggingface_token
-- El repo ID esta configurado en settings.huggingface_model_id
+Requiere:
+- HUGGINGFACE_TOKEN en entorno (para descargar modelo privado de HF Hub)
+- onnxruntime (no necesita torch)
 """
 
 import logging
+import os
 import time
 from pathlib import Path
 from typing import Optional
+
+import numpy as np
 
 from src.agents.classifier.base import BaseClassifierAgent
 from src.config import get_settings
@@ -33,7 +28,8 @@ from src.orchestrator.context import ClassifierVote
 logger = logging.getLogger(__name__)
 
 _DEFAULT_MODEL_DIR = Path(__file__).resolve().parent.parent.parent / "classifier" / "model"
-_FALLBACK_HF_MODEL = "distilbert-base-multilingual-cased"
+_ONNX_SUBDIR = "onnx"
+_ONNX_FILENAME = "model_int8.onnx"
 
 
 def _resolve_model_dir(override: Optional[Path] = None) -> Path:
@@ -49,212 +45,180 @@ def _resolve_model_dir(override: Optional[Path] = None) -> Path:
 class BertClassifierAgent(BaseClassifierAgent):
     """Clasificador BERT que vota en el sistema multi-agente.
 
-    Usa modelo fine-tuneado local si existe (541MB, alta precision).
-    Si no, fallback a HuggingFace Hub (fine-tuneado, si hay token).
-    Si no, descarga DistilBERT base de HuggingFace (260MB, precision media).
+    Usa ONNX Runtime para inferencia. El modelo fine-tuneado se descarga
+    desde HuggingFace Hub en formato ONNX INT8 (~130MB, ~130ms/inferencia).
+    Sin PyTorch — ahorra ~300MB de RAM respecto a la versión original.
     """
 
     def __init__(self, model_dir: Optional[Path] = None):
         self.model_dir = _resolve_model_dir(model_dir)
-        self.model = None
+        self.session: Optional["onnxruntime.InferenceSession"] = None
         self.tokenizer = None
         self.labels = {"cliente": 0, "lead": 1, "proveedor": 2, "nulo": 3}
         self.id2label = {v: k for k, v in self.labels.items()}
         self._loaded = False
-        self._using_fallback = False  # True si NO estamos usando fine-tuneado local
+        self._model_source: Optional[str] = None
 
     @property
     def agent_name(self) -> str:
         return "bert"
 
     def _ensure_loaded(self):
-        """Carga el modelo bajo demanda (lazy loading).
+        """Carga el modelo ONNX bajo demanda.
 
-        Si bert_enabled=False (Render free tier con 512MB RAM),
-        no carga nada — vota confianza 0.
+        Orden:
+        1. ONNX local (model_dir/onnx/model_int8.onnx)
+        2. Descarga ONNX desde HuggingFace Hub (usando token)
+        3. Si todo falla, vota confianza 0
         """
-        settings = get_settings()
-        if not settings.bert_enabled:
-            if not self._loaded:
-                logger.info(
-                    "BERT desactivado por config (bert_enabled=false). "
-                    "El sistema funciona sin voto BERT."
-                )
-            self._loaded = False
-            return
-
         if self._loaded:
             return
 
-        # ── Intento 1: modelo fine-tuneado local ──
-        if self.model_dir.exists():
-            self._using_fallback = False
-            if self._load_from_dir(self.model_dir):
+        # ── 1. ONNX local ──
+        local_onnx = self.model_dir / _ONNX_SUBDIR / _ONNX_FILENAME
+        if local_onnx.exists():
+            if self._load_onnx(str(local_onnx), str(self.model_dir / _ONNX_SUBDIR)):
+                self._model_source = "local-onnx"
                 return
 
-        # ── Intento 2: fine-tuneado desde HuggingFace Hub ──
+        # ── 2. Descarga desde HuggingFace Hub ──
         settings = get_settings()
         hf_token = settings.huggingface_token
-        hf_model_id = settings.huggingface_model_id
+        hf_model_id = settings.bert_onnx_model_id
         if hf_token and hf_model_id:
             logger.info(
-                "Modelo local no encontrado. Intentando descargar fine-tuneado "
-                "desde HuggingFace Hub: %s ...",
+                "ONNX local no encontrado. Descargando desde HuggingFace Hub: %s ...",
                 hf_model_id,
             )
-            self._using_fallback = False  # Sigue siendo fine-tuneado
             if self._load_from_hf_hub(hf_model_id, hf_token):
+                self._model_source = "hub-onnx"
                 return
 
-        # ── Intento 3: DistilBERT base desde HuggingFace (fallback clasico) ──
-        logger.warning(
-            "Modelo fine-tuneado no disponible. "
-            "Descargando DistilBERT base desde HuggingFace como ultimo fallback..."
-        )
-        self._using_fallback = True
-        if self._load_from_hf_base():
-            return
-
-        # Si llegamos aqui, todo fallo
+        # Si llegamos aquí, todo falló
         logger.error(
-            "BERT no disponible: ni modelo local, ni HuggingFace Hub, "
-            "ni fallback base. El sistema funcionara sin voto BERT."
+            "BERT ONNX no disponible: ni local ni HuggingFace Hub. "
+            "El sistema funcionará sin voto BERT."
         )
         self._loaded = False
 
-    def _load_from_dir(self, model_dir: Path) -> bool:
-        """Carga modelo fine-tuneado desde directorio local."""
+    def _load_onnx(self, onnx_path: str, tokenizer_dir: str) -> bool:
+        """Carga modelo ONNX y tokenizador desde directorio local."""
         try:
-            from transformers import AutoModelForSequenceClassification, AutoTokenizer
+            import onnxruntime as ort
+            from transformers import AutoTokenizer
 
-            logger.info("Cargando modelo BERT fine-tuneado desde %s...", model_dir)
-            self.tokenizer = AutoTokenizer.from_pretrained(str(model_dir))
-            self.model = AutoModelForSequenceClassification.from_pretrained(
-                str(model_dir)
+            self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir)
+            self.session = ort.InferenceSession(
+                onnx_path,
+                providers=["CPUExecutionProvider"],
             )
-            self.model.eval()
             self._loaded = True
-            logger.info("Modelo BERT fine-tuneado cargado correctamente")
+            onnx_mb = os.path.getsize(onnx_path) / 1048576
+            logger.info(
+                "BERT ONNX cargado: %.0fMB | %s",
+                onnx_mb,
+                onnx_path,
+            )
             return True
         except Exception as e:
-            logger.error("Error cargando modelo BERT local: %s", e)
+            logger.error("Error cargando BERT ONNX: %s", e)
             self._loaded = False
             return False
 
     def _load_from_hf_hub(self, model_id: str, token: str) -> bool:
-        """
-        Descarga y carga el modelo fine-tuneado desde HuggingFace Hub.
+        """Descarga modelo ONNX + tokenizador desde HuggingFace Hub.
 
-        Args:
-            model_id: ID del repo en HF (ej: 'AlexSV97/beexpand-bert-crm')
-            token: Token de acceso a HuggingFace (lectura basta)
+        Descarga solo los archivos necesarios (model_int8.onnx + tokenizer)
+        al directorio HF_HOME, sin cargar torch.
         """
         try:
-            from transformers import AutoModelForSequenceClassification, AutoTokenizer
+            from huggingface_hub import hf_hub_download
+            from transformers import AutoTokenizer
 
-            logger.info("Descargando modelo fine-tuneado desde HuggingFace Hub (%s)...", model_id)
-            self.tokenizer = AutoTokenizer.from_pretrained(model_id, token=token)
-            self.model = AutoModelForSequenceClassification.from_pretrained(
+            # Directorio temporal para tokenizador (usa HF cache)
+            cache_dir = os.environ.get(
+                "HF_HOME",
+                os.path.expanduser("~/.cache/huggingface"),
+            )
+
+            # Descargar modelo ONNX
+            onnx_path = hf_hub_download(
+                repo_id=model_id,
+                filename=f"{_ONNX_SUBDIR}/{_ONNX_FILENAME}",
+                token=token,
+                cache_dir=cache_dir,
+            )
+
+            # Descargar y cargar tokenizador (desde la raíz del repo, donde están los archivos)
+            # El tokenizador está en la raíz del repo HF (no en onnx/)
+            tokenizer_cache = hf_hub_download(
+                repo_id=model_id,
+                filename="tokenizer.json",
+                token=token,
+                cache_dir=cache_dir,
+            )
+            tokenizer_dir = str(Path(tokenizer_cache).parent)
+            self.tokenizer = AutoTokenizer.from_pretrained(
                 model_id,
                 token=token,
+                cache_dir=cache_dir,
             )
-            self.model.eval()
-            self._loaded = True
-            logger.info(
-                "Modelo BERT fine-tuneado cargado desde HuggingFace Hub correctamente"
-            )
-            return True
+
+            # Cargar con ONNX Runtime
+            return self._load_onnx(onnx_path, tokenizer_dir)
+
         except Exception as e:
-            logger.error("Error descargando modelo desde HuggingFace Hub: %s", e)
-            self._loaded = False
-            return False
-
-    def _load_from_hf_base(self) -> bool:
-        """Descarga y carga DistilBERT base desde HuggingFace como ultimo fallback."""
-        try:
-            from transformers import (
-                AutoConfig,
-                AutoModelForSequenceClassification,
-                AutoTokenizer,
-            )
-
-            logger.info("Descargando DistilBERT base desde HuggingFace (%s)...", _FALLBACK_HF_MODEL)
-
-            # Configurar con 4 labels para que coincida con nuestras categorias
-            config = AutoConfig.from_pretrained(
-                _FALLBACK_HF_MODEL,
-                num_labels=4,
-                id2label=self.id2label,
-                label2id=self.labels,
-            )
-            self.tokenizer = AutoTokenizer.from_pretrained(_FALLBACK_HF_MODEL)
-            self.model = AutoModelForSequenceClassification.from_pretrained(
-                _FALLBACK_HF_MODEL,
-                config=config,
-                ignore_mismatched_sizes=True,
-            )
-            self.model.eval()
-            self._loaded = True
-            logger.info(
-                "DistilBERT base cargado desde HuggingFace (precision reducida - "
-                "no fine-tuneado). Entrena con scripts/train_bert_hybrid.py para "
-                "mejorar precision."
-            )
-            return True
-        except Exception as e:
-            logger.error("Error descargando DistilBERT base desde HuggingFace: %s", e)
+            logger.error("Error descargando BERT ONNX desde HuggingFace Hub: %s", e)
             self._loaded = False
             return False
 
     async def classify(self, subject: str, body: str) -> ClassifierVote:
-        """Clasifica usando BERT. Retorna un voto."""
+        """Clasifica usando BERT vía ONNX Runtime. Retorna un voto."""
         start = time.time()
 
         self._ensure_loaded()
-        if not self._loaded:
+        if not self._loaded or self.session is None or self.tokenizer is None:
             elapsed = (time.time() - start) * 1000
-            reason = (
-                "modelo BERT no disponible - ejecuta scripts/train_bert_hybrid.py "
-                "para entrenar modelo fine-tuneado, o "
-                "configura BERT_MODEL_PATH apuntando al directorio del modelo"
-            )
             return ClassifierVote(
                 agent_name=self.agent_name,
                 category="nulo",
                 confidence=0.0,
-                reason=reason,
+                reason="modelo BERT ONNX no disponible - configura HUGGINGFACE_TOKEN",
                 details={
                     "processing_ms": round(elapsed, 1),
                     "model_source": "none",
-                    "model_path": str(self.model_dir),
                 },
             )
 
         try:
             text = f"{subject or ''} {body or ''}"[:512]
 
+            # Tokenizar con numpy (no torch)
             inputs = self.tokenizer(
                 text,
-                return_tensors="pt",
+                return_tensors="np",
                 padding="max_length",
                 truncation=True,
                 max_length=128,
             )
 
-            import torch
+            # Inferencia con ONNX Runtime
+            onnx_inputs = {
+                "input_ids": inputs["input_ids"].astype(np.int64),
+                "attention_mask": inputs["attention_mask"].astype(np.int64),
+            }
+            outputs = self.session.run(None, onnx_inputs)
+            logits = outputs[0]
 
-            with torch.no_grad():
-                outputs = self.model(**inputs)
-                logits = outputs.logits
-                probabilities = torch.softmax(logits, dim=-1)
-                confidence, predicted = torch.max(probabilities, dim=-1)
+            # Softmax con numpy
+            exp_logits = np.exp(logits - np.max(logits, axis=-1, keepdims=True))
+            probabilities = exp_logits / np.sum(exp_logits, axis=-1, keepdims=True)
 
-            label_id = predicted.item()
-            confidence_score = round(confidence.item(), 2)
-            category = self.id2label.get(label_id, "nulo")
+            predicted = int(np.argmax(probabilities))
+            confidence_score = round(float(np.max(probabilities)), 2)
+            category = self.id2label.get(predicted, "nulo")
 
             elapsed = (time.time() - start) * 1000
-            model_source = self._resolve_model_source()
 
             logger.info(
                 "BERT voto: %s -> %s (%.0f%%) en %.0fms [%s]",
@@ -262,45 +226,37 @@ class BertClassifierAgent(BaseClassifierAgent):
                 category,
                 confidence_score * 100,
                 elapsed,
-                model_source,
+                self._model_source or "unknown",
             )
 
             return ClassifierVote(
                 agent_name=self.agent_name,
                 category=category,
                 confidence=confidence_score,
-                reason=f"distilBERT [{model_source}]: "
+                reason=f"distilBERT [ONNX INT8, {self._model_source}]: "
                        f"{confidence_score:.0%} para '{category}'",
                 details={
-                    "label_id": label_id,
+                    "label_id": predicted,
                     "probabilities": probabilities[0].tolist(),
                     "processing_ms": round(elapsed, 1),
-                    "model_source": model_source,
+                    "model_source": self._model_source or "none",
                 },
             )
 
         except Exception as e:
-            logger.error("Error en clasificacion BERT: %s", e)
+            logger.error("Error en clasificación BERT ONNX: %s", e, exc_info=True)
             return ClassifierVote(
                 agent_name=self.agent_name,
                 category="nulo",
                 confidence=0.0,
-                reason=f"error BERT: {e}",
+                reason=f"error BERT ONNX: {e}",
             )
-
-    def _resolve_model_source(self) -> str:
-        """Resuelve una etiqueta legible del origen del modelo."""
-        if not self._loaded:
-            return "none"
-        if self._using_fallback:
-            return "fallback-base-hf"
-        # Es fine-tuneado — determinar si local o hub
-        settings = get_settings()
-        if settings.huggingface_token and not self.model_dir.exists():
-            return "fine-tuned-hub"
-        return "fine-tuned-local"
 
     @property
     def is_available(self) -> bool:
-        """Verifica si el modelo esta disponible sin cargarlo."""
-        return self.model_dir.exists() and (self.model_dir / "config.json").exists()
+        """Verifica si el modelo está disponible sin cargarlo."""
+        local_onnx = self.model_dir / _ONNX_SUBDIR / _ONNX_FILENAME
+        if local_onnx.exists():
+            return True
+        # Podría estar en HF Hub — asumir disponible si hay token
+        return bool(get_settings().huggingface_token)

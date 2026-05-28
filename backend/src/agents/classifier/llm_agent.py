@@ -76,7 +76,7 @@ class LLMClassifierAgent(BaseClassifierAgent):
     """Clasificador por LLM (OpenRouter/Ollama) que vota en el sistema multi-agente."""
 
     def __init__(self, model: str | None = None, timeout: int | None = None):
-        # Para clasificación usamos el modelo de análisis con fallback a chat_model local
+        # Para clasificación usamos openrouter_chat_model (rápido, distinto proveedor)
         self._client = LLMClient(model=model, timeout=timeout, use_chat_model=True)
 
     @property

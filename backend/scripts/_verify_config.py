@@ -1,6 +1,6 @@
 """
 Verifica la logica de seleccion de modelos en LLMClient
-tanto con OpenRouter activo como con fallback a Ollama.
+(solo OpenRouter, Ollama eliminado).
 
 Ejecutar:
     py scripts/_verify_config.py
@@ -19,10 +19,9 @@ def check_env():
     print(f"\n{'='*60}")
     print(f"ENTORNO ACTUAL")
     print(f"{'='*60}")
-    print(f"  OPENROUTER_API_KEY configurada: {'SI' if has_key else 'NO (fallback Ollama)'}")
+    print(f"  OPENROUTER_API_KEY configurada: {'SI' if has_key else 'NO'}")
     print(f"  openrouter_model:               {settings.openrouter_model}")
     print(f"  openrouter_chat_model:          {settings.openrouter_chat_model}")
-    print(f"  ollama_model (fallback):        {settings.ollama_model}")
     return has_key
 
 
