@@ -3,12 +3,12 @@ IMAP Fetcher — Conexión con Gmail vía IMAP + App Password.
 
 Flujo SIMPLIFICADO (sin lógica de clasificación — ahora en el Orchestrator):
 1. Conecta al servidor IMAP (imap.gmail.com:993)
-2. Busca correos por fecha (SINCE, últimos 2 días) — más fiable que UNSEEN
-3. Fallback a [Gmail]/All Mail si INBOX está vacío
-4. Dedup por message_id antes de procesar
-5. Descarga y parsea cada correo
-6. Delega el procesamiento al Orchestrator (clasificación multi-agente)
-7. Marca como VISTO y mueve a carpeta temática
+2. Busca correos por fecha (SINCE, últimos 2 días) en INBOX y [Gmail]/All Mail
+3. Dedup por message_id antes de procesar
+4. Descarga y parsea cada correo
+5. Delega el procesamiento al Orchestrator (clasificación multi-agente)
+6. Marca como VISTO (en carpeta que corresponda)
+7. Mueve a carpeta temática (solo desde INBOX)
 """
 
 import email
@@ -262,6 +262,9 @@ async def sync_emails(db: Optional[AsyncSession] = None) -> dict:
     finally:
         imap.select(settings.imap_folder)
 
+    # Límite de correos por carpeta para no exceder 512MB de RAM en Render
+    MAX_FETCH_PER_FOLDER = 20
+
     close_db = db is None
     session = db or async_session_factory()
     from src.orchestrator.orchestrator import Orchestrator
@@ -293,6 +296,10 @@ async def sync_emails(db: Optional[AsyncSession] = None) -> dict:
 
             if not ids:
                 continue
+
+            # Limitar a los N más recientes para no saturar RAM
+            ids = ids[-MAX_FETCH_PER_FOLDER:]
+            logger.info("Procesando %d correos en %s (limitados a %d)", len(ids), folder, MAX_FETCH_PER_FOLDER)
 
             # Procesar cada correo
             for msg_id in ids:
