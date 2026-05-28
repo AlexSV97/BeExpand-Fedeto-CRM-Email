@@ -70,12 +70,19 @@ class BertClassifierAgent(BaseClassifierAgent):
     def _ensure_loaded(self):
         """Carga el modelo bajo demanda (lazy loading).
 
-        Orden de intentos:
-        1. Modelo fine-tuneado LOCAL (mejor precision)
-        2. Modelo fine-tuneado desde HUGGINGFACE HUB (si hay token)
-        3. DistilBERT base desde HuggingFace (precision reducida)
-        4. Nulo — el sistema funciona sin voto BERT
+        Si bert_enabled=False (Render free tier con 512MB RAM),
+        no carga nada — vota confianza 0.
         """
+        settings = get_settings()
+        if not settings.bert_enabled:
+            if not self._loaded:
+                logger.info(
+                    "BERT desactivado por config (bert_enabled=false). "
+                    "El sistema funciona sin voto BERT."
+                )
+            self._loaded = False
+            return
+
         if self._loaded:
             return
 

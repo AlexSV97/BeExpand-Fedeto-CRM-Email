@@ -62,7 +62,10 @@ class Settings(BaseSettings):
     # ── Ollama (IA local) — FALLBACK si no hay OpenRouter ──
     ollama_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "qwen2.5:7b"
-    ollama_timeout: int = 180
+    ollama_timeout: int = 10
+    """Timeout para Ollama (segundos). Reducido a 10s porque en producción
+    (Render) no hay Ollama corriendo. Si falla, el LLMClassifier y Analyzer
+    votan confianza 0 y el sistema sigue funcionando."""
 
     # ── Chat contextual y clasificador LLM ──
     chat_model: str = "qwen2.5:7b"
@@ -76,6 +79,12 @@ class Settings(BaseSettings):
     Útil para sincronizar el modelo vía Dropbox/OneDrive:
         BERT_MODEL_PATH=D:/Dropbox/BeExpand/bert-model
     """
+
+    # ── BERT (clasificador ML local) ──
+    bert_enabled: bool = True
+    """Desactiva BERT en entornos con memoria limitada (Render free tier: 512MB).
+    False = BertClassifierAgent vota confianza 0 sin cargar modelo.
+    El sistema funciona sin BERT (usa Rule + LLM + VoteResolver)."""
 
     # ── HuggingFace Hub (modelo BERT fine-tuneado cloud) ──
     huggingface_token: str = ""
