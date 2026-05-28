@@ -114,7 +114,7 @@ class Orchestrator:
             ctx.votes = [vote_rule, vote_bert, vote_llm]
 
             # ── Paso 3: VoteResolver (decide categoría final) ──
-            logger.info("⚖️  Resolver: resolviendo %d votos...", len(votes))
+            logger.info("⚖️  Resolver: resolviendo %d votos...", len(ctx.votes))
             category, confidence, method = await self.resolver.resolve(ctx)
             ctx.final_category = category
             ctx.final_confidence = confidence
