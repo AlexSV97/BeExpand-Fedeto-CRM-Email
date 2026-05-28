@@ -5,14 +5,20 @@ Vota usando el modelo de ML local (~50ms/inferencia).
 El modelo debe estar entrenado en scripts/train_bert_hybrid.py.
 
 Estrategia de carga (por orden de prioridad):
-1. Modelo fine-tuneado local (BEST, ~541MB, necesita entrenamiento previo)
-2. DistilBERT base desde HuggingFace (FALLBACK, ~260MB, primera descarga lenta)
-3. Si todo falla, vota con confianza 0 (el VoteResolver usa Rule + LLM)
+1. Modelo fine-tuneado LOCAL (BEST, ~541MB, entrenado con datos reales)
+2. Modelo fine-tuneado desde HuggingFace Hub (BEST en produccion, ~541MB)
+3. DistilBERT base desde HuggingFace (FALLBACK, ~260MB, precision reducida)
+4. Si todo falla, vota con confianza 0 (el VoteResolver usa Rule + LLM)
 
-La ruta del modelo fine-tuneado se resuelve asi:
+La ruta del modelo fine-tuneado local se resuelve asi:
 1. Parametro explicito `model_dir`
 2. Variable de entorno BERT_MODEL_PATH
 3. Ruta por defecto: backend/src/classifier/model/
+
+El fallback via HuggingFace Hub se usa SOLO si:
+- No existe modelo local
+- Hay token configurado en settings.huggingface_token
+- El repo ID esta configurado en settings.huggingface_model_id
 """
 
 import logging
@@ -44,6 +50,7 @@ class BertClassifierAgent(BaseClassifierAgent):
     """Clasificador BERT que vota en el sistema multi-agente.
 
     Usa modelo fine-tuneado local si existe (541MB, alta precision).
+    Si no, fallback a HuggingFace Hub (fine-tuneado, si hay token).
     Si no, descarga DistilBERT base de HuggingFace (260MB, precision media).
     """
 
@@ -54,37 +61,57 @@ class BertClassifierAgent(BaseClassifierAgent):
         self.labels = {"cliente": 0, "lead": 1, "proveedor": 2, "nulo": 3}
         self.id2label = {v: k for k, v in self.labels.items()}
         self._loaded = False
-        self._using_fallback = False
+        self._using_fallback = False  # True si NO estamos usando fine-tuneado local
 
     @property
     def agent_name(self) -> str:
         return "bert"
 
     def _ensure_loaded(self):
-        """Carga el modelo bajo demanda (lazy loading)."""
+        """Carga el modelo bajo demanda (lazy loading).
+
+        Orden de intentos:
+        1. Modelo fine-tuneado LOCAL (mejor precision)
+        2. Modelo fine-tuneado desde HUGGINGFACE HUB (si hay token)
+        3. DistilBERT base desde HuggingFace (precision reducida)
+        4. Nulo — el sistema funciona sin voto BERT
+        """
         if self._loaded:
             return
 
-        # Intento 1: modelo fine-tuneado local
+        # ── Intento 1: modelo fine-tuneado local ──
         if self.model_dir.exists():
             self._using_fallback = False
             if self._load_from_dir(self.model_dir):
                 return
 
-        # Intento 2: fallback a DistilBERT base desde HuggingFace
+        # ── Intento 2: fine-tuneado desde HuggingFace Hub ──
+        settings = get_settings()
+        hf_token = settings.huggingface_token
+        hf_model_id = settings.huggingface_model_id
+        if hf_token and hf_model_id:
+            logger.info(
+                "Modelo local no encontrado. Intentando descargar fine-tuneado "
+                "desde HuggingFace Hub: %s ...",
+                hf_model_id,
+            )
+            self._using_fallback = False  # Sigue siendo fine-tuneado
+            if self._load_from_hf_hub(hf_model_id, hf_token):
+                return
+
+        # ── Intento 3: DistilBERT base desde HuggingFace (fallback clasico) ──
         logger.warning(
-            "Modelo fine-tuneado no encontrado en %s. "
-            "Descargando DistilBERT base desde HuggingFace como fallback...",
-            self.model_dir,
+            "Modelo fine-tuneado no disponible. "
+            "Descargando DistilBERT base desde HuggingFace como ultimo fallback..."
         )
         self._using_fallback = True
-        if self._load_from_hf():
+        if self._load_from_hf_base():
             return
 
-        # Si llegamos aqui, ambos intentos fallaron
+        # Si llegamos aqui, todo fallo
         logger.error(
-            "BERT no disponible: ni modelo local ni fallback HuggingFace. "
-            "El sistema funcionara sin voto BERT."
+            "BERT no disponible: ni modelo local, ni HuggingFace Hub, "
+            "ni fallback base. El sistema funcionara sin voto BERT."
         )
         self._loaded = False
 
@@ -107,8 +134,36 @@ class BertClassifierAgent(BaseClassifierAgent):
             self._loaded = False
             return False
 
-    def _load_from_hf(self) -> bool:
-        """Descarga y carga DistilBERT base desde HuggingFace como fallback."""
+    def _load_from_hf_hub(self, model_id: str, token: str) -> bool:
+        """
+        Descarga y carga el modelo fine-tuneado desde HuggingFace Hub.
+
+        Args:
+            model_id: ID del repo en HF (ej: 'AlexSV97/beexpand-bert-crm')
+            token: Token de acceso a HuggingFace (lectura basta)
+        """
+        try:
+            from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+            logger.info("Descargando modelo fine-tuneado desde HuggingFace Hub (%s)...", model_id)
+            self.tokenizer = AutoTokenizer.from_pretrained(model_id, token=token)
+            self.model = AutoModelForSequenceClassification.from_pretrained(
+                model_id,
+                token=token,
+            )
+            self.model.eval()
+            self._loaded = True
+            logger.info(
+                "Modelo BERT fine-tuneado cargado desde HuggingFace Hub correctamente"
+            )
+            return True
+        except Exception as e:
+            logger.error("Error descargando modelo desde HuggingFace Hub: %s", e)
+            self._loaded = False
+            return False
+
+    def _load_from_hf_base(self) -> bool:
+        """Descarga y carga DistilBERT base desde HuggingFace como ultimo fallback."""
         try:
             from transformers import (
                 AutoConfig,
@@ -165,7 +220,6 @@ class BertClassifierAgent(BaseClassifierAgent):
                     "processing_ms": round(elapsed, 1),
                     "model_source": "none",
                     "model_path": str(self.model_dir),
-                    "fallback_model": _FALLBACK_HF_MODEL,
                 },
             )
 
@@ -193,27 +247,22 @@ class BertClassifierAgent(BaseClassifierAgent):
             category = self.id2label.get(label_id, "nulo")
 
             elapsed = (time.time() - start) * 1000
-            model_source = "fallback-hf" if self._using_fallback else "fine-tuned"
-            more_info = (
-                ""
-                if not self._using_fallback
-                else " (base model, entrena fine-tuneado para mejor precision)"
-            )
+            model_source = self._resolve_model_source()
+
             logger.info(
-                "BERT voto: %s -> %s (%.0f%%) en %.0fms [%s]%s",
+                "BERT voto: %s -> %s (%.0f%%) en %.0fms [%s]",
                 subject[:50] if subject else "",
                 category,
                 confidence_score * 100,
                 elapsed,
                 model_source,
-                more_info,
             )
 
             return ClassifierVote(
                 agent_name=self.agent_name,
                 category=category,
                 confidence=confidence_score,
-                reason=f"distilBERT {'(fallback)' if self._using_fallback else ''}: "
+                reason=f"distilBERT [{model_source}]: "
                        f"{confidence_score:.0%} para '{category}'",
                 details={
                     "label_id": label_id,
@@ -232,6 +281,19 @@ class BertClassifierAgent(BaseClassifierAgent):
                 reason=f"error BERT: {e}",
             )
 
+    def _resolve_model_source(self) -> str:
+        """Resuelve una etiqueta legible del origen del modelo."""
+        if not self._loaded:
+            return "none"
+        if self._using_fallback:
+            return "fallback-base-hf"
+        # Es fine-tuneado — determinar si local o hub
+        settings = get_settings()
+        if settings.huggingface_token and not self.model_dir.exists():
+            return "fine-tuned-hub"
+        return "fine-tuned-local"
+
     @property
     def is_available(self) -> bool:
+        """Verifica si el modelo esta disponible sin cargarlo."""
         return self.model_dir.exists() and (self.model_dir / "config.json").exists()

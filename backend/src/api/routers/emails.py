@@ -3,10 +3,12 @@ Router de correos electrónicos.
 
 GET list con filtros: category, status, date_from/to, skip, limit.
 GET /{id} detail que incluye classification_history.
-POST /{id}/reprocess — re-clasifica un email existente con el pipeline actual.
+POST /{id}/reprocess — re-clasifica un email existente (asíncrono).
+GET /reprocess/tasks/{task_id} — estado de una tarea de reprocesado.
 PATCH /{id}/review — revisión manual de categoría por un usuario.
 """
 
+import asyncio
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -17,8 +19,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.db.models import ClassificationHistory, Contact, Email, User
-from src.db.session import get_db
+from src.db.models import ClassificationHistory, Contact, Email, ReprocessTask, User
+from src.db.session import async_session_factory, get_db
 
 from src.api.deps import get_current_user, pagination_params
 from src.api.schemas import EmailDetailResponse, EmailList, EmailResponse
@@ -27,6 +29,17 @@ from src.orchestrator.context import EmailData
 from src.orchestrator.orchestrator import Orchestrator
 
 logger = logging.getLogger(__name__)
+
+# ── Background task tracking ──────────────────────────────────────────────
+_background_tasks: list[asyncio.Task] = []
+
+
+def _cleanup_task(task: asyncio.Task) -> None:
+    """Remove task from tracking list (used as done callback)."""
+    try:
+        _background_tasks.remove(task)
+    except ValueError:
+        pass
 
 router = APIRouter(tags=["emails"])
 
@@ -51,51 +64,11 @@ async def sync_imap_emails(
     return result
 
 
-@router.post("/{email_id}/reprocess")
-async def reprocess_email(
-    email_id: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """
-    Re-clasifica un email existente con el pipeline actual del Orchestrator.
+# ── Background reprocess pipeline ─────────────────────────────────────────
 
-    Vuelve a ejecutar Analyzer → 3 clasificadores paralelo → VoteResolver
-    → Router → ActionExecutor.
-    El email y contacto existentes se actualizan con los nuevos resultados.
-    El historial de clasificaciones anteriores se conserva (append).
-    """
-    # 1. Cargar email existente
-    result = await db.execute(
-        select(Email).where(Email.id == email_id)
-    )
-    email = result.scalar_one_or_none()
-    if email is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Email not found",
-        )
 
-    # 2. Construir EmailData desde el registro existente
-    email_data = EmailData(
-        message_id=email.message_id,
-        subject=email.subject or "",
-        body_plain=email.body_plain or "",
-        body_html=email.body_html,
-        sender_name=email.sender_name or email.sender_email.split("@")[0],
-        sender_email=email.sender_email,
-        recipients=email.recipients or [],
-        has_attachments=email.has_attachments,
-        received_at=email.received_at,
-    )
-
-    # 3. Ejecutar pipeline completo del Orchestrator
-    # El ActionExecutor detecta duplicado por message_id y añade
-    # nuevos registros de classification_history (append al historial).
-    orchestrator = Orchestrator(db=db)
-    ctx = await orchestrator.process(email_data, db=db)
-
-    # 4. Actualizar el email existente con los nuevos resultados
+async def _update_email_from_context(email: Email, ctx) -> None:
+    """Update email fields with Orchestrator context results."""
     email.category = ctx.final_category or email.category
     email.status = "pendiente"
     email.summary = ctx.extracted.summary if ctx.extracted else email.summary
@@ -120,7 +93,6 @@ async def reprocess_email(
         "processing_time_ms": ctx.processing_time_ms,
         "suggested_reply": ctx.suggested_reply or "",
     }
-    # Relevancia
     if ctx.final_category in ("lead",):
         email.relevance = "alta"
     elif ctx.final_category == "nulo":
@@ -130,29 +102,189 @@ async def reprocess_email(
     else:
         email.relevance = "media"
 
+
+async def _run_reprocess_background(email_id: str, task_id: str) -> None:
+    """Run the full reprocess pipeline in background."""
+    try:
+        async with async_session_factory() as db:
+            # ── Mark task as processing ──
+            t_result = await db.execute(
+                select(ReprocessTask).where(ReprocessTask.id == task_id)
+            )
+            task = t_result.scalar_one_or_none()
+            if task is None:
+                logger.error("Reprocess task %s not found in DB", task_id[:8])
+                return
+            task.status = "processing"
+            await db.commit()
+
+            # ── Load email ──
+            e_result = await db.execute(
+                select(Email).where(Email.id == email_id)
+            )
+            email = e_result.scalar_one_or_none()
+            if email is None:
+                task.status = "failed"
+                task.error = "Email not found"
+                task.completed_at = datetime.now(timezone.utc)
+                await db.commit()
+                return
+
+            # ── Build EmailData ──
+            email_data = EmailData(
+                message_id=email.message_id,
+                subject=email.subject or "",
+                body_plain=email.body_plain or "",
+                body_html=email.body_html,
+                sender_name=email.sender_name or email.sender_email.split("@")[0],
+                sender_email=email.sender_email,
+                recipients=email.recipients or [],
+                has_attachments=email.has_attachments,
+                received_at=email.received_at,
+            )
+
+            # ── Run pipeline ──
+            orchestrator = Orchestrator(db=db)
+            ctx = await orchestrator.process(email_data, db=db)
+
+            # ── Update email ──
+            await _update_email_from_context(email, ctx)
+
+            # ── Update task as completed ──
+            task.status = "completed"
+            task.result_category = ctx.final_category
+            task.result_confidence = ctx.final_confidence
+            task.result_resolution = ctx.resolution_method
+            task.result_votes = [
+                {"agent": v.agent_name, "category": v.category, "confidence": v.confidence}
+                for v in ctx.votes
+            ]
+            task.processing_time_ms = ctx.processing_time_ms
+            task.completed_at = datetime.now(timezone.utc)
+
+            await db.commit()
+
+            logger.info(
+                "Background reprocess %s ok: %s (%.0f%%) via %s | %.0fms",
+                email_id[:8],
+                ctx.final_category,
+                (ctx.final_confidence or 0) * 100,
+                ctx.resolution_method,
+                ctx.processing_time_ms or 0,
+            )
+
+    except Exception as exc:
+        logger.error("Background reprocess %s failed: %s", email_id[:8], exc, exc_info=True)
+        try:
+            async with async_session_factory() as db:
+                t_result = await db.execute(
+                    select(ReprocessTask).where(ReprocessTask.id == task_id)
+                )
+                task = t_result.scalar_one_or_none()
+                if task:
+                    task.status = "failed"
+                    task.error = str(exc)
+                    task.completed_at = datetime.now(timezone.utc)
+                    await db.commit()
+        except Exception as db_err:
+            logger.error("Failed to persist reprocess failure: %s", db_err)
+
+
+# ── Endpoints ──
+
+
+@router.get("/reprocess/tasks/{task_id}")
+async def get_reprocess_task(
+    task_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Obtiene el estado de una tarea de reprocesado asíncrono.
+
+    Devuelve el resultado completo cuando la tarea ha terminado (status=completed),
+    o el error si ha fallado (status=failed).
+    """
+    result = await db.execute(
+        select(ReprocessTask).where(ReprocessTask.id == task_id)
+    )
+    task = result.scalar_one_or_none()
+    if task is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Reprocess task not found",
+        )
+    return {
+        "task_id": task.id,
+        "email_id": task.email_id,
+        "status": task.status,
+        "result": {
+            "category": task.result_category,
+            "confidence": task.result_confidence,
+            "resolution": task.result_resolution,
+            "votes": task.result_votes,
+            "processing_time_ms": task.processing_time_ms,
+        }
+        if task.status == "completed"
+        else None,
+        "error": task.error,
+        "created_at": task.created_at.isoformat() if task.created_at else None,
+        "completed_at": task.completed_at.isoformat() if task.completed_at else None,
+    }
+
+
+@router.post("/{email_id}/reprocess", status_code=status.HTTP_202_ACCEPTED)
+async def reprocess_email(
+    email_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Re-clasifica un email existente (asíncrono).
+
+    Crea una tarea de reprocesado y lanza el pipeline en background.
+    Devuelve 202 Accepted con un task_id para consultar el resultado
+    mediante GET /reprocess/tasks/{task_id}.
+
+    Pipeline: Analyzer → 3 clasificadores paralelo → VoteResolver
+    → Router → ActionExecutor.
+    """
+    # 1. Verificar que el email existe
+    result = await db.execute(
+        select(Email).where(Email.id == email_id)
+    )
+    email = result.scalar_one_or_none()
+    if email is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Email not found",
+        )
+
+    # 2. Crear registro de tarea
+    task = ReprocessTask(
+        id=str(uuid.uuid4()),
+        email_id=email_id,
+        status="pending",
+    )
+    db.add(task)
     await db.commit()
-    await db.refresh(email)
+    await db.refresh(task)
+
+    # 3. Lanzar pipeline en background
+    bg = asyncio.create_task(_run_reprocess_background(email_id, task.id))
+    _background_tasks.append(bg)
+    bg.add_done_callback(_cleanup_task)
 
     logger.info(
-        "Email %s re-clasificado: %s (%.0f%%) via %s | %d votos",
+        "Reprocess task %s creada para email %s",
+        task.id[:8],
         email_id[:8],
-        ctx.final_category,
-        (ctx.final_confidence or 0) * 100,
-        ctx.resolution_method,
-        len(ctx.votes),
     )
 
     return {
-        "status": "ok",
-        "category": ctx.final_category,
-        "confidence": ctx.final_confidence,
-        "resolution": ctx.resolution_method,
-        "votes": [
-            {"agent": v.agent_name, "category": v.category, "confidence": v.confidence, "reason": v.reason}
-            for v in ctx.votes
-        ],
-        "processing_time_ms": ctx.processing_time_ms,
-        "email_id": email.id,
+        "status": "accepted",
+        "task_id": task.id,
+        "email_id": email_id,
     }
 
 

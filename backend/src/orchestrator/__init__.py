@@ -9,8 +9,16 @@ from src.orchestrator.context import (
     ExtractedInfo,
     RoutingDecision,
 )
-from src.orchestrator.orchestrator import Orchestrator
 from src.orchestrator.resolver import VoteResolver
+
+
+def __getattr__(name):
+    """Lazy imports to avoid circular dependency (orchestrator ↔ agents)."""
+    if name == "Orchestrator":
+        from src.orchestrator.orchestrator import Orchestrator as _o
+        return _o
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "EmailContext",

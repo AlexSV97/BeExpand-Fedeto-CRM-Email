@@ -229,3 +229,20 @@ class User(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     last_login: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+class ReprocessTask(Base):
+    """Tarea de reprocesado asíncrono para emails."""
+    __tablename__ = "reprocess_tasks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    email_id: Mapped[str] = mapped_column(String(36), ForeignKey("emails.id", ondelete="CASCADE"), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")  # pending | processing | completed | failed
+    result_category: Mapped[Optional[str]] = mapped_column(String(20))
+    result_confidence: Mapped[Optional[float]] = mapped_column(Float)
+    result_resolution: Mapped[Optional[str]] = mapped_column(String(30))
+    result_votes: Mapped[Optional[dict]] = mapped_column(JSON, default=None)
+    processing_time_ms: Mapped[Optional[float]] = mapped_column(Float)
+    error: Mapped[Optional[str]] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))

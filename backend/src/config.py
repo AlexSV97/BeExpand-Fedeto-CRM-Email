@@ -77,6 +77,17 @@ class Settings(BaseSettings):
         BERT_MODEL_PATH=D:/Dropbox/BeExpand/bert-model
     """
 
+    # ── HuggingFace Hub (modelo BERT fine-tuneado cloud) ──
+    huggingface_token: str = ""
+    """Token de HuggingFace para descargar modelo BERT fine-tuneado privado.
+    Necesario en producción (Render), donde el modelo local no está disponible.
+    El modelo se descarga automáticamente al arrancar si no existe localmente.
+    Token de solo lectura vale, se crea en: https://huggingface.co/settings/tokens
+    """
+    huggingface_model_id: str = "AlexSV97/beexpand-bert-crm"
+    """Repo ID del modelo BERT fine-tuneado en HuggingFace Hub.
+    Modelo privado. Solo se usa si no existe el modelo local y hay token configurado."""
+
     # ── Telegram (alertas de correos urgentes) ──
     telegram_bot_token: str = ""
     """Token del bot de Telegram (de @BotFather). Vacío = desactivado."""
