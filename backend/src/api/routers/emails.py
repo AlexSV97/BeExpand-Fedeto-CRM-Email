@@ -70,7 +70,8 @@ async def sync_imap_emails(
 async def _update_email_from_context(email: Email, ctx) -> None:
     """Update email fields with Orchestrator context results."""
     email.category = ctx.final_category or email.category
-    email.status = "pendiente"
+    email.status = "procesado" if ctx.final_category else "pendiente"
+    email.processed_at = datetime.now(timezone.utc)
     email.summary = ctx.extracted.summary if ctx.extracted else email.summary
     email.extra_data = {
         "resolution_method": ctx.resolution_method,

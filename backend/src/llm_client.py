@@ -8,6 +8,7 @@ excepción (el sistema debe tener OpenRouter para funcionar).
 
 import asyncio
 import logging
+import random
 from typing import Any
 
 import httpx
@@ -99,8 +100,8 @@ class LLMClient:
             "max_tokens": max_tokens,
         }
 
-        max_retries = 3
-        base_delay = 2.0
+        max_retries = 6
+        base_delay = 3.0
 
         for attempt in range(max_retries):
             try:
@@ -111,7 +112,7 @@ class LLMClient:
                         json=payload,
                     )
 
-                    if resp.status_code == 429:
+                    if resp.status_code in (429, 502, 503):
                         retry_after = 0.0
                         try:
                             meta = resp.json().get("metadata", {})
@@ -120,9 +121,12 @@ class LLMClient:
                             pass
 
                         delay = max(retry_after, base_delay * (2**attempt))
+                        # Añadir jitter ±20% para evitar thundering herd
+                        jitter = random.uniform(0.8, 1.2)
+                        delay *= jitter
                         logger.warning(
-                            "OpenRouter rate limited (429), retry %d/%d in %.1fs",
-                            attempt + 1, max_retries, delay,
+                            "OpenRouter %d, retry %d/%d in %.1fs",
+                            resp.status_code, attempt + 1, max_retries, delay,
                         )
                         await asyncio.sleep(delay)
                         continue
@@ -135,6 +139,8 @@ class LLMClient:
             except httpx.TimeoutException:
                 if attempt < max_retries - 1:
                     delay = base_delay * (2**attempt)
+                    jitter = random.uniform(0.8, 1.2)
+                    delay *= jitter
                     logger.warning(
                         "OpenRouter timeout, retry %d/%d in %.1fs",
                         attempt + 1, max_retries, delay,

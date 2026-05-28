@@ -27,7 +27,7 @@ from src.orchestrator.context import ClassifierVote
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_MODEL_DIR = Path(__file__).resolve().parent.parent.parent / "classifier" / "model"
+_DEFAULT_MODEL_DIR = Path(__file__).resolve().parent.parent.parent / "classifier" / "model-onnx"
 _ONNX_SUBDIR = "onnx"
 _ONNX_FILENAME = "model_int8.onnx"
 
