@@ -54,7 +54,12 @@ class AnalyzerAgent:
     def __init__(self, model: str | None = None, timeout: int | None = None):
         settings = get_settings()
         # Analyzer prompt es más grande → necesita más tiempo
-        timeout_val = timeout or settings.openrouter_timeout * 2
+        if timeout:
+            timeout_val = timeout
+        elif settings.openrouter_api_key:
+            timeout_val = settings.openrouter_timeout * 2
+        else:
+            timeout_val = settings.ollama_timeout or 10
         self._client = LLMClient(model=model, timeout=timeout_val)
 
     async def analyze(

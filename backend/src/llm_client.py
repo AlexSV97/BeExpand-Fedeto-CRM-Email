@@ -53,7 +53,13 @@ class LLMClient:
         else:
             self.model = settings.ollama_model
 
-        self.timeout = timeout or settings.openrouter_timeout or 120
+        if timeout:
+            self.timeout = timeout
+        elif settings.openrouter_api_key:
+            self.timeout = settings.openrouter_timeout or 120
+        else:
+            # Ollama fallback: timeout corto (no hay Ollama en produccion)
+            self.timeout = settings.ollama_timeout or 10
         self.use_openrouter = bool(settings.openrouter_api_key)
 
     # ── API Pública ──────────────────────────────────────────────────────────
