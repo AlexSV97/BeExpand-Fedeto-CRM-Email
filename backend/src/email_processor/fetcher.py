@@ -237,49 +237,31 @@ async def sync_emails(db: Optional[AsyncSession] = None) -> dict:
         logger.error("Error IMAP connect: %s", e)
         return summary
 
-    # Buscar correos recientes con búsqueda escalonada:
-    # 1. SINCE por fecha (no depende de UNSEEN, que es poco fiable en Gmail)
-    # 2. Fallback: COUNT INBOX (para detectar si INBOX está vacío)
-    # 3. Fallback: búsqueda en [Gmail]/All Mail (si Gmail auto-archivó)
+    # Buscar correos recientes en INBOX + [Gmail]/All Mail.
+    # Gmail a veces auto-archiva emails (los mueve de INBOX a All Mail)
+    # al marcarlos como VISTO o aplicar categorías automáticas.
+    # Buscar SÓLO en INBOX puede perder esos correos.
     try:
         since_date = datetime.now(timezone.utc) - timedelta(hours=48)
         imap_date = f"{since_date.day:02d}-{_IMAP_MONTHS[since_date.month - 1]}-{since_date.year}"
-
-        # Paso 1: SINCE en INBOX
-        _, message_ids = imap.search(None, f'SINCE {imap_date}')
-        ids = message_ids[0].split() if message_ids[0] else []
-        summary["fetched"] = len(ids)
-        logger.info("INBOX: %d correos desde %s", len(ids), imap_date)
-
-        # Paso 2: si INBOX está vacío, verificar con ALL si INBOX tiene mensajes
-        if not ids:
-            _, all_ids = imap.search(None, 'ALL')
-            all_count = len(all_ids[0].split()) if all_ids[0] else 0
-            logger.info("INBOX total (ALL): %d mensajes", all_count)
-
-            if all_count == 0:
-                # Paso 3: probar en [Gmail]/All Mail por si auto-archivó
-                logger.info("INBOX vacío — probando en [Gmail]/All Mail...")
-                try:
-                    imap.select('[Gmail]/All Mail')
-                    _, all_ids = imap.search(None, f'SINCE {imap_date}')
-                    ids = all_ids[0].split() if all_ids[0] else []
-                    summary["fetched"] = len(ids)
-                    logger.info("All Mail: %d correos desde %s", len(ids), imap_date)
-                except Exception:
-                    logger.warning("No se pudo acceder a [Gmail]/All Mail")
-                    # Re-seleccionar INBOX para no dejar el estado inconsistente
-                    imap.select('INBOX')
     except Exception as e:
-        summary["error"] = f"Error searching IMAP: {e}"
+        summary["error"] = f"Error calculating date: {e}"
         imap.logout()
         return summary
 
-    if not ids:
-        imap.logout()
-        return summary
+    # ── Procesar cada carpeta por separado ──
+    # Los ID de mensaje IMAP son específicos de cada carpeta, así que
+    # debemos procesar INBOX y All Mail con selects independientes.
+    folders_to_search = [settings.imap_folder]
+    try:
+        imap.select('[Gmail]/All Mail')
+        _ = imap.search(None, 'ALL')  # solo verificar que existe
+        folders_to_search.append('[Gmail]/All Mail')
+    except Exception:
+        logger.info("[Gmail]/All Mail no accesible — solo INBOX")
+    finally:
+        imap.select(settings.imap_folder)
 
-    # Procesar cada correo con el Orchestrator
     close_db = db is None
     session = db or async_session_factory()
     from src.orchestrator.orchestrator import Orchestrator
@@ -289,71 +271,101 @@ async def sync_emails(db: Optional[AsyncSession] = None) -> dict:
     folder_map = settings.imap_folder_map or {}
 
     try:
-        for msg_id in ids:
+        for folder in folders_to_search:
             try:
-                _, data = imap.fetch(msg_id, "(RFC822)")
-                raw_bytes = data[0][1]
-                parsed = parse_raw_email(raw_bytes)
+                imap.select(folder)
+                logger.info("Buscando en %s desde %s...", folder, imap_date)
+            except Exception as e:
+                logger.warning("No se pudo seleccionar %s: %s", folder, e)
+                continue
 
-                # Dedup 1: saltar correos reenviados por nuestro pipeline (X-BeExpand)
-                if parsed.get("is_beexpand_forwarded"):
-                    logger.info("Saltando email ya procesado (X-BeExpand): %s", parsed.get("subject"))
-                    imap.store(msg_id, "+FLAGS", "\\Seen")
-                    continue
+            # Buscar correos por fecha
+            try:
+                _, msg_data = imap.search(None, f'SINCE {imap_date}')
+                ids = msg_data[0].split() if msg_data[0] else []
+            except Exception as e:
+                logger.warning("Error buscando en %s: %s", folder, e)
+                continue
 
-                # Dedup 2: saltar si el message_id ya existe en BD
-                # (cubre el caso de Gmail marcando como VISTO antes del sync)
-                if parsed.get("message_id"):
-                    existing = await session.execute(
-                        select(Email).where(Email.message_id == parsed["message_id"])
-                    )
-                    if existing.scalar_one_or_none():
-                        logger.info("Saltando email duplicado (message_id): %s", parsed.get("subject"))
+            folder_count = len(ids)
+            summary["fetched"] += folder_count
+            logger.info("%s: %d correos desde %s", folder, folder_count, imap_date)
+
+            if not ids:
+                continue
+
+            # Procesar cada correo
+            for msg_id in ids:
+                try:
+                    _, data = imap.fetch(msg_id, "(RFC822)")
+                    raw_bytes = data[0][1]
+                    parsed = parse_raw_email(raw_bytes)
+
+                    # Dedup 1: saltar correos reenviados por nuestro pipeline (X-BeExpand)
+                    if parsed.get("is_beexpand_forwarded"):
+                        logger.info("Saltando email ya procesado (X-BeExpand): %s", parsed.get("subject"))
                         imap.store(msg_id, "+FLAGS", "\\Seen")
                         continue
 
-                # Construir EmailData y procesar con Orchestrator
-                email_data = EmailData(
-                    message_id=parsed.get("message_id"),
-                    subject=parsed.get("subject"),
-                    body_plain=parsed.get("body_plain"),
-                    body_html=parsed.get("body_html"),
-                    sender_name=parsed.get("sender_name", ""),
-                    sender_email=parsed.get("sender_email", ""),
-                    recipients=parsed.get("recipients", []),
-                    has_attachments=parsed.get("has_attachments", False),
-                    received_at=parsed.get("received_at"),
-                )
+                    # Dedup 2: saltar si el message_id ya existe en BD
+                    if parsed.get("message_id"):
+                        existing = await session.execute(
+                            select(Email).where(Email.message_id == parsed["message_id"])
+                        )
+                        if existing.scalar_one_or_none():
+                            # Aún así marcar como visto en la carpeta actual
+                            try:
+                                imap.store(msg_id, "+FLAGS", "\\Seen")
+                            except Exception:
+                                pass
+                            logger.info("Saltando email duplicado (message_id): %s", parsed.get("subject"))
+                            continue
 
-                ctx = await orchestrator.process(email_data, db=session)
+                    # Construir EmailData y procesar con Orchestrator
+                    email_data = EmailData(
+                        message_id=parsed.get("message_id"),
+                        subject=parsed.get("subject"),
+                        body_plain=parsed.get("body_plain"),
+                        body_html=parsed.get("body_html"),
+                        sender_name=parsed.get("sender_name", ""),
+                        sender_email=parsed.get("sender_email", ""),
+                        recipients=parsed.get("recipients", []),
+                        has_attachments=parsed.get("has_attachments", False),
+                        received_at=parsed.get("received_at"),
+                    )
 
-                summary["processed"] += 1
-                summary["results"].append(ctx.summary_dict)
+                    ctx = await orchestrator.process(email_data, db=session)
 
-                # Marcar como visto
-                imap.store(msg_id, "+FLAGS", "\\Seen")
+                    summary["processed"] += 1
+                    summary["results"].append(ctx.summary_dict)
 
-                # Mover a carpeta temática según categoría
-                if ctx.final_category and ctx.final_category in folder_map:
-                    target = folder_map[ctx.final_category]
-                    _ensure_imap_folder(imap, target)
-                    if _move_to_imap_folder(imap, msg_id, target):
-                        moved_count += 1
-                        logger.debug("Movido %s → %s", parsed.get("subject"), target)
+                    # Marcar como visto en la carpeta actual
+                    try:
+                        imap.store(msg_id, "+FLAGS", "\\Seen")
+                    except Exception as e:
+                        logger.warning("No se pudo marcar como visto en %s: %s", folder, e)
 
-                logger.info(
-                    "Procesado: %s → %s (%.0f%%) | ruta: %s | %s",
-                    parsed.get("subject"),
-                    ctx.final_category,
-                    ctx.final_confidence * 100,
-                    ", ".join(ctx.routing.departments) if ctx.routing else "n/a",
-                    "✅ reenviado" if any(a.success for a in ctx.actions if a.action == "email_forward") else "📥 solo BD",
-                )
+                    # Mover a carpeta temática (solo si estamos en INBOX)
+                    if folder == settings.imap_folder and ctx.final_category and ctx.final_category in folder_map:
+                        target = folder_map[ctx.final_category]
+                        _ensure_imap_folder(imap, target)
+                        if _move_to_imap_folder(imap, msg_id, target):
+                            moved_count += 1
+                            logger.debug("Movido %s → %s", parsed.get("subject"), target)
 
-            except Exception as e:
-                summary["errors"] += 1
-                logger.error("Error procesando email %s: %s", msg_id, e)
-                continue
+                    logger.info(
+                        "Procesado: %s → %s (%.0f%%) | ruta: %s | %s",
+                        parsed.get("subject"),
+                        ctx.final_category,
+                        ctx.final_confidence * 100,
+                        ", ".join(ctx.routing.departments) if ctx.routing else "n/a",
+                        "reenviado" if any(a.success for a in ctx.actions if a.action == "email_forward") else "solo BD",
+                    )
+
+                except Exception as e:
+                    summary["errors"] += 1
+                    logger.error("Error procesando email %s en %s: %s", msg_id, folder, e)
+                    continue
 
         # Actualizar last_polled_at en la cuenta por defecto
         try:
@@ -376,8 +388,10 @@ async def sync_emails(db: Optional[AsyncSession] = None) -> dict:
             await session.close()
         if moved_count > 0:
             try:
+                # Volver a INBOX antes de expunge
+                imap.select(settings.imap_folder)
                 imap.expunge()
-                logger.info("Expunged %d mensajes marcados como borrados", moved_count)
+                logger.info("EXPUNGE completado en INBOX: %d mensajes", moved_count)
             except Exception as e:
                 logger.warning("Error en EXPUNGE: %s", e)
         imap.logout()
