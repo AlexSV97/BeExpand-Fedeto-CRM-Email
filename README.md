@@ -1,4 +1,4 @@
-# BeExpand CRM Email
+# BeConnect
 
 > **Sistema inteligente de clasificación y gestión de correos electrónicos con integración CRM**
 
@@ -6,7 +6,7 @@
 
 ## ¿Qué es?
 
-BeExpand CRM Email es un sistema que **lee, clasifica y organiza automáticamente los correos electrónicos que llegan a la empresa**. Cada correo se analiza, se categoriza (cliente, proveedor, lead, etc.), se determina su urgencia y relevancia, y se registra en el CRM — todo sin intervención humana.
+BeConnect es un sistema que **lee, clasifica y organiza automáticamente los correos electrónicos que llegan a la empresa**. Cada correo se analiza, se categoriza (cliente, proveedor, lead, etc.), se determina su urgencia y relevancia, y se registra en el CRM — todo sin intervención humana.
 
 El resultado: un equipo comercial que **deja de perder tiempo organizando correos** y se centra en lo que realmente importa: **vender y dar servicio**.
 
@@ -83,7 +83,7 @@ En tiempo real, el equipo ve en pantalla los correos clasificados, las oportunid
 
 ## Humano vs Sistema
 
-| Aspecto | Trabajo manual | Con BeExpand CRM Email |
+| Aspecto | Trabajo manual | Con BeConnect |
 |:---|:---|:---|
 | **Tiempo por correo** | 2-5 minutos leyendo, entendiendo y clasificando | 2-5 segundos automático |
 | **Jornada de 8h** | ~100-150 correos procesados | Todos los que lleguen, sin límite |
