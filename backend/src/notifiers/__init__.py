@@ -1,8 +1,10 @@
 """
 Módulo de notificaciones externas.
-Actualmente soporta Telegram para alertas de correos urgentes.
+
+Actualmente soporta WhatsApp Business API para alertas de correos urgentes.
+TelegramNotifier se mantiene por compatibilidad pero está deprecado.
 """
 
-from src.notifiers.telegram import TelegramNotifier
+from src.notifiers.whatsapp import WhatsAppNotifier
 
-__all__ = ["TelegramNotifier"]
+__all__ = ["WhatsAppNotifier"]

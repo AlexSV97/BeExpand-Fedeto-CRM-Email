@@ -474,15 +474,17 @@ export interface ImapUpdate {
 }
 
 export interface NotificationSettings {
-  telegram_bot_token: string
-  telegram_chat_id: string
-  telegram_min_urgency: string
+  whatsapp_access_token: string
+  whatsapp_phone_number_id: string
+  whatsapp_to_phone: string
+  whatsapp_min_urgency: string
 }
 
 export interface NotificationUpdate {
-  telegram_bot_token?: string
-  telegram_chat_id?: string
-  telegram_min_urgency?: string
+  whatsapp_access_token?: string
+  whatsapp_phone_number_id?: string
+  whatsapp_to_phone?: string
+  whatsapp_min_urgency?: string
 }
 
 export interface PasswordUpdate {
@@ -503,14 +505,14 @@ export interface TestImapResponse {
   folders: string[]
 }
 
-export interface TestTelegramResponse {
+export interface TestWhatsAppResponse {
   success: boolean
   message: string
 }
 
 export interface SystemStatus {
   imap_configured: boolean
-  telegram_configured: boolean
+  whatsapp_configured: boolean
   openrouter_configured: boolean
   ollama_reachable: boolean
   crm_configured: boolean
@@ -546,8 +548,8 @@ export async function testImapConnection(data: TestImapRequest): Promise<TestIma
   return request<TestImapResponse>('POST', '/settings/test-imap', data)
 }
 
-export async function testTelegram(): Promise<TestTelegramResponse> {
-  return request<TestTelegramResponse>('POST', '/settings/test-telegram')
+export async function testWhatsApp(): Promise<TestWhatsAppResponse> {
+  return request<TestWhatsAppResponse>('POST', '/settings/test-whatsapp')
 }
 
 export async function getSystemStatus(): Promise<SystemStatus> {

@@ -5,9 +5,10 @@ Acciones que ejecuta:
 1. Guardar email en BD (con toda la metadata del orquestador)
 2. Actualizar/crear contacto
 3. Registrar historial de clasificación (votes + decisión final)
-4. Notificar por Telegram si el correo es urgente
+4. Notificar por WhatsApp si el correo es urgente
 5. Reenviar email a departamentos vía SMTP (si no es nulo)
-6. Registrar resultados de cada acción en el EmailContext
+6. Procesar facturas en adjuntos PDF
+7. Registrar resultados de cada acción en el EmailContext
 
 El dashboard consulta la BD directamente, así que al guardar aquí,
 el frontend ya ve los datos actualizados.
@@ -77,13 +78,13 @@ class ActionExecutor:
         if crm_action:
             actions.append(crm_action)
 
-        # 3. Notificar por Telegram si el correo es urgente
+        # 3. Notificar por WhatsApp si el correo es urgente
         if ctx.final_category and ctx.final_category != Category.NULO.value and ctx.extracted:
-            alert_action = await self._notify_telegram(ctx)
+            alert_action = await self._notify_whatsapp(ctx)
             actions.append(alert_action)
         else:
             actions.append(ActionResult(
-                action="telegram_alert",
+                action="whatsapp_alert",
                 success=True,
                 detail="Email nulo o sin análisis — no se notifica",
             ))
@@ -443,20 +444,20 @@ class ActionExecutor:
             detail=result.get("detail", ""),
         )
 
-    async def _notify_telegram(self, ctx: EmailContext) -> ActionResult:
-        """Envía alerta a Telegram si el correo es urgente.
+    async def _notify_whatsapp(self, ctx: EmailContext) -> ActionResult:
+        """Envía alerta a WhatsApp Business si el correo es urgente.
 
-        La decisión de notificar o no depende del TelegramNotifier,
-        que evalúa el umbral de urgencia configurado (telegram_min_urgency).
+        La decisión de notificar o no depende del WhatsAppNotifier,
+        que evalúa el umbral de urgencia configurado (whatsapp_min_urgency).
         """
-        from src.notifiers.telegram import TelegramNotifier
+        from src.notifiers.whatsapp import WhatsAppNotifier
 
-        notifier = TelegramNotifier()
+        notifier = WhatsAppNotifier()
         if not notifier.enabled:
             return ActionResult(
-                action="telegram_alert",
+                action="whatsapp_alert",
                 success=True,
-                detail="Telegram no configurado — omitido",
+                detail="WhatsApp no configurado — omitido",
             )
 
         sent = await notifier.send_alert(
@@ -470,9 +471,9 @@ class ActionExecutor:
         )
 
         return ActionResult(
-            action="telegram_alert",
+            action="whatsapp_alert",
             success=sent,
-            detail="Alerta enviada a Telegram" if sent else "No se envió alerta",
+            detail="Alerta enviada a WhatsApp" if sent else "No se envió alerta",
         )
 
     async def _save_attachments(self, ctx: EmailContext, email_id: str) -> None:

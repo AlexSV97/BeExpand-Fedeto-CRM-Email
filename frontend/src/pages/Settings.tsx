@@ -1,7 +1,7 @@
 /**
  * Ajustes del sistema — 4 pestañas:
  *   1. Buzones (IMAP)
- *   2. Notificaciones (Telegram)
+ *   2. Notificaciones (WhatsApp)
  *   3. Cuenta (contraseña)
  *   4. Estado del Sistema (solo lectura)
  */
@@ -15,13 +15,13 @@ import {
   updateNotificationSettings,
   changePassword,
   testImapConnection,
-  testTelegram,
+  testWhatsApp,
   getSystemStatus,
   type ImapUpdate,
   type NotificationUpdate,
   type SystemStatus,
   type TestImapResponse,
-  type TestTelegramResponse,
+  type TestWhatsAppResponse,
 } from '../services/api'
 
 // ── Tabs ──
@@ -297,12 +297,13 @@ function ImapTab() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// Pestaña 2: Notificaciones (Telegram)
+// Pestaña 2: Notificaciones (WhatsApp Business)
 // ═══════════════════════════════════════════════════════════════════
 
 function NotificationsTab() {
-  const [botToken, setBotToken] = useState('')
-  const [chatId, setChatId] = useState('')
+  const [accessToken, setAccessToken] = useState('')
+  const [phoneNumberId, setPhoneNumberId] = useState('')
+  const [toPhone, setToPhone] = useState('')
   const [minUrgency, setMinUrgency] = useState('alta')
 
   const [loading, setLoading] = useState(true)
@@ -310,19 +311,117 @@ function NotificationsTab() {
   const [feedback, setFeedback] = useState<{ msg: string; type: 'success' | 'error' | null }>({ msg: '', type: null })
 
   const [testing, setTesting] = useState(false)
-  const [testResult, setTestResult] = useState<TestTelegramResponse | null>(null)
+  const [testResult, setTestResult] = useState<TestWhatsAppResponse | null>(null)
 
   const fetchSettings = useCallback(async () => {
     try {
       const s = await getNotificationSettings()
-      setBotToken(s.telegram_bot_token)
-      setChatId(s.telegram_chat_id)
-      setMinUrgency(s.telegram_min_urgency)
+      setAccessToken(s.whatsapp_access_token)
+      setPhoneNumberId(s.whatsapp_phone_number_id)
+      setToPhone(s.whatsapp_to_phone)
+      setMinUrgency(s.whatsapp_min_urgency)
     } catch {
       setFeedback({ msg: 'Error al cargar configuración de notificaciones', type: 'error' })
     } finally {
       setLoading(false)
     }
+  }, [])
+
+  useEffect(() => { fetchSettings() }, [fetchSettings])
+
+  const handleSave = async () => {
+    setSaving(true)
+    setFeedback({ msg: '', type: null })
+    try {
+      const body: NotificationUpdate = {
+        whatsapp_phone_number_id: phoneNumberId,
+        whatsapp_to_phone: toPhone,
+        whatsapp_min_urgency: minUrgency,
+      }
+      if (accessToken && !accessToken.startsWith('*')) body.whatsapp_access_token = accessToken
+      await updateNotificationSettings(body)
+      setFeedback({ msg: 'Configuración de notificaciones guardada', type: 'success' })
+      fetchSettings()
+    } catch (e) {
+      setFeedback({ msg: e instanceof Error ? e.message : 'Error al guardar', type: 'error' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleTest = async () => {
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const result = await testWhatsApp()
+      setTestResult(result)
+    } catch (e) {
+      setTestResult({ success: false, message: e instanceof Error ? e.message : 'Error' } as TestWhatsAppResponse)
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  if (loading) return <div className="text-center py-12 text-muted-foreground text-sm">Cargando configuración...</div>
+
+  return (
+    <div className="space-y-6">
+      <SectionCard title="WhatsApp Business" description="Configura las alertas de correos urgentes vía WhatsApp Business API (Meta).">
+        <div className="space-y-4 mb-5">
+          <Input label="Token de Acceso (Meta)" value={accessToken} onChange={setAccessToken} type="password" placeholder="EAAT..." />
+          <Input label="Phone Number ID" value={phoneNumberId} onChange={setPhoneNumberId} placeholder="123456789" />
+          <Input label="Teléfono destino" value={toPhone} onChange={setToPhone} placeholder="34600123456" />
+          <p className="text-[11px] text-muted-foreground/60 -mt-3">Formato internacional sin +. Ej: 34600123456</p>
+          <Select
+            label="Urgencia mínima para notificar"
+            value={minUrgency}
+            onChange={setMinUrgency}
+            options={[
+              { value: 'alta', label: 'Alta' },
+              { value: 'media', label: 'Media' },
+              { value: 'baja', label: 'Baja' },
+            ]}
+          />
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-5 py-2.5 bg-chart-1 text-white rounded-xl text-sm font-semibold
+              hover:bg-chart-1/90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          >
+            {saving ? 'Guardando...' : 'Guardar'}
+          </button>
+          <button
+            onClick={handleTest}
+            disabled={testing}
+            className="px-5 py-2.5 bg-card text-chart-3 border border-chart-3/40 rounded-xl text-sm font-semibold
+              hover:bg-chart-3/10 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          >
+            {testing ? 'Enviando...' : 'Enviar prueba'}
+          </button>
+        </div>
+        <Feedback message={feedback.msg} type={feedback.type} />
+      </SectionCard>
+
+      {testResult && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`rounded-2xl border p-4 ${testResult.success ? 'bg-chart-2/10 border-chart-2/20' : 'bg-destructive/10 border-destructive/20'}`}
+        >
+          <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${testResult.success ? 'bg-chart-2' : 'bg-destructive'}`} />
+            <span className={`text-sm font-semibold ${testResult.success ? 'text-chart-2' : 'text-destructive'}`}>
+              {testResult.success ? 'Notificación enviada' : 'Error'}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">{testResult.message}</p>
+        </motion.div>
+      )}
+    </div>
+  )
+}
   }, [])
 
   useEffect(() => { fetchSettings() }, [fetchSettings])
@@ -350,7 +449,7 @@ function NotificationsTab() {
       const result = await testTelegram()
       setTestResult(result)
     } catch (e) {
-      setTestResult({ success: false, message: e instanceof Error ? e.message : 'Error', folders: [] } as unknown as TestTelegramResponse)
+      setTestResult({ success: false, message: e instanceof Error ? e.message : 'Error', folders: [] } as unknown as TestWhatsAppResponse)
     } finally {
       setTesting(false)
     }
@@ -535,7 +634,7 @@ function StatusTab() {
           <StatusBadge ok={status.imap_configured} label="IMAP (Buzón de correo)" />
           <StatusBadge ok={status.ollama_reachable} label="Ollama (IA local)" />
           <StatusBadge ok={status.openrouter_configured} label="OpenRouter (IA cloud)" />
-          <StatusBadge ok={status.telegram_configured} label="Telegram (Notificaciones)" />
+          <StatusBadge ok={status.whatsapp_configured} label="WhatsApp (Notificaciones)" />
           <StatusBadge ok={status.crm_configured} label="VTiger CRM" />
         </div>
       </SectionCard>

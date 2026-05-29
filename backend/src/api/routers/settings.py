@@ -4,11 +4,11 @@ Router de Ajustes del sistema.
 Endpoints:
     GET  /settings/imap             -- Configuracion IMAP (password enmascarada)
     PUT  /settings/imap             -- Actualizar configuracion IMAP
-    GET  /settings/notifications    -- Configuracion Telegram (token enmascarado)
-    PUT  /settings/notifications    -- Actualizar configuracion Telegram
+    GET  /settings/notifications    -- Configuracion WhatsApp (token enmascarado)
+    PUT  /settings/notifications    -- Actualizar configuracion WhatsApp
     PUT  /settings/password         -- Cambiar contrasena del admin
     POST /settings/test-imap        -- Probar conexion IMAP
-    POST /settings/test-telegram    -- Enviar notificacion de prueba
+    POST /settings/test-whatsapp    -- Enviar notificacion de prueba
     GET  /settings/status           -- Health check del sistema
 
 Todas requieren autenticacion (admin).
@@ -72,15 +72,17 @@ class ImapUpdate(BaseModel):
 # -- Notificaciones --
 
 class NotificationSettings(BaseModel):
-    telegram_bot_token: str  # Enmascarado en GET
-    telegram_chat_id: str
-    telegram_min_urgency: str
+    whatsapp_access_token: str  # Enmascarado en GET
+    whatsapp_phone_number_id: str
+    whatsapp_to_phone: str
+    whatsapp_min_urgency: str
 
 
 class NotificationUpdate(BaseModel):
-    telegram_bot_token: Optional[str] = None
-    telegram_chat_id: Optional[str] = None
-    telegram_min_urgency: Optional[str] = None
+    whatsapp_access_token: Optional[str] = None
+    whatsapp_phone_number_id: Optional[str] = None
+    whatsapp_to_phone: Optional[str] = None
+    whatsapp_min_urgency: Optional[str] = None
 
 
 # -- Password --
@@ -105,7 +107,7 @@ class TestImapResponse(BaseModel):
     folders: list[str] = []
 
 
-class TestTelegramResponse(BaseModel):
+class TestWhatsAppResponse(BaseModel):
     success: bool
     message: str
 
@@ -114,7 +116,7 @@ class TestTelegramResponse(BaseModel):
 
 class SystemStatus(BaseModel):
     imap_configured: bool
-    telegram_configured: bool
+    whatsapp_configured: bool
     openrouter_configured: bool
     crm_configured: bool
     last_sync_at: Optional[str] = None
@@ -263,7 +265,7 @@ async def test_imap_connection(
 
 
 # ---------------------------------------------------------------------------
-# Notificaciones (Telegram)
+# Notificaciones (WhatsApp Business)
 # ---------------------------------------------------------------------------
 
 @router.get("/notifications", response_model=NotificationSettings)
@@ -273,18 +275,22 @@ async def get_notification_settings(
 ):
     """Retorna configuracion de notificaciones con token enmascarado."""
     settings = get_settings()
-    db_token = await _get_setting(db, "telegram_bot_token")
-    real_token = db_token if db_token is not None else settings.telegram_bot_token
+    db_token = await _get_setting(db, "whatsapp_access_token")
+    real_token = db_token if db_token is not None else settings.whatsapp_access_token
 
     return NotificationSettings(
-        telegram_bot_token=mask_value(real_token) if real_token else "",
-        telegram_chat_id=(
-            await _get_setting(db, "telegram_chat_id")
-            or settings.telegram_chat_id
+        whatsapp_access_token=mask_value(real_token) if real_token else "",
+        whatsapp_phone_number_id=(
+            await _get_setting(db, "whatsapp_phone_number_id")
+            or settings.whatsapp_phone_number_id
         ),
-        telegram_min_urgency=(
-            await _get_setting(db, "telegram_min_urgency")
-            or settings.telegram_min_urgency
+        whatsapp_to_phone=(
+            await _get_setting(db, "whatsapp_to_phone")
+            or settings.whatsapp_to_phone
+        ),
+        whatsapp_min_urgency=(
+            await _get_setting(db, "whatsapp_min_urgency")
+            or settings.whatsapp_min_urgency
         ),
     )
 
@@ -295,81 +301,98 @@ async def update_notification_settings(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Actualiza configuracion de notificaciones."""
-    if body.telegram_bot_token is not None and not _is_masked(body.telegram_bot_token):
-        await _set_setting(db, "telegram_bot_token", body.telegram_bot_token)
-    if body.telegram_chat_id is not None:
-        await _set_setting(db, "telegram_chat_id", body.telegram_chat_id)
-    if body.telegram_min_urgency is not None:
-        await _set_setting(db, "telegram_min_urgency", body.telegram_min_urgency)
+    """Actualiza configuracion de notificaciones WhatsApp."""
+    if body.whatsapp_access_token is not None and not _is_masked(body.whatsapp_access_token):
+        await _set_setting(db, "whatsapp_access_token", body.whatsapp_access_token)
+    if body.whatsapp_phone_number_id is not None:
+        await _set_setting(db, "whatsapp_phone_number_id", body.whatsapp_phone_number_id)
+    if body.whatsapp_to_phone is not None:
+        await _set_setting(db, "whatsapp_to_phone", body.whatsapp_to_phone)
+    if body.whatsapp_min_urgency is not None:
+        await _set_setting(db, "whatsapp_min_urgency", body.whatsapp_min_urgency)
 
     await db.commit()
 
     settings = get_settings()
-    db_token = await _get_setting(db, "telegram_bot_token")
-    real_token = db_token if db_token is not None else settings.telegram_bot_token
+    db_token = await _get_setting(db, "whatsapp_access_token")
+    real_token = db_token if db_token is not None else settings.whatsapp_access_token
 
     return NotificationSettings(
-        telegram_bot_token=mask_value(real_token) if real_token else "",
-        telegram_chat_id=(
-            await _get_setting(db, "telegram_chat_id")
-            or settings.telegram_chat_id
+        whatsapp_access_token=mask_value(real_token) if real_token else "",
+        whatsapp_phone_number_id=(
+            await _get_setting(db, "whatsapp_phone_number_id")
+            or settings.whatsapp_phone_number_id
         ),
-        telegram_min_urgency=(
-            await _get_setting(db, "telegram_min_urgency")
-            or settings.telegram_min_urgency
+        whatsapp_to_phone=(
+            await _get_setting(db, "whatsapp_to_phone")
+            or settings.whatsapp_to_phone
+        ),
+        whatsapp_min_urgency=(
+            await _get_setting(db, "whatsapp_min_urgency")
+            or settings.whatsapp_min_urgency
         ),
     )
 
 
-@router.post("/test-telegram", response_model=TestTelegramResponse)
-async def test_telegram(
+@router.post("/test-whatsapp", response_model=TestWhatsAppResponse)
+async def test_whatsapp(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Envia un mensaje de prueba a Telegram."""
-    from src.notifiers.telegram import TelegramNotifier
+    """Envia un mensaje de prueba a WhatsApp Business."""
+    from src.notifiers.whatsapp import WhatsAppNotifier
 
     settings = get_settings()
-    db_token = await _get_setting(db, "telegram_bot_token")
-    db_chat_id = await _get_setting(db, "telegram_chat_id")
+    db_token = await _get_setting(db, "whatsapp_access_token")
+    db_phone_number_id = await _get_setting(db, "whatsapp_phone_number_id")
+    db_to_phone = await _get_setting(db, "whatsapp_to_phone")
 
-    token = db_token if db_token is not None else settings.telegram_bot_token
-    chat_id = db_chat_id if db_chat_id is not None else settings.telegram_chat_id
+    token = db_token if db_token is not None else settings.whatsapp_access_token
+    phone_number_id = db_phone_number_id if db_phone_number_id is not None else settings.whatsapp_phone_number_id
+    to_phone = db_to_phone if db_to_phone is not None else settings.whatsapp_to_phone
 
     if not token:
-        return TestTelegramResponse(success=False, message="Token de Telegram no configurado")
-    if not chat_id:
-        return TestTelegramResponse(success=False, message="Chat ID no configurado")
+        return TestWhatsAppResponse(success=False, message="Token de WhatsApp no configurado")
+    if not phone_number_id:
+        return TestWhatsAppResponse(success=False, message="Phone Number ID no configurado")
+    if not to_phone:
+        return TestWhatsAppResponse(success=False, message="Teléfono destino no configurado")
 
     try:
         import httpx
 
         text = (
-            "Prueba de Notificacion\n\n"
-            "Si recibes este mensaje, la integracion con Telegram funciona correctamente.\n\n"
+            "⚠️ Prueba de Notificación - BeConnect\n\n"
+            "Si recibes este mensaje, la integración con WhatsApp Business funciona correctamente.\n\n"
             f"Enviado: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}"
         )
 
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-        async with httpx.AsyncClient(timeout=10) as client:
-            response = await client.post(url, json={
-                "chat_id": chat_id,
-                "text": text,
-            })
+        url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.post(
+                url,
+                headers={"Authorization": f"Bearer {token}"},
+                json={
+                    "messaging_product": "whatsapp",
+                    "to": to_phone,
+                    "type": "text",
+                    "text": {"body": text},
+                },
+            )
             result = response.json()
 
-        if result.get("ok"):
-            return TestTelegramResponse(success=True, message="Mensaje de prueba enviado correctamente")
+        if result.get("messages"):
+            return TestWhatsAppResponse(success=True, message="Mensaje de prueba enviado correctamente a WhatsApp")
         else:
-            return TestTelegramResponse(
+            error_desc = result.get("error", {}).get("message", "desconocido")
+            return TestWhatsAppResponse(
                 success=False,
-                message=f"Error Telegram: {result.get('description', 'desconocido')}",
+                message=f"Error WhatsApp API: {error_desc}",
             )
     except ImportError:
-        return TestTelegramResponse(success=False, message="httpx no esta instalado")
+        return TestWhatsAppResponse(success=False, message="httpx no esta instalado")
     except Exception as e:
-        return TestTelegramResponse(success=False, message=f"Error de conexion: {e}")
+        return TestWhatsAppResponse(success=False, message=f"Error de conexion: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -453,9 +476,10 @@ async def get_system_status(
             settings.imap_email
             and settings.imap_password
         ),
-        telegram_configured=bool(
-            settings.telegram_bot_token
-            and settings.telegram_chat_id
+        whatsapp_configured=bool(
+            settings.whatsapp_access_token
+            and settings.whatsapp_phone_number_id
+            and settings.whatsapp_to_phone
         ),
         openrouter_configured=bool(settings.openrouter_api_key),
         crm_configured=bool(settings.vtiger_url),
