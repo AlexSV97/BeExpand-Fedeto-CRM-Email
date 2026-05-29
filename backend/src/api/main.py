@@ -25,6 +25,7 @@ from src.api.routers import (
     crm,
     dashboard,
     emails,
+    invoices,
     opportunities,
     settings,
 )
@@ -163,6 +164,7 @@ app.include_router(opportunities.router, prefix="/api/v1/opportunities")
 app.include_router(classification.router, prefix="/api/v1/classification-history")
 app.include_router(crm.router, prefix="/api/v1/crm")
 app.include_router(dashboard.router, prefix="/api/v1/dashboard")
+app.include_router(invoices.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
 app.include_router(settings.router, prefix="/api/v1")
 

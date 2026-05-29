@@ -22,9 +22,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import get_settings
-from src.db.models import ClassificationHistory, Contact, Email
+from src.attachment_storage import save_attachment
+from src.db.models import ClassificationHistory, Contact, Email, Invoice
 from src.email_processor.forwarder import forward_email
-from src.orchestrator.context import ActionResult, Category, EmailContext
+from src.orchestrator.context import ActionResult, AttachmentContent, Category, EmailContext
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +99,10 @@ class ActionExecutor:
                 detail="Email nulo o sin ruta — no se reenvía",
             ))
 
+        # 5. Procesar facturas (si el email tiene adjuntos PDF)
+        invoice_action = await self._process_invoices(ctx)
+        actions.append(invoice_action)
+
         ctx.actions = actions
         return actions
 
@@ -110,10 +115,14 @@ class ActionExecutor:
             # 2. Guardar email
             email = await self._save_email(ctx, contact)
 
-            # 3. Guardar historial de clasificación
+            # 3. Guardar adjuntos en disco (si hay)
+            if ctx.raw.attachments_data:
+                await self._save_attachments(ctx, email.id)
+
+            # 4. Guardar historial de clasificación
             await self._save_classification_history(ctx, email.id)
 
-            # 4. Actualizar contadores del contacto
+            # 5. Actualizar contadores del contacto
             contact.email_count = (contact.email_count or 0) + 1
             now = ctx.raw.received_at
             if now is None:
@@ -128,11 +137,12 @@ class ActionExecutor:
             await self.db.commit()
 
             logger.info(
-                "BD guardado: %s | categoría=%s (%.0f%%) | método=%s",
+                "BD guardado: %s | categoría=%s (%.0f%%) | método=%s | adjuntos=%d",
                 ctx.raw.subject,
                 ctx.final_category,
                 ctx.final_confidence * 100,
                 ctx.resolution_method,
+                len(ctx.raw.attachments_data),
             )
 
             return ActionResult(
@@ -463,6 +473,173 @@ class ActionExecutor:
             action="telegram_alert",
             success=sent,
             detail="Alerta enviada a Telegram" if sent else "No se envió alerta",
+        )
+
+    async def _save_attachments(self, ctx: EmailContext, email_id: str) -> None:
+        """Guarda los adjuntos del email en disco y actualiza la referencia en BD.
+
+        Solo se ejecuta si el email tiene adjuntos en attachments_data.
+        Los archivos se guardan en: storage/attachments/{email_id}/{filename}
+        """
+        if not ctx.raw.attachments_data:
+            return
+
+        stored_refs = []
+        for att in ctx.raw.attachments_data:
+            stored = save_attachment(
+                email_id=email_id,
+                filename=att.filename,
+                content_type=att.content_type,
+                data=att.data,
+            )
+            stored_refs.append({
+                "filename": stored.filename,
+                "content_type": stored.content_type,
+                "file_path": stored.file_path,
+                "size": stored.size,
+                "stored_at": stored.stored_at,
+            })
+
+        # Actualizar el campo attachments del email en BD
+        from sqlalchemy import select
+        from src.db.models import Email as EmailModel
+
+        result = await self.db.execute(
+            select(EmailModel).where(EmailModel.id == email_id)
+        )
+        email = result.scalar_one_or_none()
+        if email:
+            email.attachments = stored_refs
+            await self.db.commit()
+            logger.info(
+                "%d adjuntos guardados para email %s",
+                len(stored_refs), email_id,
+            )
+
+    async def _process_invoices(self, ctx: EmailContext) -> ActionResult:
+        """Procesa facturas detectadas en adjuntos PDF del email.
+
+        Solo se activa si:
+        - El email tiene adjuntos
+        - La categoría es 'proveedor' o el Analyzer detectó tipo factura
+        - Hay archivos PDF entre los adjuntos
+
+        Extrae los datos estructurados de la factura usando el InvoiceAgent.
+        """
+        if not ctx.raw.attachments_data:
+            return ActionResult(
+                action="invoice_process",
+                success=True,
+                detail="Sin adjuntos — no se procesan facturas",
+            )
+
+        # Verificar si hay PDFs entre los adjuntos
+        pdf_attachments = [
+            a for a in ctx.raw.attachments_data
+            if a.content_type == "application/pdf" or a.filename.lower().endswith(".pdf")
+        ]
+
+        if not pdf_attachments:
+            return ActionResult(
+                action="invoice_process",
+                success=True,
+                detail="Sin archivos PDF entre los adjuntos",
+            )
+
+        # Obtener el email_id (último email guardado)
+        from sqlalchemy import select
+        from src.db.models import Email as EmailModel
+
+        result = await self.db.execute(
+            select(EmailModel).where(EmailModel.message_id == ctx.raw.message_id)
+            .order_by(EmailModel.created_at.desc())
+        )
+        email = result.scalar_one_or_none()
+        if not email:
+            logger.warning("Email no encontrado en BD para procesar facturas")
+            return ActionResult(
+                action="invoice_process",
+                success=False,
+                detail="Email no encontrado en BD",
+            )
+
+        # Procesar cada PDF con InvoiceAgent
+        from src.agents.invoice_agent import InvoiceAgent
+
+        agent = InvoiceAgent()
+        invoices_created = 0
+        errors = []
+
+        for pdf_att in pdf_attachments:
+            try:
+                from src.attachment_storage import ATTACHMENTS_DIR
+
+                email_attachments_dir = ATTACHMENTS_DIR / email.id
+                if not email_attachments_dir.exists():
+                    logger.warning("Directorio de adjuntos no encontrado: %s", email_attachments_dir)
+                    continue
+
+                pdf_path = email_attachments_dir / pdf_att.filename
+                if not pdf_path.exists():
+                    logger.warning("PDF no encontrado en disco: %s", pdf_path)
+                    continue
+
+                # Extraer datos de la factura usando el InvoiceAgent
+                invoice_data = await agent.extract_invoice(
+                    pdf_path=str(pdf_path),
+                    filename=pdf_att.filename,
+                    email_subject=ctx.raw.subject or "",
+                    sender_name=ctx.raw.sender_name or "",
+                    sender_email=ctx.raw.sender_email or "",
+                )
+
+                if invoice_data:
+                    # Guardar registro de factura en BD
+                    from datetime import date, datetime
+
+                    # Sanitizar: los date/datetime no son JSON-serializables
+                    sanitized_data = {
+                        k: v.isoformat() if isinstance(v, (date, datetime)) else v
+                        for k, v in invoice_data.items()
+                    }
+
+                    invoice_record = Invoice(
+                        email_id=email.id,
+                        filename=pdf_att.filename,
+                        file_path=str(pdf_path),
+                        file_size=pdf_att.size,
+                        numero=invoice_data.get("numero"),
+                        proveedor=invoice_data.get("proveedor"),
+                        importe=invoice_data.get("importe"),
+                        fecha=invoice_data.get("fecha"),
+                        vencimiento=invoice_data.get("vencimiento"),
+                        extracted_data=sanitized_data,
+                    )
+                    self.db.add(invoice_record)
+                    invoices_created += 1
+                    logger.info(
+                        "Factura extraída: %s | %s | %.2f€",
+                        invoice_data.get("numero", "?"),
+                        invoice_data.get("proveedor", "?"),
+                        invoice_data.get("importe", 0),
+                    )
+
+            except Exception as e:
+                logger.error("Error procesando PDF %s: %s", pdf_att.filename, e)
+                errors.append(str(e))
+
+        if invoices_created > 0:
+            await self.db.commit()
+            return ActionResult(
+                action="invoice_process",
+                success=True,
+                detail=f"{invoices_created} factura(s) extraída(s) de {len(pdf_attachments)} PDF(s)",
+            )
+
+        return ActionResult(
+            action="invoice_process",
+            success=len(errors) == 0,
+            detail=f"No se extrajeron facturas ({len(errors)} errores)" if errors else "PDF procesado sin datos de factura",
         )
 
     def _determine_relevance(self, ctx: EmailContext) -> str:

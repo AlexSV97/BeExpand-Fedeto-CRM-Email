@@ -23,6 +23,15 @@ from enum import Enum
 from typing import Optional
 
 
+@dataclass
+class AttachmentContent:
+    """Contenido de un adjunto extraído del email."""
+    filename: str
+    content_type: str
+    data: bytes
+    size: int = 0
+
+
 # ── Enumeraciones compartidas ──
 
 
@@ -80,6 +89,8 @@ class EmailData:
     has_attachments: bool = False
     received_at: datetime | None = None
     raw_headers: dict | None = None
+    attachments_data: list[AttachmentContent] = field(default_factory=list)
+    """Contenido binario de los adjuntos extraídos del email."""
 
 
 # ── Resultados de agentes ──

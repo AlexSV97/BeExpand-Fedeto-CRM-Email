@@ -30,10 +30,11 @@ import imaplib
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.attachment_storage import StoredAttachment
 from src.config import get_settings
 from src.db.models import Account, Email
 from src.db.session import async_session_factory
-from src.orchestrator.context import EmailData
+from src.orchestrator.context import AttachmentContent, EmailData
 
 logger = logging.getLogger(__name__)
 
@@ -135,15 +136,29 @@ def parse_raw_email(raw_bytes: bytes) -> dict:
     # Body
     body_plain, body_html = get_email_body(msg)
 
-    # Attachments
+    # Attachments — extraer contenido
     has_attachments = False
+    attachment_list: list[AttachmentContent] = []
     if msg.is_multipart():
         for part in msg.walk():
             if part.get_content_maintype() == "multipart":
                 continue
             if part.get("Content-Disposition") is not None:
                 has_attachments = True
-                break
+                filename = part.get_filename()
+                if filename:
+                    filename = decode_mime_header(filename)
+                else:
+                    filename = "attachment"
+                content_type = part.get_content_type()
+                payload = part.get_payload(decode=True)
+                if payload:
+                    attachment_list.append(AttachmentContent(
+                        filename=filename,
+                        content_type=content_type,
+                        data=payload,
+                        size=len(payload),
+                    ))
 
     return {
         "message_id": message_id,
@@ -154,6 +169,7 @@ def parse_raw_email(raw_bytes: bytes) -> dict:
         "body_plain": body_plain,
         "body_html": body_html,
         "has_attachments": has_attachments,
+        "attachments_data": attachment_list,
         "received_at": received_at,
         "is_beexpand_forwarded": bool(msg.get("X-BeExpand-Category")),
     }
@@ -338,6 +354,7 @@ async def sync_emails(db: Optional[AsyncSession] = None) -> dict:
                         sender_email=parsed.get("sender_email", ""),
                         recipients=parsed.get("recipients", []),
                         has_attachments=parsed.get("has_attachments", False),
+                        attachments_data=parsed.get("attachments_data", []),
                         received_at=parsed.get("received_at"),
                     )
 

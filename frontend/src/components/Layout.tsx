@@ -47,6 +47,7 @@ const navTabs = [
   { to: '/dashboard', label: 'Panel', icon: <LogoIcon /> },
   { to: '/contacts', label: 'Contactos' },
   { to: '/opportunities', label: 'Oportunidades' },
+  { to: '/invoices', label: 'Facturas' },
   { to: '/settings', label: 'Ajustes' },
 ]
 

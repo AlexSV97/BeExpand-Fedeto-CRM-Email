@@ -183,6 +183,7 @@ class Orchestrator:
         received_at: datetime | None = None,
         has_attachments: bool = False,
         body_html: str | None = None,
+        attachments_data: list | None = None,
         db: AsyncSession | None = None,
     ) -> EmailContext:
         """
@@ -190,6 +191,8 @@ class Orchestrator:
 
         Útil para llamadas desde la API o desde scripts de prueba.
         """
+        from src.orchestrator.context import AttachmentContent
+
         email_data = EmailData(
             message_id=message_id,
             subject=subject,
@@ -199,6 +202,7 @@ class Orchestrator:
             sender_email=sender_email,
             recipients=recipients or [],
             has_attachments=has_attachments,
+            attachments_data=attachments_data or [],
             received_at=received_at,
         )
         return await self.process(email_data, db=db)

@@ -553,3 +553,59 @@ export async function testTelegram(): Promise<TestTelegramResponse> {
 export async function getSystemStatus(): Promise<SystemStatus> {
   return request<SystemStatus>('GET', '/settings/status')
 }
+
+// ── Invoices ──
+
+export interface InvoiceResponse {
+  id: string
+  email_id: string
+  filename: string
+  file_size: number
+  numero: string | null
+  proveedor: string | null
+  importe: number | null
+  fecha: string | null
+  vencimiento: string | null
+  created_at: string | null
+}
+
+export interface InvoiceDetailResponse extends InvoiceResponse {
+  file_path: string
+  extracted_data: Record<string, unknown>
+}
+
+export interface InvoicesListResponse {
+  total: number
+  skip: number
+  limit: number
+  invoices: InvoiceResponse[]
+}
+
+export async function getInvoices(params?: {
+  proveedor?: string
+  fecha_from?: string
+  fecha_to?: string
+  skip?: number
+  limit?: number
+}): Promise<InvoicesListResponse> {
+  const q = new URLSearchParams()
+  if (params?.proveedor) q.set('proveedor', params.proveedor)
+  if (params?.fecha_from) q.set('fecha_from', params.fecha_from)
+  if (params?.fecha_to) q.set('fecha_to', params.fecha_to)
+  if (params?.skip) q.set('skip', String(params.skip))
+  if (params?.limit) q.set('limit', String(params.limit))
+  return request<InvoicesListResponse>('GET', `/invoices?${q.toString()}`)
+}
+
+export async function getInvoice(id: string): Promise<InvoiceDetailResponse> {
+  return request<InvoiceDetailResponse>('GET', `/invoices/${id}`)
+}
+
+export async function getEmailInvoices(emailId: string): Promise<{ email_id: string; total: number; invoices: InvoiceResponse[] }> {
+  return request('GET', `/emails/${emailId}/invoices`)
+}
+
+export function getInvoiceDownloadUrl(id: string): string {
+  const token = getToken()
+  return `${API_BASE}/invoices/${id}/download?token=${token}`
+}
