@@ -474,17 +474,19 @@ export interface ImapUpdate {
 }
 
 export interface NotificationSettings {
-  whatsapp_access_token: string
-  whatsapp_phone_number_id: string
-  whatsapp_to_phone: string
-  whatsapp_min_urgency: string
+  twilio_account_sid: string
+  twilio_auth_token: string
+  twilio_from_number: string
+  twilio_to_number: string
+  twilio_min_urgency: string
 }
 
 export interface NotificationUpdate {
-  whatsapp_access_token?: string
-  whatsapp_phone_number_id?: string
-  whatsapp_to_phone?: string
-  whatsapp_min_urgency?: string
+  twilio_account_sid?: string
+  twilio_auth_token?: string
+  twilio_from_number?: string
+  twilio_to_number?: string
+  twilio_min_urgency?: string
 }
 
 export interface PasswordUpdate {

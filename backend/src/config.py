@@ -80,17 +80,18 @@ class Settings(BaseSettings):
     Token de solo lectura vale, se crea en: https://huggingface.co/settings/tokens
     """
 
-    # ── WhatsApp Business (alertas de correos urgentes) ──
-    whatsapp_access_token: str = ""
-    """Token de acceso permanente de Meta WhatsApp Cloud API. Vacío = desactivado.
-    Se genera en: business.facebook.com → WhatsApp → API Setup."""
-    whatsapp_phone_number_id: str = ""
-    """ID del número de teléfono emisor en WhatsApp Business API.
-    Aparece en la misma página que el token."""
-    whatsapp_to_phone: str = ""
-    """Número de teléfono destinatario en formato internacional sin + (ej: 34600123456).
+    # ── WhatsApp (Twilio) — notificaciones de correos urgentes ──
+    twilio_account_sid: str = ""
+    """Account SID de Twilio. Vacío = desactivado."""
+    twilio_auth_token: str = ""
+    """Auth Token de Twilio. Vacío = desactivado."""
+    twilio_from_number: str = ""
+    """Número de Twilio WhatsApp (ej: +14155238886 para sandbox).
+    Incluye el + y el código de país."""
+    twilio_to_number: str = ""
+    """Número destino en formato internacional con + (ej: +34600123456).
     Vacío = desactivado."""
-    whatsapp_min_urgency: str = "alta"
+    twilio_min_urgency: str = "alta"
     """Umbral mínimo de urgencia para notificar: alta | media | baja."""
 
     # ── Redis / Celery ──

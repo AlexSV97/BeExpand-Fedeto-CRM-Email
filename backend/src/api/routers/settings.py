@@ -4,11 +4,11 @@ Router de Ajustes del sistema.
 Endpoints:
     GET  /settings/imap             -- Configuracion IMAP (password enmascarada)
     PUT  /settings/imap             -- Actualizar configuracion IMAP
-    GET  /settings/notifications    -- Configuracion WhatsApp (token enmascarado)
-    PUT  /settings/notifications    -- Actualizar configuracion WhatsApp
+    GET  /settings/notifications    -- Configuracion Twilio WhatsApp (credentials enmascaradas)
+    PUT  /settings/notifications    -- Actualizar configuracion Twilio WhatsApp
     PUT  /settings/password         -- Cambiar contrasena del admin
     POST /settings/test-imap        -- Probar conexion IMAP
-    POST /settings/test-whatsapp    -- Enviar notificacion de prueba
+    POST /settings/test-whatsapp    -- Enviar notificacion de prueba (Twilio)
     GET  /settings/status           -- Health check del sistema
 
 Todas requieren autenticacion (admin).
@@ -69,20 +69,22 @@ class ImapUpdate(BaseModel):
     folder_map: Optional[dict[str, str]] = None
 
 
-# -- Notificaciones --
+# -- Notificaciones (Twilio WhatsApp) --
 
 class NotificationSettings(BaseModel):
-    whatsapp_access_token: str  # Enmascarado en GET
-    whatsapp_phone_number_id: str
-    whatsapp_to_phone: str
-    whatsapp_min_urgency: str
+    twilio_account_sid: str  # Enmascarado en GET
+    twilio_auth_token: str   # Enmascarado en GET
+    twilio_from_number: str
+    twilio_to_number: str
+    twilio_min_urgency: str
 
 
 class NotificationUpdate(BaseModel):
-    whatsapp_access_token: Optional[str] = None
-    whatsapp_phone_number_id: Optional[str] = None
-    whatsapp_to_phone: Optional[str] = None
-    whatsapp_min_urgency: Optional[str] = None
+    twilio_account_sid: Optional[str] = None
+    twilio_auth_token: Optional[str] = None
+    twilio_from_number: Optional[str] = None
+    twilio_to_number: Optional[str] = None
+    twilio_min_urgency: Optional[str] = None
 
 
 # -- Password --
@@ -265,7 +267,7 @@ async def test_imap_connection(
 
 
 # ---------------------------------------------------------------------------
-# Notificaciones (WhatsApp Business)
+# Notificaciones (Twilio WhatsApp)
 # ---------------------------------------------------------------------------
 
 @router.get("/notifications", response_model=NotificationSettings)
@@ -273,24 +275,27 @@ async def get_notification_settings(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Retorna configuracion de notificaciones con token enmascarado."""
+    """Retorna configuracion de notificaciones con credentials enmascaradas."""
     settings = get_settings()
-    db_token = await _get_setting(db, "whatsapp_access_token")
-    real_token = db_token if db_token is not None else settings.whatsapp_access_token
+    db_sid = await _get_setting(db, "twilio_account_sid")
+    db_token = await _get_setting(db, "twilio_auth_token")
+    real_sid = db_sid if db_sid is not None else settings.twilio_account_sid
+    real_token = db_token if db_token is not None else settings.twilio_auth_token
 
     return NotificationSettings(
-        whatsapp_access_token=mask_value(real_token) if real_token else "",
-        whatsapp_phone_number_id=(
-            await _get_setting(db, "whatsapp_phone_number_id")
-            or settings.whatsapp_phone_number_id
+        twilio_account_sid=mask_value(real_sid) if real_sid else "",
+        twilio_auth_token=mask_value(real_token) if real_token else "",
+        twilio_from_number=(
+            await _get_setting(db, "twilio_from_number")
+            or settings.twilio_from_number
         ),
-        whatsapp_to_phone=(
-            await _get_setting(db, "whatsapp_to_phone")
-            or settings.whatsapp_to_phone
+        twilio_to_number=(
+            await _get_setting(db, "twilio_to_number")
+            or settings.twilio_to_number
         ),
-        whatsapp_min_urgency=(
-            await _get_setting(db, "whatsapp_min_urgency")
-            or settings.whatsapp_min_urgency
+        twilio_min_urgency=(
+            await _get_setting(db, "twilio_min_urgency")
+            or settings.twilio_min_urgency
         ),
     )
 
@@ -301,35 +306,40 @@ async def update_notification_settings(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Actualiza configuracion de notificaciones WhatsApp."""
-    if body.whatsapp_access_token is not None and not _is_masked(body.whatsapp_access_token):
-        await _set_setting(db, "whatsapp_access_token", body.whatsapp_access_token)
-    if body.whatsapp_phone_number_id is not None:
-        await _set_setting(db, "whatsapp_phone_number_id", body.whatsapp_phone_number_id)
-    if body.whatsapp_to_phone is not None:
-        await _set_setting(db, "whatsapp_to_phone", body.whatsapp_to_phone)
-    if body.whatsapp_min_urgency is not None:
-        await _set_setting(db, "whatsapp_min_urgency", body.whatsapp_min_urgency)
+    """Actualiza configuracion de notificaciones Twilio WhatsApp."""
+    if body.twilio_account_sid is not None and not _is_masked(body.twilio_account_sid):
+        await _set_setting(db, "twilio_account_sid", body.twilio_account_sid)
+    if body.twilio_auth_token is not None and not _is_masked(body.twilio_auth_token):
+        await _set_setting(db, "twilio_auth_token", body.twilio_auth_token)
+    if body.twilio_from_number is not None:
+        await _set_setting(db, "twilio_from_number", body.twilio_from_number)
+    if body.twilio_to_number is not None:
+        await _set_setting(db, "twilio_to_number", body.twilio_to_number)
+    if body.twilio_min_urgency is not None:
+        await _set_setting(db, "twilio_min_urgency", body.twilio_min_urgency)
 
     await db.commit()
 
     settings = get_settings()
-    db_token = await _get_setting(db, "whatsapp_access_token")
-    real_token = db_token if db_token is not None else settings.whatsapp_access_token
+    db_sid = await _get_setting(db, "twilio_account_sid")
+    db_token = await _get_setting(db, "twilio_auth_token")
+    real_sid = db_sid if db_sid is not None else settings.twilio_account_sid
+    real_token = db_token if db_token is not None else settings.twilio_auth_token
 
     return NotificationSettings(
-        whatsapp_access_token=mask_value(real_token) if real_token else "",
-        whatsapp_phone_number_id=(
-            await _get_setting(db, "whatsapp_phone_number_id")
-            or settings.whatsapp_phone_number_id
+        twilio_account_sid=mask_value(real_sid) if real_sid else "",
+        twilio_auth_token=mask_value(real_token) if real_token else "",
+        twilio_from_number=(
+            await _get_setting(db, "twilio_from_number")
+            or settings.twilio_from_number
         ),
-        whatsapp_to_phone=(
-            await _get_setting(db, "whatsapp_to_phone")
-            or settings.whatsapp_to_phone
+        twilio_to_number=(
+            await _get_setting(db, "twilio_to_number")
+            or settings.twilio_to_number
         ),
-        whatsapp_min_urgency=(
-            await _get_setting(db, "whatsapp_min_urgency")
-            or settings.whatsapp_min_urgency
+        twilio_min_urgency=(
+            await _get_setting(db, "twilio_min_urgency")
+            or settings.twilio_min_urgency
         ),
     )
 
@@ -339,55 +349,63 @@ async def test_whatsapp(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Envia un mensaje de prueba a WhatsApp Business."""
+    """Envia un mensaje de prueba a WhatsApp via Twilio."""
     from src.notifiers.whatsapp import WhatsAppNotifier
 
     settings = get_settings()
-    db_token = await _get_setting(db, "whatsapp_access_token")
-    db_phone_number_id = await _get_setting(db, "whatsapp_phone_number_id")
-    db_to_phone = await _get_setting(db, "whatsapp_to_phone")
+    db_sid = await _get_setting(db, "twilio_account_sid")
+    db_token = await _get_setting(db, "twilio_auth_token")
+    db_from = await _get_setting(db, "twilio_from_number")
+    db_to = await _get_setting(db, "twilio_to_number")
 
-    token = db_token if db_token is not None else settings.whatsapp_access_token
-    phone_number_id = db_phone_number_id if db_phone_number_id is not None else settings.whatsapp_phone_number_id
-    to_phone = db_to_phone if db_to_phone is not None else settings.whatsapp_to_phone
+    sid = db_sid if db_sid is not None else settings.twilio_account_sid
+    token = db_token if db_token is not None else settings.twilio_auth_token
+    from_number = db_from if db_from is not None else settings.twilio_from_number
+    to_number = db_to if db_to is not None else settings.twilio_to_number
 
+    if not sid:
+        return TestWhatsAppResponse(success=False, message="Twilio Account SID no configurado")
     if not token:
-        return TestWhatsAppResponse(success=False, message="Token de WhatsApp no configurado")
-    if not phone_number_id:
-        return TestWhatsAppResponse(success=False, message="Phone Number ID no configurado")
-    if not to_phone:
-        return TestWhatsAppResponse(success=False, message="Teléfono destino no configurado")
+        return TestWhatsAppResponse(success=False, message="Twilio Auth Token no configurado")
+    if not from_number:
+        return TestWhatsAppResponse(success=False, message="Número origen Twilio no configurado")
+    if not to_number:
+        return TestWhatsAppResponse(success=False, message="Número destino no configurado")
 
     try:
         import httpx
+        from base64 import b64encode
 
         text = (
             "⚠️ Prueba de Notificación - BeConnect\n\n"
-            "Si recibes este mensaje, la integración con WhatsApp Business funciona correctamente.\n\n"
+            "Si recibes este mensaje, la integración con Twilio WhatsApp funciona correctamente.\n\n"
             f"Enviado: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}"
         )
 
-        url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
+        auth_header = b64encode(f"{sid}:{token}".encode()).decode()
+        url = f"https://api.twilio.com/2010-04-01/Accounts/{sid}/Messages.json"
+
         async with httpx.AsyncClient(timeout=15) as client:
             response = await client.post(
                 url,
-                headers={"Authorization": f"Bearer {token}"},
-                json={
-                    "messaging_product": "whatsapp",
-                    "to": to_phone,
-                    "type": "text",
-                    "text": {"body": text},
+                headers={
+                    "Authorization": f"Basic {auth_header}",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                data={
+                    "To": f"whatsapp:{to_number}",
+                    "From": f"whatsapp:{from_number}",
+                    "Body": text,
                 },
             )
             result = response.json()
 
-        if result.get("messages"):
-            return TestWhatsAppResponse(success=True, message="Mensaje de prueba enviado correctamente a WhatsApp")
+        if response.status_code in (200, 201) and result.get("sid"):
+            return TestWhatsAppResponse(success=True, message="Mensaje de prueba enviado correctamente a WhatsApp (Twilio)")
         else:
-            error_desc = result.get("error", {}).get("message", "desconocido")
             return TestWhatsAppResponse(
                 success=False,
-                message=f"Error WhatsApp API: {error_desc}",
+                message=f"Error Twilio API: {result.get('message', result)}",
             )
     except ImportError:
         return TestWhatsAppResponse(success=False, message="httpx no esta instalado")
@@ -477,9 +495,10 @@ async def get_system_status(
             and settings.imap_password
         ),
         whatsapp_configured=bool(
-            settings.whatsapp_access_token
-            and settings.whatsapp_phone_number_id
-            and settings.whatsapp_to_phone
+            settings.twilio_account_sid
+            and settings.twilio_auth_token
+            and settings.twilio_from_number
+            and settings.twilio_to_number
         ),
         openrouter_configured=bool(settings.openrouter_api_key),
         crm_configured=bool(settings.vtiger_url),

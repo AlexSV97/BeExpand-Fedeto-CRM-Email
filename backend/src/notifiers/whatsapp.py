@@ -1,24 +1,25 @@
 """
-WhatsAppNotifier — envía alertas de correos urgentes vía WhatsApp Business API.
+WhatsAppNotifier — envía alertas de correos urgentes vía Twilio WhatsApp API.
 
-Usa la Meta WhatsApp Cloud API vía httpx (sin dependencias adicionales).
+Usa la API REST de Twilio vía httpx (sin dependencias adicionales).
 
 Configuración necesaria en .env:
-    WHATSAPP_ACCESS_TOKEN=EAAT...  (token de acceso de Meta)
-    WHATSAPP_PHONE_NUMBER_ID=123456789  (ID del número emisor)
-    WHATSAPP_TO_PHONE=34600123456  (destinatario, formato internacional sin +)
-    WHATSAPP_MIN_URGENCY=alta  (umbral: alta | media | baja)
+    TWILIO_ACCOUNT_SID=ACxxx...  (de tu consola Twilio)
+    TWILIO_AUTH_TOKEN=xxx...     (de tu consola Twilio)
+    TWILIO_FROM_NUMBER=+14155238886  (sandbox) o tu número aprobado
+    TWILIO_TO_NUMBER=+34600123456     (destinatario)
+    TWILIO_MIN_URGENCY=alta
 
-Para obtener las credenciales:
-    1. Crea/usa una Meta Business Account (business.facebook.com)
-    2. Crea una WhatsApp Business Account
-    3. Registra un número de teléfono (verificación con código SMS)
-    4. Genera un token de acceso permanente desde:
-       business.facebook.com → WhatsApp → API Setup
-    5. El phone_number_id aparece en la misma página
+Sandbox de prueba (GRATIS):
+    1. Regístrate en https://twilio.com
+    2. Ve a Messaging → Try it out → Send a WhatsApp message
+    3. Te dan un número sandbox (+14155238886) y una palabra clave
+    4. Desde tu móvil, envía "join <palabra>" al número sandbox
+    5. ¡Ya puedes recibir mensajes!
 """
 
 import logging
+from base64 import b64encode
 
 from src.config import get_settings
 
@@ -28,23 +29,24 @@ _URGENCY_SCALE = {"alta": 3, "media": 2, "baja": 1}
 
 
 class WhatsAppNotifier:
-    """Notificador de correos urgentes vía Meta WhatsApp Cloud API."""
+    """Notificador de correos urgentes vía Twilio WhatsApp API."""
 
     def __init__(self, settings=None):
         self._settings = settings or get_settings()
 
     @property
     def enabled(self) -> bool:
-        """El notificador está operativo si hay token y destinatario configurados."""
+        """El notificador está operativo si hay credenciales y números configurados."""
         return bool(
-            self._settings.whatsapp_access_token
-            and self._settings.whatsapp_phone_number_id
-            and self._settings.whatsapp_to_phone
+            self._settings.twilio_account_sid
+            and self._settings.twilio_auth_token
+            and self._settings.twilio_from_number
+            and self._settings.twilio_to_number
         )
 
     def _should_notify(self, urgency: str) -> bool:
         """Comprueba si la urgencia del correo supera el umbral mínimo."""
-        min_urgency = self._settings.whatsapp_min_urgency
+        min_urgency = self._settings.twilio_min_urgency
         level = _URGENCY_SCALE.get(urgency, 0)
         threshold = _URGENCY_SCALE.get(min_urgency, 3)
         return level >= threshold
@@ -59,7 +61,7 @@ class WhatsAppNotifier:
         summary: str | None = None,
         action_required: str | None = None,
     ) -> str:
-        """Construye el mensaje de texto plano (WhatsApp no soporta Markdown completo)."""
+        """Construye el mensaje de texto plano (WhatsApp no soporta Markdown)."""
         lines = [
             "⚠️ CORREO URGENTE - BeConnect",
             "",
@@ -99,52 +101,57 @@ class WhatsAppNotifier:
             True si se envió correctamente, False en caso contrario.
         """
         if not self.enabled:
-            logger.debug("WhatsApp no configurado — omitiendo alerta")
+            logger.debug("Twilio WhatsApp no configurado — omitiendo alerta")
             return False
 
         if not self._should_notify(urgency):
             logger.debug("Urgencia '%s' por debajo del umbral '%s' — omitiendo alerta",
-                         urgency, self._settings.whatsapp_min_urgency)
+                         urgency, self._settings.twilio_min_urgency)
             return False
 
         try:
             import httpx
 
-            token = self._settings.whatsapp_access_token
-            phone_number_id = self._settings.whatsapp_phone_number_id
-            to_phone = self._settings.whatsapp_to_phone
             text = self._build_message(
                 subject, sender_name, sender_email,
                 urgency, category, summary, action_required,
             )
 
-            url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
+            account_sid = self._settings.twilio_account_sid
+            auth_token = self._settings.twilio_auth_token
+            from_number = self._settings.twilio_from_number
+            to_number = self._settings.twilio_to_number
+
+            # Auth: Basic base64(account_sid:auth_token)
+            auth_header = b64encode(f"{account_sid}:{auth_token}".encode()).decode()
+
+            url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
+
             async with httpx.AsyncClient(timeout=15) as client:
                 response = await client.post(
                     url,
                     headers={
-                        "Authorization": f"Bearer {token}",
+                        "Authorization": f"Basic {auth_header}",
+                        "Content-Type": "application/x-www-form-urlencoded",
                     },
-                    json={
-                        "messaging_product": "whatsapp",
-                        "to": to_phone,
-                        "type": "text",
-                        "text": {"body": text},
+                    data={
+                        "To": f"whatsapp:{to_number}",
+                        "From": f"whatsapp:{from_number}",
+                        "Body": text,
                     },
                 )
-                response.raise_for_status()
                 result = response.json()
 
-            if result.get("messages"):
-                logger.info("Alerta WhatsApp enviada: %s", subject)
+            if response.status_code in (200, 201) and result.get("sid"):
+                logger.info("Alerta WhatsApp enviada (Twilio): %s", subject)
                 return True
 
-            logger.warning("WhatsApp API error: %s", result.get("error", result))
+            logger.warning("Twilio API error: %s", result.get("message", result))
             return False
 
         except ImportError:
             logger.warning("httpx no disponible — no se puede enviar alerta WhatsApp")
             return False
         except Exception as e:
-            logger.error("Error enviando alerta WhatsApp: %s", e)
+            logger.error("Error enviando alerta WhatsApp (Twilio): %s", e)
             return False

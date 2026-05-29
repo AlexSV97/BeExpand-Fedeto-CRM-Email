@@ -1,7 +1,7 @@
 /**
  * Ajustes del sistema — 4 pestañas:
  *   1. Buzones (IMAP)
- *   2. Notificaciones (WhatsApp)
+ *   2. Notificaciones (WhatsApp via Twilio)
  *   3. Cuenta (contraseña)
  *   4. Estado del Sistema (solo lectura)
  */
@@ -297,13 +297,14 @@ function ImapTab() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// Pestaña 2: Notificaciones (WhatsApp Business)
+// Pestaña 2: Notificaciones (WhatsApp via Twilio)
 // ═══════════════════════════════════════════════════════════════════
 
 function NotificationsTab() {
-  const [accessToken, setAccessToken] = useState('')
-  const [phoneNumberId, setPhoneNumberId] = useState('')
-  const [toPhone, setToPhone] = useState('')
+  const [accountSid, setAccountSid] = useState('')
+  const [authToken, setAuthToken] = useState('')
+  const [fromNumber, setFromNumber] = useState('')
+  const [toNumber, setToNumber] = useState('')
   const [minUrgency, setMinUrgency] = useState('alta')
 
   const [loading, setLoading] = useState(true)
@@ -316,10 +317,11 @@ function NotificationsTab() {
   const fetchSettings = useCallback(async () => {
     try {
       const s = await getNotificationSettings()
-      setAccessToken(s.whatsapp_access_token)
-      setPhoneNumberId(s.whatsapp_phone_number_id)
-      setToPhone(s.whatsapp_to_phone)
-      setMinUrgency(s.whatsapp_min_urgency)
+      setAccountSid(s.twilio_account_sid)
+      setAuthToken(s.twilio_auth_token)
+      setFromNumber(s.twilio_from_number)
+      setToNumber(s.twilio_to_number)
+      setMinUrgency(s.twilio_min_urgency)
     } catch {
       setFeedback({ msg: 'Error al cargar configuración de notificaciones', type: 'error' })
     } finally {
@@ -334,11 +336,12 @@ function NotificationsTab() {
     setFeedback({ msg: '', type: null })
     try {
       const body: NotificationUpdate = {
-        whatsapp_phone_number_id: phoneNumberId,
-        whatsapp_to_phone: toPhone,
-        whatsapp_min_urgency: minUrgency,
+        twilio_from_number: fromNumber,
+        twilio_to_number: toNumber,
+        twilio_min_urgency: minUrgency,
       }
-      if (accessToken && !accessToken.startsWith('*')) body.whatsapp_access_token = accessToken
+      if (accountSid && !accountSid.startsWith('*')) body.twilio_account_sid = accountSid
+      if (authToken && !authToken.startsWith('*')) body.twilio_auth_token = authToken
       await updateNotificationSettings(body)
       setFeedback({ msg: 'Configuración de notificaciones guardada', type: 'success' })
       fetchSettings()
@@ -366,12 +369,16 @@ function NotificationsTab() {
 
   return (
     <div className="space-y-6">
-      <SectionCard title="WhatsApp Business" description="Configura las alertas de correos urgentes vía WhatsApp Business API (Meta).">
+      <SectionCard title="Twilio WhatsApp" description="Configura las alertas de correos urgentes vía Twilio WhatsApp API.">
         <div className="space-y-4 mb-5">
-          <Input label="Token de Acceso (Meta)" value={accessToken} onChange={setAccessToken} type="password" placeholder="EAAT..." />
-          <Input label="Phone Number ID" value={phoneNumberId} onChange={setPhoneNumberId} placeholder="123456789" />
-          <Input label="Teléfono destino" value={toPhone} onChange={setToPhone} placeholder="34600123456" />
-          <p className="text-[11px] text-muted-foreground/60 -mt-3">Formato internacional sin +. Ej: 34600123456</p>
+          <Input label="Account SID (Twilio)" value={accountSid} onChange={setAccountSid} type="password" placeholder="ACxxx..." />
+          <p className="text-[11px] text-muted-foreground/60 -mt-3">Lo encuentras en la consola de Twilio (Dashboard).</p>
+          <Input label="Auth Token (Twilio)" value={authToken} onChange={setAuthToken} type="password" placeholder="xxx..." />
+          <p className="text-[11px] text-muted-foreground/60 -mt-3">Misma página que el Account SID. No compartas este token.</p>
+          <Input label="Número origen (Twilio)" value={fromNumber} onChange={setFromNumber} placeholder="+14155238886" />
+          <p className="text-[11px] text-muted-foreground/60 -mt-3">Tu número sandbox o número aprobado. Incluye el +. Ej: +14155238886</p>
+          <Input label="Teléfono destino" value={toNumber} onChange={setToNumber} placeholder="+34600123456" />
+          <p className="text-[11px] text-muted-foreground/60 -mt-3">Formato internacional con +. Ej: +34600123456</p>
           <Select
             label="Urgencia mínima para notificar"
             value={minUrgency}
