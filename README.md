@@ -10,6 +10,9 @@ BeConnect es un sistema que **lee, clasifica y organiza automáticamente los cor
 
 El resultado: un equipo comercial que **deja de perder tiempo organizando correos** y se centra en lo que realmente importa: **vender y dar servicio**.
 
+**Nota estratégica:** este repositorio también sirve como base documental y técnica para la evolución hacia **BeConnect AI Layer sobre OTRS/Znuny para Aiuken**. Ver la sección final para la propuesta, arquitectura, roadmap y backlog.
+
+
 ---
 
 ## El Problema
@@ -254,8 +257,70 @@ cd backend && pytest -v
 | M3 — Clasificadores (Rule + BERT + LLM) | ✅ Completo |
 | M4 — API REST + Dashboard React | ✅ Completo |
 | M5 — Orquestador paralelo multi-agente | ✅ Completo |
+| BeConnect AI Layer para OTRS/Znuny (Aiuken) | 🟡 En propuesta |
 | Despliegue en Render | ✅ Operativo |
 | Dashboard con Settings | ✅ Completo |
+
+## BeConnect AI Layer sobre OTRS/Znuny para Aiuken
+
+> **Idea central:** Aiuken ya tiene una operativa madura en OTRS/Znuny. BeConnect no la reemplaza: la convierte en un **SOC inteligente, gobernado y trazable**.
+
+### Principios
+- **OTRS/Znuny = system of record**
+- **BeConnect = capa de inteligencia y experiencia**
+- **API-first, no acceso directo a BD**
+- **Read-only primero, writeback después**
+- **Human-in-the-loop para acciones críticas**
+- **Auditoría completa de IA y usuarios**
+
+### Arquitectura objetivo
+```text
+Canales / Ingesta
+      ↓
+OTRS / Znuny (tickets, colas, SLA, auditoría)
+      ↓  API / eventos / lecturas controladas
+BeConnect Core (IA + orquestación + RAG + SLA)
+      ↓
+BeConnect UI (copiloto, war room, reporting)
+```
+
+### Fases de implementación
+
+| Fase | Objetivo | Entregables |
+|---|---|---|
+| 0 | Base técnica | conector OTRS/Znuny, modelo canónico, normalizador, audit log, RBAC |
+| 1 | Ingesta y ticket creation | email/SIEM/ITSM → ticket, prioridad normalizada, deduplicación |
+| 2 | Colas y escalado | árbol de colas, sugerencia N1/N2/N3, owner/lock, motivo de escalado |
+| 3 | Ciclo de vida + SLA | estados, Stop-SLA, tiempo restante, riesgo de incumplimiento, alertas |
+| 4 | Smart Queue + Copilot | bandeja inteligente, resumen técnico, casos similares, borradores, aprobación |
+| 5 | Knowledge Vault / RAG | histórico consultable, embeddings, búsqueda semántica, fuentes citadas |
+| 6 | Agentes + gobierno | Triage/SLA/Knowledge/Response/Escalation/Compliance Agents |
+| 7 | Reporting + mejora continua | KPIs, informes, observabilidad, feedback, ajuste de reglas/prompts |
+
+### Roadmap 30/60/90 días
+
+| Horizonte | Enfoque | Resultado |
+|---|---|---|
+| 0–30 días | Integración | BeConnect lee tickets, normaliza datos y audita acciones |
+| 31–60 días | Operación mejorada | tickets mejor creados, colas sugeridas, SLA básico visible |
+| 61–90 días | Copiloto | Smart Queue, resúmenes, casos similares, borradores con aprobación |
+
+### Backlog resumido
+- Conector OTRS/Znuny
+- Modelo canónico `Ticket/Article/Queue/SLA/ExternalRef`
+- Normalización de tickets y eventos
+- Audit log y RBAC
+- Ingesta email / SIEM / ITSM
+- Colas y escalado N1/N2/N3
+- SLA predictivo y alertas tempranas
+- Smart Queue y Ticket Copilot
+- Knowledge Vault / RAG
+- Agentes especializados con gobierno
+- Reporting y mejora continua
+
+### Mensaje ejecutivo
+> **No venimos a cambiar el SOC de Aiuken. Venimos a potenciarlo con una capa de IA gobernada que reduce fricción, mejora la respuesta, anticipa riesgos y convierte el histórico en ventaja operativa.**
+
 
 ---
 
