@@ -343,4 +343,4 @@ BeConnect UI (copiloto, war room, reporting)
 
 ## Licencia
 
-Proyecto desarrollado para **Be Expand**.
+Proyecto desarrollado para **Aiuken**.
