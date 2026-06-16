@@ -29,6 +29,7 @@ from src.api.routers import (
     invoices,
     knowledge,
     opportunities,
+    reporting,
     queues,
     sla,
     settings,
@@ -174,6 +175,7 @@ app.include_router(chat.router, prefix="/api/v1")
 app.include_router(settings.router, prefix="/api/v1")
 app.include_router(knowledge.router, prefix="/api/v1")
 app.include_router(agents.router, prefix="/api/v1")
+app.include_router(reporting.router, prefix="/api/v1")
 app.include_router(queues.router, prefix="/api/v1")
 app.include_router(sla.router, prefix="/api/v1")
 app.include_router(tickets.router, prefix="/api/v1")
