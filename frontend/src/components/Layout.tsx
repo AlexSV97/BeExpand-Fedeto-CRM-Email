@@ -9,6 +9,8 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { motion } from 'framer-motion'
 import ChatWidget from './ChatWidget'
+import { isSocShellEnabled } from '../config/socShell'
+import { t } from '../content/socCopy'
 
 // ── Iconos inline ──
 
@@ -51,6 +53,10 @@ const navTabs = [
   { to: '/settings', label: 'Ajustes' },
 ]
 
+function navLabel(label: string): string {
+  return isSocShellEnabled() ? t(label) : label
+}
+
 function Navigation() {
   const { user, logout } = useAuth()
 
@@ -71,9 +77,11 @@ function Navigation() {
             className="flex items-center gap-3"
           >
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-foreground to-foreground/70 flex items-center justify-center">
-              <span className="text-background font-bold text-sm font-display">Bc</span>
+              <span className="text-background font-bold text-sm font-display">{isSocShellEnabled() ? 'AS' : 'Bc'}</span>
             </div>
-            <span className="font-semibold text-lg tracking-tight font-display text-foreground">BeConnect</span>
+            <span className="font-semibold text-lg tracking-tight font-display text-foreground">
+              {isSocShellEnabled() ? t('Aiuken SOC') : 'BeConnect'}
+            </span>
           </motion.div>
         </NavLink>
 
@@ -100,7 +108,7 @@ function Navigation() {
                       transition={{ type: "spring", stiffness: 500, damping: 35 }}
                     />
                   )}
-                  <span className="relative z-10">{tab.label}</span>
+                  <span className="relative z-10">{navLabel(tab.label)}</span>
                 </>
               )}
             </NavLink>
@@ -109,6 +117,13 @@ function Navigation() {
 
         {/* Usuario */}
         <div className="flex items-center gap-4">
+          {/* Indicador SOC (solo cuando la flag está activa) */}
+          {isSocShellEnabled() && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-chart-1/10 border border-chart-1/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-chart-1 animate-pulse" />
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-chart-1">SOC</span>
+            </div>
+          )}
           <button
             onClick={logout}
             className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"

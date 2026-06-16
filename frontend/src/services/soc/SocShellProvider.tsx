@@ -19,10 +19,9 @@ export function SocShellProvider({ children }: { children: ReactNode }) {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // When feature is disabled, pass children through without context
-  if (!store.featureEnabled) return <>{children}</>
-
-  // When enabled, provide SOC shell context
+  // Always provide context — components check featureEnabled themselves.
+  // This avoids a first-render timing gap where SocShell would try to
+  // call useSocShell() before the Provider has synced the flag.
   return (
     <SocShellContext.Provider value={store}>
       {children}
