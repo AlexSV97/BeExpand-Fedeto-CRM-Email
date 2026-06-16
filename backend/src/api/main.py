@@ -18,6 +18,7 @@ from sqlalchemy import select
 
 from src.api.routers import (
     accounts,
+    agents,
     auth,
     chat,
     classification,
@@ -26,6 +27,7 @@ from src.api.routers import (
     dashboard,
     emails,
     invoices,
+    knowledge,
     opportunities,
     queues,
     sla,
@@ -170,6 +172,8 @@ app.include_router(dashboard.router, prefix="/api/v1/dashboard")
 app.include_router(invoices.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
 app.include_router(settings.router, prefix="/api/v1")
+app.include_router(knowledge.router, prefix="/api/v1")
+app.include_router(agents.router, prefix="/api/v1")
 app.include_router(queues.router, prefix="/api/v1")
 app.include_router(sla.router, prefix="/api/v1")
 app.include_router(tickets.router, prefix="/api/v1")

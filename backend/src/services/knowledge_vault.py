@@ -1,0 +1,200 @@
+from __future__ import annotations
+
+import re
+from collections import Counter
+from dataclasses import dataclass
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+_STOPWORDS = {
+    "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
+    "how", "i", "in", "is", "it", "me", "of", "on", "or", "please",
+    "show", "the", "to", "we", "what", "when", "with", "you",
+}
+
+
+def _tokenize(text: str) -> list[str]:
+    tokens = re.findall(r"[a-z0-9áéíóúñü]+", text.lower())
+    return [token for token in tokens if token not in _STOPWORDS]
+
+
+def _safe_join(parts: list[str]) -> str:
+    return " ".join(part for part in parts if part).strip()
+
+
+class KnowledgeDocument(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    title: str
+    body: str
+    source_type: str = "ticket"
+    document_type: str = "case"
+    source_id: str | None = None
+    customer: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class KnowledgeSearchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    query: str
+    limit: int = 5
+    customer: str | None = None
+    document_type: str | None = None
+    source_type: str | None = None
+    tags: list[str] = Field(default_factory=list)
+
+
+class SimilarCaseRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    subject: str
+    body_text: str = ""
+    customer: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    limit: int = 5
+
+
+class KnowledgeSearchResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    document: KnowledgeDocument
+    score: float
+    matched_terms: list[str] = Field(default_factory=list)
+    explanation: str
+
+
+class KnowledgeSearchResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    query: str
+    total: int
+    items: list[KnowledgeSearchResult]
+
+
+class SimilarCasesResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    subject: str
+    total: int
+    items: list[KnowledgeSearchResult]
+
+
+@dataclass(slots=True)
+class _DocumentScore:
+    document: KnowledgeDocument
+    score: float
+    matched_terms: list[str]
+    explanation: str
+
+
+class KnowledgeVaultService:
+    def __init__(self, documents: list[KnowledgeDocument] | None = None):
+        self._documents = documents or []
+
+    @property
+    def documents(self) -> list[KnowledgeDocument]:
+        return list(self._documents)
+
+    def add_document(self, document: KnowledgeDocument) -> None:
+        self._documents.append(document)
+
+    def search(self, request: KnowledgeSearchRequest) -> KnowledgeSearchResponse:
+        scored = self._rank_documents(request.query, request)
+        items = [
+            KnowledgeSearchResult(
+                document=score.document,
+                score=round(score.score, 3),
+                matched_terms=score.matched_terms,
+                explanation=score.explanation,
+            )
+            for score in scored[: request.limit]
+        ]
+        return KnowledgeSearchResponse(query=request.query, total=len(scored), items=items)
+
+    def similar_cases(self, request: SimilarCaseRequest) -> SimilarCasesResponse:
+        query = _safe_join([request.subject, request.body_text])
+        search_request = KnowledgeSearchRequest(
+            query=query,
+            limit=request.limit,
+            customer=request.customer,
+            document_type="case",
+            tags=request.tags,
+        )
+        result = self.search(search_request)
+        return SimilarCasesResponse(subject=request.subject, total=result.total, items=result.items)
+
+    def _rank_documents(
+        self,
+        query: str,
+        request: KnowledgeSearchRequest,
+    ) -> list[_DocumentScore]:
+        query_tokens = _tokenize(query)
+        if not query_tokens:
+            return []
+
+        ranked: list[_DocumentScore] = []
+        query_counter = Counter(query_tokens)
+        query_term_set = set(query_tokens)
+        for document in self._documents:
+            if request.document_type and document.document_type != request.document_type:
+                continue
+            if request.source_type and document.source_type != request.source_type:
+                continue
+            if request.customer and (document.customer or "").lower() != request.customer.lower():
+                continue
+            if request.tags:
+                doc_tags = {tag.lower() for tag in document.tags}
+                if not set(tag.lower() for tag in request.tags).issubset(doc_tags):
+                    continue
+
+            title_tokens = Counter(_tokenize(document.title))
+            body_tokens = Counter(_tokenize(document.body))
+            tag_tokens = Counter(_tokenize(" ".join(document.tags)))
+            customer_tokens = Counter(_tokenize(document.customer or ""))
+            metadata_tokens = Counter(_tokenize(" ".join(str(value) for value in document.metadata.values())))
+
+            matched_terms = sorted(
+                ((query_term_set & set(title_tokens))
+                | (query_term_set & set(body_tokens))
+                | (query_term_set & set(tag_tokens))
+                | (query_term_set & set(customer_tokens))
+                | (query_term_set & set(metadata_tokens)))
+            )
+
+            title_hits = sum(min(query_counter[token], title_tokens[token]) for token in query_term_set)
+            body_hits = sum(min(query_counter[token], body_tokens[token]) for token in query_term_set)
+            tag_hits = sum(min(query_counter[token], tag_tokens[token]) for token in query_term_set)
+            customer_hits = sum(min(query_counter[token], customer_tokens[token]) for token in query_term_set)
+            metadata_hits = sum(min(query_counter[token], metadata_tokens[token]) for token in query_term_set)
+
+            phrase_bonus = 0.0
+            lowered_query = query.lower()
+            if lowered_query and lowered_query in document.title.lower():
+                phrase_bonus += 3.5
+            if lowered_query and lowered_query in document.body.lower():
+                phrase_bonus += 1.5
+
+            score = (
+                title_hits * 4.0
+                + body_hits * 1.5
+                + tag_hits * 2.5
+                + customer_hits * 3.0
+                + metadata_hits * 1.0
+                + phrase_bonus
+            )
+            if score <= 0:
+                continue
+
+            explanation = (
+                f"title={title_hits}, body={body_hits}, tags={tag_hits}, "
+                f"customer={customer_hits}, metadata={metadata_hits}, phrase={phrase_bonus:.1f}"
+            )
+            ranked.append(_DocumentScore(document=document, score=score, matched_terms=matched_terms, explanation=explanation))
+
+        ranked.sort(key=lambda item: (-item.score, item.document.title.lower(), item.document.id))
+        return ranked
