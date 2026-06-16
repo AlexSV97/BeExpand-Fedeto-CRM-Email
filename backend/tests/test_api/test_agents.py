@@ -78,3 +78,12 @@ async def test_agent_recommendation_and_approval_endpoints(client, auth_headers)
         "agent.recommendation.created",
         "agent.approval.approved",
     ]
+
+    history_response = await client.get("/api/v1/agents/history", headers=auth_headers)
+    assert history_response.status_code == 200
+    history_payload = history_response.json()
+    assert history_payload["total"] >= 2
+    assert {item["record_kind"] for item in history_payload["items"]} >= {
+        "agent_recommendation",
+        "agent_approval",
+    }

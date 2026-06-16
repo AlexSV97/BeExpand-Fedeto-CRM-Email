@@ -248,31 +248,28 @@ class AgentGovernanceService:
                 OperationalRecord.resource_id == request.recommendation_id,
             )
         )
-        persisted = result.scalar_one_or_none()
+        recommendation = result.scalar_one_or_none()
         payload = {
             "approval_request": request.model_dump(mode="json"),
             "approval_record": record.model_dump(mode="json"),
         }
-        if persisted is None:
-            persisted = OperationalRecord(
-                record_kind="agent_approval",
-                resource_id=request.recommendation_id,
-                actor_kind="human",
-                actor_name=request.approver_name,
-                status=record.status.value,
-                title=f"Approval for {request.recommendation_id}",
-                payload=payload,
-            )
-            db.add(persisted)
-        else:
-            persisted.status = record.status.value
-            persisted.actor_kind = "human"
-            persisted.actor_name = request.approver_name
-            persisted.title = f"Approval for {request.recommendation_id}"
-            persisted.payload = {
-                **(persisted.payload or {}),
-                **payload,
+        if recommendation is not None:
+            recommendation.status = record.status.value
+            recommendation.payload = {
+                **(recommendation.payload or {}),
+                "approval": payload,
             }
+
+        persisted = OperationalRecord(
+            record_kind="agent_approval",
+            resource_id=request.recommendation_id,
+            actor_kind="human",
+            actor_name=request.approver_name,
+            status=record.status.value,
+            title=f"Approval for {request.recommendation_id}",
+            payload=payload,
+        )
+        db.add(persisted)
         await db.commit()
         await db.refresh(persisted)
         return persisted
