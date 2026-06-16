@@ -1,8 +1,8 @@
-# BeExpand-Fedeto-CRM-Email
+# Aiuken SOC — Frontend + Backend
 
 ## Stack
 - **Backend**: Python 3.12+, FastAPI, SQLAlchemy 2.0 (async), Alembic, Celery + Redis
-- **Frontend**: React 19 + TypeScript, Vite 8 (Rolldown), Recharts, React Router 7
+- **Frontend**: React 19 + TypeScript 6, Vite 8 (Rolldown), Zustand 5, Recharts, Framer Motion, React Router 7, Lucide React
 - **BD**: SQLite (dev) / PostgreSQL 16 (prod)
 - **CRM**: VTiger REST API (via httpx)
 - **IA Local**: Ollama (llama3.2:3b), DistilBERT multilingual cased
@@ -40,7 +40,9 @@ Email ──→ Orchestrator ──┬── Analyzer (LLM: info estructurada)
 - M1-M4 COMPLETADOS (IMAP, Parser, Classifier secuencial, API, Frontend)
 - ✅ M5 (Orquestador Paralelo) — YA IMPLEMENTADO
 - Pipeline completo: IMAP → Parse → Analyzer → 3 clasificadores paralelo → Voto → Router → ActionExecutor
-- Tests backend: ~94 tests
+- Backend Aiuken SOC (Sprints 0-7) — ✅ Completo (156 tests)
+- SOC Shell Frontend — ✅ Completo (9 superficies, feature flag vía localStorage)
+- Tests backend: ~156 tests
 
 ## Ramas activas
 - `main` — producción
@@ -79,10 +81,17 @@ admin / admin123
 - **SDD**: Usar flujo SDD para cambios grandes (explore → propose → spec → design → tasks → apply → verify)
 
 ## Skills relevantes
-- pytest (tests Python), playwright (E2E), typescript, react-19, tailwind-4
+- pytest (tests Python), playwright (E2E), typescript, react-19, tailwind-4, zustand-5
 - code-architect, code-explorer (para diseñar features nuevas)
 - git-master, work-unit-commits, branch-pr, chained-pr (para commits y PRs)
 - sdd-* (para cambios estructurados)
+
+## SOC Shell Frontend
+- Feature flag: `localStorage.setItem('soc_shell_enabled', 'true')` activa el SOC shell
+- Navegación mediante Zustand + History API (sin React Router)
+- 9 surfaces en `src/pages/soc/`, registradas en `src/services/soc/surfaceRegistry.tsx`
+- API client SOC en `src/services/soc/client.ts` (socFetch con auth JWT, timeout, retry)
+- Todas las surfaces tienen loading/empty/error states + mock data fallback
 
 ## Servicios
 - Ollama: http://127.0.0.1:11434 (ejecutar `ollama serve`)

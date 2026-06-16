@@ -1,17 +1,18 @@
-# BeConnect
+# Aiuken SOC
 
-> **Sistema inteligente de clasificación y gestión de correos electrónicos**
+> **Plataforma de inteligencia y operaciones SOC — clasificación inteligente de correos, gestión de tickets y centro de comando**
 
 ---
 
 ## ¿Qué es?
 
-BeConnect es un sistema que **lee, clasifica y organiza automáticamente los correos electrónicos que llegan a la empresa**. Cada correo se analiza, se categoriza (cliente, proveedor, lead, etc.), se determina su urgencia y relevancia, y se registra en el CRM — todo sin intervención humana.
+**Aiuken SOC** es un sistema que **lee, clasifica y organiza automáticamente los correos electrónicos** que llegan a la empresa, y provee un **Centro de Operaciones de Seguridad (SOC)** completo para la gestión de tickets, SLA, agentes, auditoría y reportes.
 
-El resultado: un equipo comercial que **deja de perder tiempo organizando correos** y se centra en lo que realmente importa: **vender y dar servicio**.
+Cada correo se analiza, se categoriza (cliente, proveedor, lead, etc.), se determina su urgencia y relevancia, y se registra en el CRM — todo sin intervención humana.
 
-**Nota estratégica:** este repositorio también sirve como base documental y técnica para la evolución hacia **BeConnect AI Layer sobre OTRS/Znuny para Aiuken**. Ver la sección final para la propuesta, arquitectura, roadmap y backlog.
+Sobre esa base, la plataforma ofrece un **SOC shell** con 9 superficies especializadas: Command Center, Smart Ticket Queue, Ticket Copilot, SLA War Room, Knowledge Vault, Agent Governance, Reporting, Audit y Configuration.
 
+El resultado: un equipo que **deja de perder tiempo organizando correos y tickets** y se centra en lo que realmente importa: **resolver incidentes, dar servicio y vender**.
 
 ---
 
@@ -25,6 +26,7 @@ Las empresas reciben decenas o cientos de correos al día en múltiples direccio
 - Decidir a qué departamento enviarlo
 - Apuntar la información en el CRM
 - Hacer seguimiento para que no se pierda
+- Gestionar tickets, SLA, colas y escalados manualmente
 
 **Esto es lento, caro y propenso a errores.** Los correos importantes se pierden entre el ruido, las oportunidades se enfrían, y el CRM se acaba quedando desactualizado porque nadie tiene tiempo de rellenarlo manualmente.
 
@@ -41,7 +43,7 @@ Cada correo que llega a la empresa pasa por un pipeline inteligente que:
 3. **Evalúa la urgencia** y la relevancia comercial
 4. **Determina el departamento** al que debe dirigirse
 5. **Actualiza el CRM** automáticamente
-6. **Muestra todo** en un dashboard claro y en tiempo real
+6. **Muestra todo** en un dashboard SOC con 9 superficies especializadas
 
 Y todo esto ocurre **en menos de 5 segundos por correo**, 24/7, sin que nadie tenga que hacer nada.
 
@@ -52,7 +54,7 @@ Y todo esto ocurre **en menos de 5 segundos por correo**, 24/7, sin que nadie te
 Para que se entienda bien, sigamos el camino de un correo desde que llega hasta que se muestra en el dashboard:
 
 ### 1. 📥 Llega un correo
-Un cliente escribe a info@beexpand.com. El sistema lo detecta automáticamente (revisa la bandeja de entrada cada 60 segundos).
+Un cliente escribe a una dirección vigilada. El sistema lo detecta automáticamente (revisa la bandeja de entrada cada 60 segundos).
 
 ### 2. 📄 Se analiza el contenido
 El sistema extrae todo lo importante del correo: quién lo envía, de qué empresa es, qué pide, si adjunta documentos, el nivel de urgencia.
@@ -77,8 +79,8 @@ El sistema decide a qué área debe llegar (comercial, administración, soporte,
 ### 6. 💾 Se guarda en el CRM
 Toda la información relevante se vuelca automáticamente en VTiger: contacto, empresa, oportunidad, historial de interacciones.
 
-### 7. 📊 Se muestra en el dashboard
-En tiempo real, el equipo ve en pantalla los correos clasificados, las oportunidades detectadas, los contactos nuevos y las tendencias.
+### 7. 📊 Se muestra en el SOC
+En tiempo real, el equipo ve en el Command Center los KPIs, alertas, presión de cola y riesgo SLA.
 
 **Todo esto ocurre en menos de 5 segundos.** Mientras un humano estaría aún leyendo el asunto, el sistema ya ha clasificado, registrado y mostrado el correo.
 
@@ -86,7 +88,7 @@ En tiempo real, el equipo ve en pantalla los correos clasificados, las oportunid
 
 ## Humano vs Sistema
 
-| Aspecto | Trabajo manual | Con BeConnect |
+| Aspecto | Trabajo manual | Con Aiuken SOC |
 |:---|:---|:---|
 | **Tiempo por correo** | 2-5 minutos leyendo, entendiendo y clasificando | 2-5 segundos automático |
 | **Jornada de 8h** | ~100-150 correos procesados | Todos los que lleguen, sin límite |
@@ -101,15 +103,15 @@ En tiempo real, el equipo ve en pantalla los correos clasificados, las oportunid
 
 ## Beneficios para la Empresa
 
-### Para el equipo comercial
-- **Dejan de perder tiempo** leyendo y clasificando correos manualmente
-- **Ven todas las oportunidades** en un dashboard, sin revisar la bandeja de entrada
-- **Pueden priorizar** por urgencia, valor, o categoría — no por orden de llegada
+### Para el equipo de operaciones/SOC
+- **Dejan de perder tiempo** leyendo y clasificando correos y tickets manualmente
+- **Ven todas las incidencias** en un Command Center unificado
+- **Pueden priorizar** por urgencia, SLA, valor — no por orden de llegada
 
 ### Para la dirección
-- **Visibilidad total** de la actividad comercial: cuántos correos, de qué tipo, tendencias
-- **Detección temprana** de oportunidades y problemas
-- **Métricas concretas** para tomar decisiones
+- **Visibilidad total** de la actividad: KPIs, cumplimiento SLA, rendimiento de agentes
+- **Detección temprana** de incidentes y riesgos de incumplimiento
+- **Auditoría completa** de todas las acciones — IA y humanas
 
 ### Para la empresa en general
 - **Ningún correo importante se pierde** — el 100% se clasifica y almacena
@@ -119,36 +121,60 @@ En tiempo real, el equipo ve en pantalla los correos clasificados, las oportunid
 
 ---
 
-## Dashboard
+## Aiuken SOC Shell — Centro de Comando
 
-El sistema tiene un panel de control visual que muestra:
+El frontend incluye un **SOC Shell** completo con 9 superficies especializadas, accesible mediante feature flag:
 
-- **Resumen general**: total de correos, contactos, oportunidades del día/semana/mes
-- **Correos clasificados**: lista completa con búsqueda y filtros por categoría, urgencia, fecha
-- **Contactos**: clientes, leads, proveedores detectados automáticamente
-- **Oportunidades**: pipeline visual con etapas (nueva, en conversación, cerrada)
-- **Tendencias**: gráficos de volumen de correos, categorías más frecuentes, horas punta
-- **Detalle de cada correo**: quién votó qué, con qué confianza, resumen del contenido
+### Cómo activarlo
+```js
+localStorage.setItem('soc_shell_enabled', 'true')
+// Recargar la página
+```
 
----
+### Superficies del SOC
 
-## Implementación en la Empresa
+| # | Superficie | Descripción |
+|---|-----------|-------------|
+| 1 | **Command Center** | KPIs en tiempo real, alertas recientes, presión de cola, resumen de riesgo SLA |
+| 2 | **Smart Ticket Queue** | Bandeja inteligente con filtros, búsqueda, paginación — navega al Copilot por fila |
+| 3 | **Ticket Copilot** | Vista partida: detalle del ticket + panel de IA con sugerencias, borradores y acciones |
+| 4 | **SLA War Room** | Temporizadores de SLA, alertas de breach, matriz prioridad×cola |
+| 5 | **Knowledge Vault** | Buscador de artículos, categorías (SOPs, Playbooks, Known Issues), relevance score |
+| 6 | **Agent Governance** | Roster de agentes, estado online, menú de override, compliance score |
+| 7 | **Reporting** | Reportes por tipo (SLA, agentes, tickets, colas), date range, gráficos Recharts |
+| 8 | **Audit** | Timeline de eventos inmutable, filtros por actor/tipo/fecha, detalles expandibles |
+| 9 | **Configuration** | Thresholds de SLA, definiciones de niveles, visibilidad de superficies, integraciones |
 
-### ¿Qué necesita la empresa?
-- **Una cuenta de correo** vigilada (la que ya usan o una dedicada tipo info@)
-- **Acceso al CRM** VTiger (o conectarse al que ya tienen)
-- **Nada más**: el sistema funciona en la nube, no necesita instalar nada en los ordenadores
+### Arquitectura del SOC Shell
 
-### ¿Cómo se despliega?
-El sistema está alojado en **Render** (plataforma cloud). Cualquier mejora que se desarrolle se despliega automáticamente — no hay que tocar servidores ni hacer despliegues manuales.
+```
+src/
+├── services/soc/
+│   ├── contracts.ts          # Tipos: SurfaceId, SurfaceStatus, SurfaceDescriptor
+│   ├── surfaceRegistry.tsx   # Registro singleton con lazy loading de las 9 surfaces
+│   ├── socShellStore.ts      # Store Zustand + history.pushState/popstate sync
+│   ├── SocShellProvider.tsx  # Context provider con useSocShell() hook
+│   ├── client.ts             # socFetch() con auth JWT, timeout 30s, 2 retries con backoff
+│   ├── endpoints.ts          # Mapeo SurfaceId → rutas API (/api/v1/soc/*)
+│   ├── normalize/            # 9 normalizadores API → view-model
+│   └── index.ts              # Barrel
+├── components/soc/
+│   ├── SocShell.tsx          # Shell principal con tab strip y surface outlet
+│   ├── SocLoadingState.tsx   # Estado de carga
+│   ├── SocEmptyState.tsx     # Estado vacío con CTA opcional
+│   ├── SocErrorState.tsx     # Estado de error con retry
+│   ├── SocStaleBanner.tsx    # Banner de datos desactualizados
+│   └── index.ts              # Barrel
+├── content/socCopy.ts        # Sistema de copia neutral con SOC_TERM_MAP + t()
+├── config/socShell.ts        # Feature flag vía localStorage
+└── pages/soc/                # 9 surfaces implementadas
+```
 
-### ¿Cómo se usa en el día a día?
-1. El equipo sigue trabajando con su correo como siempre
-2. El sistema procesa cada correo en segundo plano
-3. En cualquier momento, abren el dashboard y ven todo clasificado y organizado
-4. Las oportunidades y contactos nuevos ya están en el CRM
-
-**No requiere formación**, no cambia la forma de trabajar del equipo. Es un asistente invisible que hace el trabajo pesado.
+**Principios de diseño:**
+- **Sin React Router**: la navegación entre surfaces usa Zustand + History API
+- **Feature flag**: `localStorage.setItem('soc_shell_enabled', 'true')` activa el SOC shell; con flag OFF la app funciona exactamente como antes
+- **Mock data fallback**: todas las surfaces muestran datos de ejemplo cuando el backend no está disponible
+- **Copia neutral**: `socCopy.ts` traduce términos legacy automáticamente
 
 ---
 
@@ -160,7 +186,7 @@ El sistema está alojado en **Render** (plataforma cloud). Cualquier mejora que 
 |:---|:---|
 | **Backend** | Python 3.12+, FastAPI, SQLAlchemy 2.0 asíncrono |
 | **Base de datos** | PostgreSQL 16 (SQLite en desarrollo) |
-| **Frontend** | React 19 + TypeScript, Vite 8, Tailwind CSS 4, Recharts |
+| **Frontend** | React 19 + TypeScript 6, Vite 8, Tailwind CSS 4, Zustand 5, Recharts, Framer Motion |
 | **Clasificación** | Pipeline multi-agente paralelo: Rule Engine + BERT (ONNX) + LLM (OpenRouter) |
 | **CRM** | VTiger REST API (cliente HTTP con httpx) |
 | **Correo** | IMAP nativo (conexión directa al servidor de correo) |
@@ -171,27 +197,27 @@ El sistema está alojado en **Render** (plataforma cloud). Cualquier mejora que 
 
 ```
 Correo → IMAP Sync → Parser → Analyzer (LLM)
-                                   │
-          ┌────────────────────────┴────────────────────────┐
-          │              ORQUESTADOR PARALELO                │
-          │                                                  │
-          │  ┌─────────────────┐  ┌──────────┐  ┌────────┐  │
-          │  │ RuleClassifier  │  │ BERT     │  │ LLM    │  │
-          │  │ (~1ms, reglas)  │  │ (~50ms)  │  │ (~2s)  │  │
-          │  └────────┬────────┘  └─────┬────┘  └───┬────┘  │
-          └───────────┼──────────────────┼───────────┼───────┘
-                      └──────────────────┼───────────┘
-                                         ▼
-                             VoteResolver (consenso / mayoría / juez)
-                                         │
-                                ┌────────┴────────┐
-                                ▼                  ▼
-                           Router              Dashboard
-                        (departamento)       (React + Recharts)
-                                │
-                                ▼
-                         ActionExecutor
-                        (CRM + historial)
+                                    │
+           ┌────────────────────────┴────────────────────────┐
+           │              ORQUESTADOR PARALELO                │
+           │                                                  │
+           │  ┌─────────────────┐  ┌──────────┐  ┌────────┐  │
+           │  │ RuleClassifier  │  │ BERT     │  │ LLM    │  │
+           │  │ (~1ms, reglas)  │  │ (~50ms)  │  │ (~2s)  │  │
+           │  └────────┬────────┘  └─────┬────┘  └───┬────┘  │
+           └───────────┼──────────────────┼───────────┼───────┘
+                       └──────────────────┼───────────┘
+                                          ▼
+                              VoteResolver (consenso / mayoría / juez)
+                                          │
+                                 ┌────────┴────────┐
+                                 ▼                  ▼
+                            Router              Dashboard / SOC
+                         (departamento)       (React + Recharts + SOC Shell)
+                                 │
+                                 ▼
+                          ActionExecutor
+                         (CRM + historial)
 ```
 
 **Los 3 clasificadores se ejecutan en paralelo.** Cada uno vota con el mismo peso. Si 2 de 3 coinciden, gana esa categoría por mayoría. Si los 3 son distintos, un juez (IA) revisa los votos y decide.
@@ -211,12 +237,22 @@ BeExpand-Fedeto-CRM-Email/
 │   │   ├── crm_integration/    # Integración con VTiger
 │   │   └── tasks/              # Tareas programadas
 │   ├── scripts/                # Utilidades (datos de prueba, testeo)
-│   └── tests/                  # Tests automatizados
+│   └── tests/                  # Tests automatizados (156 tests)
 ├── frontend/
 │   └── src/
 │       ├── pages/              # Dashboard, Contactos, Oportunidades, Ajustes
-│       ├── components/         # Componentes reutilizables
-│       └── services/           # Cliente API
+│       │   └── soc/            # 9 surfaces del SOC Shell (CommandCenter, TicketQueue, etc.)
+│       ├── components/
+│       │   ├── ...             # Componentes reutilizables existentes
+│       │   └── soc/            # SocShell, SocLoadingState, SocEmptyState, SocErrorState, SocStaleBanner
+│       ├── services/
+│       │   ├── api.ts          # Cliente API general
+│       │   └── soc/            # Adaptador SOC: client, endpoints, normalize, store, registry
+│       ├── content/
+│       │   └── socCopy.ts      # Sistema de copia neutral con term map
+│       ├── config/
+│       │   └── socShell.ts     # Feature flag del SOC Shell
+│       └── contexts/           # AuthContext, etc.
 └── infrastructure/             # Docker, configuraciones
 ```
 
@@ -241,10 +277,12 @@ npm run dev
 ### Tests
 
 ```bash
+# Backend (156 tests automatizados)
 cd backend && pytest -v
-```
 
-156 tests automatizados (pytest-asyncio, respx para mock HTTP).
+# Frontend (build check)
+cd frontend && npm run build
+```
 
 ---
 
@@ -257,18 +295,22 @@ cd backend && pytest -v
 | M3 — Clasificadores (Rule + BERT + LLM) | ✅ Completo |
 | M4 — API REST + Dashboard React | ✅ Completo |
 | M5 — Orquestador paralelo multi-agente | ✅ Completo |
-| BeConnect AI Layer para OTRS/Znuny (Aiuken) | ✅ Implementado en backend (Sprints 0-7) |
+| Backend Aiuken SOC (Sprints 0-7) | ✅ Completo (156 tests) |
 | Despliegue en Render | ✅ Operativo |
 | Dashboard con Settings | ✅ Completo |
+| **SOC Shell Frontend** | ✅ **Completo (9 superficies)** |
+| Command Center | ✅ KPIs, alertas, presión de cola, riesgo SLA |
+| Smart Ticket Queue | ✅ Filtros, búsqueda, paginación, navegación a Copilot |
+| Ticket Copilot | ✅ Split view, sugerencias IA, acciones |
 
-## BeConnect AI Layer sobre OTRS/Znuny para Aiuken
+## Aiuken SOC — Capa de Inteligencia sobre OTRS/Znuny
 
 ### Contexto estratégico
-Aiuken dispone de una base SOC madura sobre OTRS/Znuny. BeConnect se propone como una **capa de inteligencia gobernada** que amplía esa operación sin reemplazar el sistema de registro, incorporando copiloto de analista, RAG, SLA predictivo, agentes especializados y observabilidad.
+Aiuken dispone de una base SOC madura sobre OTRS/Znuny. Aiuken SOC se propone como una **capa de inteligencia gobernada** que amplía esa operación sin reemplazar el sistema de registro, incorporando copiloto de analista, RAG, SLA predictivo, agentes especializados y observabilidad.
 
 ### Principios de diseño
 - **OTRS/Znuny como system of record**
-- **BeConnect como capa de inteligencia y experiencia**
+- **Aiuken SOC como capa de inteligencia y experiencia**
 - **Integración API-first**
 - **Lectura primero, escritura asistida después**
 - **Human-in-the-loop para acciones críticas**
@@ -280,9 +322,9 @@ Canales / Ingesta
       ↓
 OTRS / Znuny (tickets, colas, SLA, auditoría)
       ↓  API / eventos / lecturas controladas
-BeConnect Core (IA + orquestación + RAG + SLA)
+Aiuken SOC Core (IA + orquestación + RAG + SLA)
       ↓
-BeConnect UI (copiloto, war room, reporting)
+Aiuken SOC UI (copiloto, war room, reporting, command center)
 ```
 
 ### Alcance por fases
@@ -302,7 +344,7 @@ BeConnect UI (copiloto, war room, reporting)
 
 | Horizonte | Enfoque | Resultado |
 |---|---|---|
-| 0–30 días | Integración | BeConnect lee tickets, normaliza datos y audita acciones |
+| 0–30 días | Integración | Aiuken SOC lee tickets, normaliza datos y audita acciones |
 | 31–60 días | Operación mejorada | Tickets mejor creados, colas sugeridas, SLA básico visible |
 | 61–90 días | Copiloto | Smart Queue, resúmenes, casos similares, borradores con aprobación |
 
@@ -337,7 +379,6 @@ BeConnect UI (copiloto, war room, reporting)
 
 ### Mensaje ejecutivo
 > **No venimos a cambiar el SOC de Aiuken. Venimos a potenciarlo con una capa de IA gobernada que reduce fricción, mejora la respuesta, anticipa riesgos y convierte el histórico en ventaja operativa.**
-
 
 ---
 
