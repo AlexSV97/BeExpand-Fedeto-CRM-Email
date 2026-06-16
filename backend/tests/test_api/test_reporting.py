@@ -80,7 +80,7 @@ async def test_reporting_endpoints_return_daily_and_weekly_reports(client, auth_
     assert report_history_response.status_code == 200
     report_history_payload = report_history_response.json()
     assert report_history_payload["total"] >= 2
-    assert {item["kind"] for item in report_history_payload["items"]} == {"report_snapshot"}
+    assert {item["record_kind"] for item in report_history_payload["items"]} == {"report_snapshot"}
 
 
 @pytest.mark.asyncio
@@ -128,4 +128,4 @@ async def test_feedback_endpoint_returns_deterministic_suggestions(client, auth_
     assert feedback_history_response.status_code == 200
     feedback_history_payload = feedback_history_response.json()
     assert feedback_history_payload["total"] >= 2
-    assert {item["kind"] for item in feedback_history_payload["items"]} == {"feedback_entry"}
+    assert {item["record_kind"] for item in feedback_history_payload["items"]} == {"feedback_entry"}

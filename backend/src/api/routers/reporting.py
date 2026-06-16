@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_current_user
+from src.api.schemas import OperationalHistoryResponse, OperationalRecordView
 from src.db.models import OperationalRecord, User
 from src.db.session import get_db
 from src.services.reporting import (
@@ -38,19 +39,19 @@ def get_feedback_loop_service(request: Request) -> FeedbackLoopService:
     return service
 
 
-def _serialize_record(record: OperationalRecord) -> dict:
-    return {
-        "id": record.id,
-        "kind": record.record_kind,
-        "resource_id": record.resource_id,
-        "actor_kind": record.actor_kind,
-        "actor_name": record.actor_name,
-        "status": record.status,
-        "title": record.title,
-        "payload": record.payload or {},
-        "created_at": record.created_at.isoformat() if record.created_at else None,
-        "updated_at": record.updated_at.isoformat() if record.updated_at else None,
-    }
+def _serialize_record(record: OperationalRecord) -> OperationalRecordView:
+    return OperationalRecordView(
+        id=record.id,
+        record_kind=record.record_kind,
+        resource_id=record.resource_id,
+        actor_kind=record.actor_kind,
+        actor_name=record.actor_name,
+        status=record.status,
+        title=record.title,
+        payload=record.payload or {},
+        created_at=record.created_at,
+        updated_at=record.updated_at,
+    )
 
 
 @router.post("/reporting/daily", response_model=OperationalReport)
@@ -91,7 +92,7 @@ async def record_feedback(
     return response
 
 
-@router.get("/reporting/history")
+@router.get("/reporting/history", response_model=OperationalHistoryResponse)
 async def list_report_history(
     limit: int = 20,
     current_user: User = Depends(get_current_user),
@@ -99,10 +100,10 @@ async def list_report_history(
     service: ReportingService = Depends(get_reporting_service),
 ):
     snapshots = await service.list_report_snapshots(db, limit=limit)
-    return {"items": [_serialize_record(snapshot) for snapshot in snapshots], "total": len(snapshots)}
+    return OperationalHistoryResponse(items=[_serialize_record(snapshot) for snapshot in snapshots], total=len(snapshots))
 
 
-@router.get("/reporting/feedback/history")
+@router.get("/reporting/feedback/history", response_model=OperationalHistoryResponse)
 async def list_feedback_history(
     limit: int = 20,
     current_user: User = Depends(get_current_user),
@@ -110,5 +111,5 @@ async def list_feedback_history(
     service: FeedbackLoopService = Depends(get_feedback_loop_service),
 ):
     records = await service.list_feedback_records(db, limit=limit)
-    return {"items": [_serialize_record(record) for record in records], "total": len(records)}
+    return OperationalHistoryResponse(items=[_serialize_record(record) for record in records], total=len(records))
 

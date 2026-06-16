@@ -4,15 +4,15 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_current_user
+from src.api.schemas import AuditTrailResponse, OperationalHistoryResponse, OperationalRecordView
 from src.db.models import OperationalRecord, User
 from src.db.session import get_db
 from src.services.agent_governance import (
     AgentApprovalRequest,
-    AgentAuditTrail,
+    AgentApprovalRecord,
     AgentGovernanceService,
     AgentRecommendationRequest,
     AgentRecommendationResponse,
-    AgentApprovalRecord,
 )
 
 router = APIRouter(tags=["agents"])
@@ -27,19 +27,19 @@ def get_agent_governance_service(request: Request) -> AgentGovernanceService:
     return service
 
 
-def _serialize_record(record: OperationalRecord) -> dict[str, object]:
-    return {
-        "id": record.id,
-        "record_kind": record.record_kind,
-        "resource_id": record.resource_id,
-        "actor_kind": record.actor_kind,
-        "actor_name": record.actor_name,
-        "status": record.status,
-        "title": record.title,
-        "payload": record.payload,
-        "created_at": record.created_at.isoformat() if record.created_at else None,
-        "updated_at": record.updated_at.isoformat() if record.updated_at else None,
-    }
+def _serialize_record(record: OperationalRecord) -> OperationalRecordView:
+    return OperationalRecordView(
+        id=record.id,
+        record_kind=record.record_kind,
+        resource_id=record.resource_id,
+        actor_kind=record.actor_kind,
+        actor_name=record.actor_name,
+        status=record.status,
+        title=record.title,
+        payload=record.payload or {},
+        created_at=record.created_at,
+        updated_at=record.updated_at,
+    )
 
 
 @router.post("/agents/recommendation", response_model=AgentRecommendationResponse)
@@ -70,15 +70,16 @@ async def approve_agent_plan(
     return record
 
 
-@router.get("/agents/audit", response_model=AgentAuditTrail)
+@router.get("/agents/audit", response_model=AuditTrailResponse)
 async def list_agent_audit(
     current_user: User = Depends(get_current_user),
     service: AgentGovernanceService = Depends(get_agent_governance_service),
 ):
-    return AgentAuditTrail(items=service.audit_log())
+    items = service.audit_log()
+    return AuditTrailResponse(items=items, total=len(items))
 
 
-@router.get("/agents/history")
+@router.get("/agents/history", response_model=OperationalHistoryResponse)
 async def list_agent_history(
     limit: int = 20,
     current_user: User = Depends(get_current_user),
@@ -86,4 +87,4 @@ async def list_agent_history(
     service: AgentGovernanceService = Depends(get_agent_governance_service),
 ):
     records = await service.list_history(db, limit=limit)
-    return {"items": [_serialize_record(record) for record in records], "total": len(records)}
+    return OperationalHistoryResponse(items=[_serialize_record(record) for record in records], total=len(records))

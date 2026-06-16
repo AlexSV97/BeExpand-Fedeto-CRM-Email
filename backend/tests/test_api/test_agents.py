@@ -74,6 +74,7 @@ async def test_agent_recommendation_and_approval_endpoints(client, auth_headers)
     audit_response = await client.get("/api/v1/agents/audit", headers=auth_headers)
     assert audit_response.status_code == 200
     audit_payload = audit_response.json()
+    assert audit_payload["total"] == 2
     assert [event["action"] for event in audit_payload["items"]] == [
         "agent.recommendation.created",
         "agent.approval.approved",
