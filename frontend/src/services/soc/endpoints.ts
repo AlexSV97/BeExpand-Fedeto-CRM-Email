@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SOC endpoints and API contracts.
  *
  * Maps surface IDs to API paths and defines initial request/response types
@@ -11,15 +11,15 @@ import { SURFACE_IDS, type SurfaceId } from './contracts'
 // ── Endpoint paths ──
 
 const SOC_ENDPOINTS: Record<SurfaceId, string> = {
-  [SURFACE_IDS.COMMAND_CENTER]: '/api/v1/soc/command-center',
-  [SURFACE_IDS.SMART_TICKET_QUEUE]: '/api/v1/soc/tickets',
-  [SURFACE_IDS.TICKET_COPILOT]: '/api/v1/soc/tickets/:id/copilot',
-  [SURFACE_IDS.SLA_WAR_ROOM]: '/api/v1/soc/sla',
-  [SURFACE_IDS.KNOWLEDGE_VAULT]: '/api/v1/soc/knowledge',
-  [SURFACE_IDS.AGENT_GOVERNANCE]: '/api/v1/soc/agents',
-  [SURFACE_IDS.REPORTING]: '/api/v1/soc/reports',
-  [SURFACE_IDS.AUDIT]: '/api/v1/soc/audit',
-  [SURFACE_IDS.CONFIGURATION]: '/api/v1/soc/config',
+  [SURFACE_IDS.COMMAND_CENTER]: '/soc/command-center',
+  [SURFACE_IDS.SMART_TICKET_QUEUE]: '/soc/tickets',
+  [SURFACE_IDS.TICKET_COPILOT]: '/soc/tickets/:id/copilot',
+  [SURFACE_IDS.SLA_WAR_ROOM]: '/soc/sla',
+  [SURFACE_IDS.KNOWLEDGE_VAULT]: '/soc/knowledge',
+  [SURFACE_IDS.AGENT_GOVERNANCE]: '/soc/agents',
+  [SURFACE_IDS.REPORTING]: '/soc/reports',
+  [SURFACE_IDS.AUDIT]: '/soc/audit',
+  [SURFACE_IDS.CONFIGURATION]: '/soc/config',
 }
 
 // ── Request / Response types ──
