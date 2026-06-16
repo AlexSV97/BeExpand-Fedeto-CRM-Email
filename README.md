@@ -244,7 +244,7 @@ npm run dev
 cd backend && pytest -v
 ```
 
-~94 tests automatizados (pytest-asyncio, respx para mock HTTP).
+156 tests automatizados (pytest-asyncio, respx para mock HTTP).
 
 ---
 
@@ -257,7 +257,7 @@ cd backend && pytest -v
 | M3 — Clasificadores (Rule + BERT + LLM) | ✅ Completo |
 | M4 — API REST + Dashboard React | ✅ Completo |
 | M5 — Orquestador paralelo multi-agente | ✅ Completo |
-| BeConnect AI Layer para OTRS/Znuny (Aiuken) | 🟡 En definición |
+| BeConnect AI Layer para OTRS/Znuny (Aiuken) | ✅ Implementado en backend (Sprints 0-7) |
 | Despliegue en Render | ✅ Operativo |
 | Dashboard con Settings | ✅ Completo |
 
