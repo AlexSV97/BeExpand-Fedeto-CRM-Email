@@ -10,4 +10,5 @@ from . import queues
 from . import opportunities
 from . import invoices
 from . import settings
+from . import sla
 from . import tickets

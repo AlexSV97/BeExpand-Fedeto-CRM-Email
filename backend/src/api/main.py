@@ -28,6 +28,7 @@ from src.api.routers import (
     invoices,
     opportunities,
     queues,
+    sla,
     settings,
     tickets,
 )
@@ -170,6 +171,7 @@ app.include_router(invoices.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
 app.include_router(settings.router, prefix="/api/v1")
 app.include_router(queues.router, prefix="/api/v1")
+app.include_router(sla.router, prefix="/api/v1")
 app.include_router(tickets.router, prefix="/api/v1")
 
 # CORS: en Docker localhost:5173, en Render la URL del frontend
