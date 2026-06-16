@@ -257,19 +257,20 @@ cd backend && pytest -v
 | M3 — Clasificadores (Rule + BERT + LLM) | ✅ Completo |
 | M4 — API REST + Dashboard React | ✅ Completo |
 | M5 — Orquestador paralelo multi-agente | ✅ Completo |
-| BeConnect AI Layer para OTRS/Znuny (Aiuken) | 🟡 En propuesta |
+| BeConnect AI Layer para OTRS/Znuny (Aiuken) | 🟡 En definición |
 | Despliegue en Render | ✅ Operativo |
 | Dashboard con Settings | ✅ Completo |
 
 ## BeConnect AI Layer sobre OTRS/Znuny para Aiuken
 
-> **Idea central:** Aiuken ya tiene una operativa madura en OTRS/Znuny. BeConnect no la reemplaza: la convierte en un **SOC inteligente, gobernado y trazable**.
+### Contexto estratégico
+Aiuken dispone de una base SOC madura sobre OTRS/Znuny. BeConnect se propone como una **capa de inteligencia gobernada** que amplía esa operación sin reemplazar el sistema de registro, incorporando copiloto de analista, RAG, SLA predictivo, agentes especializados y observabilidad.
 
-### Principios
-- **OTRS/Znuny = system of record**
-- **BeConnect = capa de inteligencia y experiencia**
-- **API-first, no acceso directo a BD**
-- **Read-only primero, writeback después**
+### Principios de diseño
+- **OTRS/Znuny como system of record**
+- **BeConnect como capa de inteligencia y experiencia**
+- **Integración API-first**
+- **Lectura primero, escritura asistida después**
 - **Human-in-the-loop para acciones críticas**
 - **Auditoría completa de IA y usuarios**
 
@@ -284,16 +285,16 @@ BeConnect Core (IA + orquestación + RAG + SLA)
 BeConnect UI (copiloto, war room, reporting)
 ```
 
-### Fases de implementación
+### Alcance por fases
 
 | Fase | Objetivo | Entregables |
 |---|---|---|
-| 0 | Base técnica | conector OTRS/Znuny, modelo canónico, normalizador, audit log, RBAC |
-| 1 | Ingesta y ticket creation | email/SIEM/ITSM → ticket, prioridad normalizada, deduplicación |
-| 2 | Colas y escalado | árbol de colas, sugerencia N1/N2/N3, owner/lock, motivo de escalado |
-| 3 | Ciclo de vida + SLA | estados, Stop-SLA, tiempo restante, riesgo de incumplimiento, alertas |
-| 4 | Smart Queue + Copilot | bandeja inteligente, resumen técnico, casos similares, borradores, aprobación |
-| 5 | Knowledge Vault / RAG | histórico consultable, embeddings, búsqueda semántica, fuentes citadas |
+| 0 | Base técnica | Conector OTRS/Znuny, modelo canónico, normalizador, audit log, RBAC |
+| 1 | Ingesta y ticket creation | Email/SIEM/ITSM → ticket, prioridad normalizada, deduplicación |
+| 2 | Colas y escalado | Árbol de colas, sugerencia N1/N2/N3, owner/lock, motivo de escalado |
+| 3 | Ciclo de vida + SLA | Estados, Stop-SLA, tiempo restante, riesgo de incumplimiento, alertas |
+| 4 | Smart Queue + Copilot | Bandeja inteligente, resumen técnico, casos similares, borradores, aprobación |
+| 5 | Knowledge Vault / RAG | Histórico consultable, embeddings, búsqueda semántica, fuentes citadas |
 | 6 | Agentes + gobierno | Triage/SLA/Knowledge/Response/Escalation/Compliance Agents |
 | 7 | Reporting + mejora continua | KPIs, informes, observabilidad, feedback, ajuste de reglas/prompts |
 
@@ -302,7 +303,7 @@ BeConnect UI (copiloto, war room, reporting)
 | Horizonte | Enfoque | Resultado |
 |---|---|---|
 | 0–30 días | Integración | BeConnect lee tickets, normaliza datos y audita acciones |
-| 31–60 días | Operación mejorada | tickets mejor creados, colas sugeridas, SLA básico visible |
+| 31–60 días | Operación mejorada | Tickets mejor creados, colas sugeridas, SLA básico visible |
 | 61–90 días | Copiloto | Smart Queue, resúmenes, casos similares, borradores con aprobación |
 
 ### Backlog resumido
@@ -317,6 +318,22 @@ BeConnect UI (copiloto, war room, reporting)
 - Knowledge Vault / RAG
 - Agentes especializados con gobierno
 - Reporting y mejora continua
+
+### Documentación asociada
+- [Propuesta ejecutiva](docs/propuesta-aiuken-beconnect.md)
+- [Backlog técnico implementable](docs/backlog-aiuken-beconnect.md)
+- [Índice maestro](docs/indice-maestro-aiuken.md)
+
+### Diagramas de apoyo
+- [Arquitectura general](images/ChatGPT%20Image%2016%20jun%202026,%2015_33_29.png)
+- [Flujo 1: Ingesta y creación de ticket](images/ChatGPT%20Image%2016%20jun%202026,%2015_48_14%20(1).png)
+- [Flujo 2: Colas y escalado](images/ChatGPT%20Image%2016%20jun%202026,%2015_48_14%20(2).png)
+- [Flujo 3: Ciclo de vida y SLA](images/ChatGPT%20Image%2016%20jun%202026,%2015_48_14%20(3).png)
+- [Flujo 4: Smart Queue + Copilot](images/ChatGPT%20Image%2016%20jun%202026,%2015_48_15%20(4).png)
+- [Flujo 5: Knowledge Vault / RAG](images/ChatGPT%20Image%2016%20jun%202026,%2015_48_15%20(5).png)
+- [Flujo 6: Agentes y gobierno](images/ChatGPT%20Image%2016%20jun%202026,%2015_48_15%20(6).png)
+- [Flujo 7: Reporting y mejora continua](images/ChatGPT%20Image%2016%20jun%202026,%2015_48_15%20(7).png)
+- [Cierre / visión global](images/ChatGPT%20Image%2016%20jun%202026,%2015_48_15%20(8).png)
 
 ### Mensaje ejecutivo
 > **No venimos a cambiar el SOC de Aiuken. Venimos a potenciarlo con una capa de IA gobernada que reduce fricción, mejora la respuesta, anticipa riesgos y convierte el histórico en ventaja operativa.**
