@@ -264,3 +264,20 @@ class ReprocessTask(Base):
     error: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+class OperationalRecord(Base):
+    """Registro duradero para aprobaciones, feedback, reportes y auditoría operativa."""
+    __tablename__ = "operational_records"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    record_kind: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    resource_id: Mapped[Optional[str]] = mapped_column(String(100), index=True)
+    actor_kind: Mapped[Optional[str]] = mapped_column(String(20), index=True)
+    actor_name: Mapped[Optional[str]] = mapped_column(String(100))
+    status: Mapped[Optional[str]] = mapped_column(String(30), index=True)
+    title: Mapped[Optional[str]] = mapped_column(String(255))
+    payload: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+

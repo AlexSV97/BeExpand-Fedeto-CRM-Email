@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_current_user
-from src.db.models import User
+from src.db.models import OperationalRecord, User
+from src.db.session import get_db
 from src.services.reporting import (
     AnalystFeedbackRequest,
     FeedbackLoopResponse,
@@ -40,10 +43,13 @@ def get_feedback_loop_service(request: Request) -> FeedbackLoopService:
 async def daily_report(
     body: OperationalReportPayload,
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
     service: ReportingService = Depends(get_reporting_service),
 ):
     request = OperationalReportRequest(window=ReportWindow.DAILY, **body.model_dump())
-    return service.generate_report(request)
+    report = service.generate_report(request)
+    await service.persist_report(db, report)
+    return report
 
 
 @router.post("/reporting/weekly", response_model=OperationalReport)

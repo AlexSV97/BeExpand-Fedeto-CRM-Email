@@ -6,8 +6,11 @@ from typing import Any
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.audit.models import AuditActorKind, AuditEvent, AuditOutcome
+from src.db.models import OperationalRecord
 from src.domain.ticketing import Queue, SLA, Ticket, TicketState
 from src.services.knowledge_vault import KnowledgeVaultService, SimilarCaseRequest
 from src.services.queue_strategy import QueueDecisionRequest, QueueStrategyService, QueueTier
@@ -207,6 +210,96 @@ class AgentGovernanceService:
 
     def audit_log(self) -> list[AuditEvent]:
         return list(self._audit_events)
+
+
+    async def persist_recommendation(
+        self,
+        db: AsyncSession,
+        recommendation_id: str,
+        request: AgentRecommendationRequest,
+        response: AgentRecommendationResponse,
+    ) -> OperationalRecord:
+        record = OperationalRecord(
+            record_kind="agent_recommendation",
+            resource_id=recommendation_id,
+            actor_kind="system",
+            actor_name="agent-governance",
+            status="pending" if response.policy.requires_approval else "auto_approved",
+            title=f"Agent recommendation for {request.subject}",
+            payload={
+                "request": request.model_dump(mode="json"),
+                "response": response.model_dump(mode="json"),
+            },
+        )
+        db.add(record)
+        await db.commit()
+        await db.refresh(record)
+        return record
+
+    async def persist_approval(
+        self,
+        db: AsyncSession,
+        request: AgentApprovalRequest,
+        record: AgentApprovalRecord,
+    ) -> OperationalRecord:
+        result = await db.execute(
+            select(OperationalRecord).where(
+                OperationalRecord.record_kind == "agent_recommendation",
+                OperationalRecord.resource_id == request.recommendation_id,
+            )
+        )
+        persisted = result.scalar_one_or_none()
+        payload = {
+            "approval_request": request.model_dump(mode="json"),
+            "approval_record": record.model_dump(mode="json"),
+        }
+        if persisted is None:
+            persisted = OperationalRecord(
+                record_kind="agent_approval",
+                resource_id=request.recommendation_id,
+                actor_kind="human",
+                actor_name=request.approver_name,
+                status=record.status.value,
+                title=f"Approval for {request.recommendation_id}",
+                payload=payload,
+            )
+            db.add(persisted)
+        else:
+            persisted.status = record.status.value
+            persisted.actor_kind = "human"
+            persisted.actor_name = request.approver_name
+            persisted.title = f"Approval for {request.recommendation_id}"
+            persisted.payload = {
+                **(persisted.payload or {}),
+                **payload,
+            }
+        await db.commit()
+        await db.refresh(persisted)
+        return persisted
+
+    async def persist_audit_event(self, db: AsyncSession, event: AuditEvent) -> OperationalRecord:
+        record = OperationalRecord(
+            record_kind="audit_event",
+            resource_id=event.resource_id,
+            actor_kind=event.actor_kind.value,
+            actor_name=event.actor_name,
+            status=event.outcome.value,
+            title=event.action,
+            payload=event.model_dump(mode="json"),
+        )
+        db.add(record)
+        await db.commit()
+        await db.refresh(record)
+        return record
+
+    async def list_history(self, db: AsyncSession, limit: int = 20) -> list[OperationalRecord]:
+        result = await db.execute(
+            select(OperationalRecord)
+            .where(OperationalRecord.record_kind.in_(["agent_recommendation", "agent_approval", "audit_event"]))
+            .order_by(OperationalRecord.created_at.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
 
     def _triage(self, request: AgentRecommendationRequest) -> AgentRecommendationItem:
         decision = self._queue_strategy.recommend(

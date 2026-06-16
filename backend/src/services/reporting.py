@@ -8,7 +8,10 @@ from typing import Any, Callable
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.db.models import OperationalRecord
 from src.domain.ticketing import Ticket, TicketState
 from src.services.knowledge_vault import KnowledgeDocument
 from src.services.ticket_lifecycle import TicketLifecycleService
@@ -124,6 +127,29 @@ class ReportingService:
             metrics=metrics,
             recommendations=recommendations,
         )
+
+    async def persist_report(self, db: AsyncSession, report: OperationalReport) -> OperationalRecord:
+        record = OperationalRecord(
+            record_kind="report_snapshot",
+            resource_id=f"{report.window.value}:{report.period_end.isoformat()}",
+            status=report.window.value,
+            title=f"{report.window.value.title()} operational report",
+            payload=report.model_dump(mode="json"),
+        )
+        db.add(record)
+        await db.commit()
+        await db.refresh(record)
+        return record
+
+    async def list_report_snapshots(self, db: AsyncSession, limit: int = 20) -> list[OperationalRecord]:
+        result = await db.execute(
+            select(OperationalRecord)
+            .where(OperationalRecord.record_kind == "report_snapshot")
+            .order_by(OperationalRecord.created_at.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
 
     def _metrics(
         self,
@@ -253,6 +279,39 @@ class FeedbackLoopService:
 
     def list_feedback(self) -> list[FeedbackLoopResponse]:
         return list(self._feedback)
+
+    async def persist_feedback(
+        self,
+        db: AsyncSession,
+        request: AnalystFeedbackRequest,
+        response: FeedbackLoopResponse,
+    ) -> OperationalRecord:
+        record = OperationalRecord(
+            record_kind="feedback_entry",
+            resource_id=response.feedback_id,
+            actor_kind="human",
+            actor_name=request.analyst_name,
+            status=request.verdict.value,
+            title=f"Feedback for {request.target}",
+            payload={
+                "request": request.model_dump(mode="json"),
+                "response": response.model_dump(mode="json"),
+            },
+        )
+        db.add(record)
+        await db.commit()
+        await db.refresh(record)
+        return record
+
+    async def list_feedback_records(self, db: AsyncSession, limit: int = 20) -> list[OperationalRecord]:
+        result = await db.execute(
+            select(OperationalRecord)
+            .where(OperationalRecord.record_kind == "feedback_entry")
+            .order_by(OperationalRecord.created_at.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
 
     def _suggestions_from_feedback(self, request: AnalystFeedbackRequest) -> list[ImprovementSuggestion]:
         text = " ".join([request.target, request.comment, " ".join(request.tags)]).lower()
