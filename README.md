@@ -1,6 +1,6 @@
 # BeConnect
 
-> **Sistema inteligente de clasificación y gestión de correos electrónicos con integración CRM**
+> **Sistema inteligente de clasificación y gestión de correos electrónicos**
 
 ---
 
