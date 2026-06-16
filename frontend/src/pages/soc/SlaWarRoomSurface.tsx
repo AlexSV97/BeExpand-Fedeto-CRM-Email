@@ -14,7 +14,7 @@ import { SOC_ENDPOINTS } from '../../services/soc/endpoints'
 import { normalizeSlaWarRoom } from '../../services/soc/normalize/slaWarRoom'
 import type { SlaWarRoomView } from '../../services/soc/normalize/slaWarRoom'
 import { SocLoadingState, SocEmptyState, SocErrorState } from '../../components/soc'
-import { t } from '../../content/socCopy'
+import { applyNeutralCopy, t } from '../../content/socCopy'
 import { cn } from '../../lib/utils'
 import {
   AlertTriangle,
@@ -164,7 +164,7 @@ function TimerCard({ timer }: { timer: ActiveSlaTimer }) {
           {t(`ticket.priority.${timer.priority}`)}
         </span>
       </div>
-      <p className="text-sm text-foreground truncate mb-3">{timer.subject}</p>
+      <p className="text-sm text-foreground truncate mb-3">{applyNeutralCopy(timer.subject)}</p>
       <div className="flex items-center justify-between text-xs">
         <div className="flex items-center gap-1 text-muted-foreground">
           <Timer className="h-3 w-3" />
@@ -217,7 +217,7 @@ function BreachRow({ breach }: { breach: BreachAlert }) {
             </span>
           )}
         </div>
-        <p className="text-xs text-muted-foreground truncate mt-0.5">{breach.subject}</p>
+        <p className="text-xs text-muted-foreground truncate mt-0.5">{applyNeutralCopy(breach.subject)}</p>
       </div>
       <div className="text-right shrink-0">
         <p className={cn(
@@ -276,13 +276,13 @@ export default function SlaWarRoomSurface() {
       setData(view)
       setSurfaceStatus(SURFACE_ID, 'ready')
     } catch (err: unknown) {
+      // Fallback: use mock data when backend is unavailable
+      setSurfaceStatus(SURFACE_ID, 'ready')
       const socErr: SocError = {
-        code: err instanceof Error && 'code' in err ? (err as { code: string }).code : 'UNKNOWN_ERROR',
+        code: 'FALLBACK_MODE',
         message: err instanceof Error ? err.message : String(err),
-        retry: fetchData,
       }
       setError(socErr)
-      setSurfaceStatus(SURFACE_ID, 'error')
     } finally {
       setLoading(false)
     }
@@ -292,21 +292,23 @@ export default function SlaWarRoomSurface() {
     fetchData()
   }, [fetchData])
 
+  const isFallback = error?.code === 'FALLBACK_MODE'
+
   // ── Loading ──
 
   if (loading) {
     return <SocLoadingState surfaceLabel={t('surfaces.slaWarRoom')} />
   }
 
-  // ── Error ──
+  // ── Error (only when NOT in fallback mode) ──
 
-  if (error) {
+  if (error && !isFallback) {
     return <SocErrorState error={error} />
   }
 
-  // ── Empty ──
+  // ── Empty (skip in fallback mode — show mock data) ──
 
-  if (!data || (data.breachTimers.length === 0 && data.activeSLAs.length === 0)) {
+  if (!isFallback && (!data || (data.breachTimers.length === 0 && data.activeSLAs.length === 0))) {
     return <SocEmptyState surfaceId={SURFACE_ID} />
   }
 
@@ -318,6 +320,11 @@ export default function SlaWarRoomSurface() {
       <div className="flex items-center gap-2">
         <Gauge className="h-5 w-5 text-chart-1" />
         <h2 className="text-lg font-semibold">{t('surfaces.slaWarRoom')}</h2>
+        {isFallback && (
+          <span className="ml-auto text-[10px] font-medium px-2 py-0.5 rounded bg-warning/10 text-warning border border-warning/20">
+            Fallback Mode
+          </span>
+        )}
       </div>
 
       {/* Active SLA Timers */}

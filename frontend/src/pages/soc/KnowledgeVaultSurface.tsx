@@ -235,13 +235,13 @@ export default function KnowledgeVaultSurface() {
       setData(view)
       setSurfaceStatus(SURFACE_ID, 'ready')
     } catch (err: unknown) {
+      // Fallback: use mock data when backend is unavailable
+      setSurfaceStatus(SURFACE_ID, 'ready')
       const socErr: SocError = {
-        code: err instanceof Error && 'code' in err ? (err as { code: string }).code : 'UNKNOWN_ERROR',
+        code: 'FALLBACK_MODE',
         message: err instanceof Error ? err.message : String(err),
-        retry: fetchData,
       }
       setError(socErr)
-      setSurfaceStatus(SURFACE_ID, 'error')
     } finally {
       setLoading(false)
     }
@@ -274,6 +274,8 @@ export default function KnowledgeVaultSurface() {
     return [...result].sort((a, b) => b.relevance - a.relevance)
   }, [articles, activeCategory, searchQuery])
 
+  const isFallback = error?.code === 'FALLBACK_MODE'
+
   const hasActiveFilters = activeCategory !== null || searchQuery.trim() !== ''
 
   const clearFilters = () => {
@@ -287,15 +289,15 @@ export default function KnowledgeVaultSurface() {
     return <SocLoadingState surfaceLabel={t('surfaces.knowledgeVault')} />
   }
 
-  // ── Error ──
+  // ── Error (only when NOT in fallback mode) ──
 
-  if (error) {
+  if (error && !isFallback) {
     return <SocErrorState error={error} />
   }
 
-  // ── Empty ──
+  // ── Empty (skip in fallback mode — show mock data) ──
 
-  if (!data || (data.articles.length === 0 && articles.length === 0)) {
+  if (!isFallback && (!data || (data.articles.length === 0 && articles.length === 0))) {
     return <SocEmptyState surfaceId={SURFACE_ID} />
   }
 
@@ -310,6 +312,11 @@ export default function KnowledgeVaultSurface() {
         <span className="text-xs text-muted-foreground">
           ({articles.length} {t('knowledge.articles')})
         </span>
+        {isFallback && (
+          <span className="ml-auto text-[10px] font-medium px-2 py-0.5 rounded bg-warning/10 text-warning border border-warning/20">
+            Fallback Mode
+          </span>
+        )}
       </div>
 
       {/* Search bar */}

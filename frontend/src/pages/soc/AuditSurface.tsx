@@ -15,7 +15,7 @@ import { SOC_ENDPOINTS } from '../../services/soc/endpoints'
 import { normalizeAudit } from '../../services/soc/normalize/audit'
 import type { AuditView } from '../../services/soc/normalize/audit'
 import { SocLoadingState, SocEmptyState, SocErrorState } from '../../components/soc'
-import { t } from '../../content/socCopy'
+import { applyNeutralCopy, t } from '../../content/socCopy'
 import { cn } from '../../lib/utils'
 import {
   ScrollText,
@@ -148,7 +148,7 @@ function AuditEventRow({ event }: { event: MockAuditEvent }) {
             </span>
             <span className="text-[10px] text-muted-foreground">{formatTimestamp(event.timestamp)}</span>
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5 truncate">{event.target}</p>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">{applyNeutralCopy(event.target)}</p>
         </div>
 
         {hasDetails && (
