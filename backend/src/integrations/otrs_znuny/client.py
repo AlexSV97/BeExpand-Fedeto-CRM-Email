@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 import httpx
 
-from src.domain.ticketing import Queue, SLA, Ticket
+from src.domain.ticketing import Article, ArticleDraft, Queue, SLA, Ticket, TicketCreateRequest, TicketUpdateRequest
 from src.integrations.otrs_znuny.settings import OtrsZnunySettings
 
 
@@ -46,9 +46,15 @@ class OtrsZnunyClient:
         if not self._settings.is_configured:
             raise OtrsZnunyConfigurationError("OTRS/Znuny integration is not configured")
 
-    async def _request(self, method: str, path: str, params: dict[str, str | int] | None = None) -> dict | list:
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        params: dict[str, str | int] | None = None,
+        json: dict | list | None = None,
+    ) -> dict | list:
         self._ensure_configured()
-        response = await self._client.request(method, path, params=params)
+        response = await self._client.request(method, path, params=params, json=json)
         if response.status_code >= 400:
             raise OtrsZnunyError(f"OTRS/Znuny API error {response.status_code}: {response.text}")
         if not response.content:
@@ -104,3 +110,48 @@ class OtrsZnunyClient:
     async def list_slas(self) -> list[SLA]:
         payload = await self._request("GET", self._settings.slas_path())
         return [SLA.model_validate(item) for item in self._unwrap_collection(payload, "slas")]
+
+    async def create_ticket(self, request: TicketCreateRequest) -> Ticket:
+        payload = await self._request(
+            "POST",
+            self._settings.tickets_path(),
+            json=request.model_dump(mode="json", exclude_none=True),
+        )
+        ticket = self._unwrap_single(payload, "ticket")
+        return Ticket.model_validate(ticket)
+
+    async def add_article(self, ticket_id: str, article: ArticleDraft) -> Article:
+        payload = await self._request(
+            "POST",
+            self._settings.ticket_articles_path(ticket_id),
+            json=article.model_dump(mode="json", exclude_none=True),
+        )
+        article_payload = self._unwrap_single(payload, "article")
+        return Article.model_validate(article_payload)
+
+    async def update_ticket(
+        self,
+        ticket_id: str,
+        *,
+        state: str | None = None,
+        priority: str | None = None,
+        owner: str | None = None,
+        assigned_to: str | None = None,
+        queue: Queue | None = None,
+        metadata: dict | None = None,
+    ) -> Ticket:
+        request = TicketUpdateRequest(
+            state=state,
+            priority=priority,
+            owner=owner,
+            assigned_to=assigned_to,
+            queue=queue,
+            metadata=metadata or {},
+        )
+        payload = await self._request(
+            "PATCH",
+            self._settings.ticket_update_path(ticket_id),
+            json=request.model_dump(mode="json", exclude_none=True),
+        )
+        ticket = self._unwrap_single(payload, "ticket")
+        return Ticket.model_validate(ticket)

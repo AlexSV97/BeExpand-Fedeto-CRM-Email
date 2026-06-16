@@ -8,9 +8,11 @@ from src.audit.models import AuditActorKind, AuditEvent, AuditOutcome
 from src.domain.ticketing import (
     ActorKind,
     Article,
+    ArticleDraft,
     ExternalRef,
     Queue,
     SLA,
+    TicketCreateRequest,
     Ticket,
     TicketPriority,
     TicketState,
@@ -192,6 +194,110 @@ async def test_otrs_connector_get_ticket_parses_single_ticket_payload():
     assert ticket.id == "TCK-9"
     assert ticket.sla.solution_time_minutes == 480
     assert ticket.articles[0].author_email == "agent@example.com"
+
+
+@pytest.mark.asyncio
+async def test_otrs_connector_create_ticket_posts_ticket_payload():
+    captured: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["method"] = request.method
+        captured["path"] = request.url.path
+        captured["json"] = request.content.decode()
+        return httpx.Response(201, json={"ticket": _ticket_payload("TCK-42")})
+
+    settings = OtrsZnunySettings(base_url="https://otrs.example.com", api_token="secret-token")
+    request = TicketCreateRequest(
+        subject="Email inbound",
+        queue=Queue(name="Support"),
+        customer_email="customer@example.com",
+        priority=TicketPriority.HIGH,
+        state=TicketState.OPEN,
+        articles=[
+            ArticleDraft(
+                author_kind=ActorKind.HUMAN,
+                author_name="Customer",
+                author_email="customer@example.com",
+                subject="Email inbound",
+                body_text="Help needed",
+            )
+        ],
+        metadata={"source": "email"},
+    )
+
+    async with OtrsZnunyClient(settings=settings, transport=httpx.MockTransport(handler)) as client:
+        ticket = await client.create_ticket(request)
+
+    assert captured["method"] == "POST"
+    assert captured["path"] == "/api/v1/tickets"
+    assert ticket.id == "TCK-42"
+    assert ticket.external_ref("otrs").external_id == "TCK-42"
+
+
+@pytest.mark.asyncio
+async def test_otrs_connector_add_article_posts_comment_payload():
+    captured: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["method"] = request.method
+        captured["path"] = request.url.path
+        captured["json"] = request.content.decode()
+        return httpx.Response(
+            201,
+            json={
+                "article": {
+                    "id": "a-99",
+                    "ticket_id": "TCK-9",
+                    "author_kind": "system",
+                    "author_name": "BeConnect AI",
+                    "subject": "Internal note",
+                    "body_text": "Watching this case.",
+                    "is_visible_to_customer": False,
+                }
+            },
+        )
+
+    settings = OtrsZnunySettings(base_url="https://otrs.example.com", api_token="secret-token")
+    comment = ArticleDraft(
+        author_kind=ActorKind.SYSTEM,
+        author_name="BeConnect AI",
+        subject="Internal note",
+        body_text="Watching this case.",
+        is_visible_to_customer=False,
+    )
+
+    async with OtrsZnunyClient(settings=settings, transport=httpx.MockTransport(handler)) as client:
+        article = await client.add_article("TCK-9", comment)
+
+    assert captured["method"] == "POST"
+    assert captured["path"] == "/api/v1/tickets/TCK-9/articles"
+    assert article.id == "a-99"
+    assert article.is_visible_to_customer is False
+
+
+@pytest.mark.asyncio
+async def test_otrs_connector_update_ticket_patches_priority_and_state():
+    captured: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["method"] = request.method
+        captured["path"] = request.url.path
+        captured["json"] = request.content.decode()
+        return httpx.Response(200, json={"ticket": _ticket_payload("TCK-7")})
+
+    settings = OtrsZnunySettings(base_url="https://otrs.example.com", api_token="secret-token")
+
+    async with OtrsZnunyClient(settings=settings, transport=httpx.MockTransport(handler)) as client:
+        ticket = await client.update_ticket(
+            "TCK-7",
+            priority=TicketPriority.URGENT,
+            state=TicketState.PENDING,
+        )
+
+    assert captured["method"] == "PATCH"
+    assert captured["path"] == "/api/v1/tickets/TCK-7"
+    assert ticket.id == "TCK-7"
+    assert ticket.priority is TicketPriority.NORMAL
 
 
 def test_audit_event_identifies_human_actor():

@@ -6,13 +6,13 @@ Incluye autenticación JWT (get_current_user) y utilidades de paginación.
 
 from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import get_settings
 from src.db.models import User
 from src.db.session import get_db
+from src.utils.jwt import JWTError, decode
 
 # Bearer token extraído automáticamente del header Authorization
 security = HTTPBearer(auto_error=False)
@@ -38,7 +38,7 @@ async def get_current_user(
 
     settings = get_settings()
     try:
-        payload = jwt.decode(
+        payload = decode(
             credentials.credentials,
             settings.secret_key,
             algorithms=[settings.algorithm],

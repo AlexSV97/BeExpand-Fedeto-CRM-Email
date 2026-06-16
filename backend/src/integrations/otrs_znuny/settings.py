@@ -46,6 +46,12 @@ class OtrsZnunySettings(BaseSettings):
     def ticket_path(self, ticket_id: str) -> str:
         return f"{self.tickets_path().rstrip('/')}/{ticket_id}"
 
+    def ticket_articles_path(self, ticket_id: str) -> str:
+        return f"{self.ticket_path(ticket_id).rstrip('/')}/articles"
+
+    def ticket_update_path(self, ticket_id: str) -> str:
+        return self.ticket_path(ticket_id)
+
     def queues_path(self) -> str:
         return self._join_path("/queues")
 

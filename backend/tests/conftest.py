@@ -10,7 +10,7 @@ Provides:
 
 import pytest
 from httpx import AsyncClient, ASGITransport
-from passlib.hash import bcrypt
+from src.utils.passwords import hash_password
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -59,7 +59,7 @@ async def client():
         admin = User(
             id="admin-uuid-1",
             username="admin",
-            hashed_password=bcrypt.hash("admin123"),
+            hashed_password=hash_password("admin123"),
             role="admin",
             active=True,
         )
@@ -106,7 +106,7 @@ async def inactive_user():
         user = User(
             id="inactive-uuid-1",
             username="inactive_user",
-            hashed_password=bcrypt.hash("inactive123"),
+            hashed_password=hash_password("inactive123"),
             role="viewer",
             active=False,
         )

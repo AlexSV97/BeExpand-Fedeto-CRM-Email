@@ -6,6 +6,8 @@ from . import contacts
 from . import crm
 from . import dashboard
 from . import emails
+from . import queues
 from . import opportunities
 from . import invoices
 from . import settings
+from . import tickets

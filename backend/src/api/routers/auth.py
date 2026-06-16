@@ -9,14 +9,14 @@ Endpoints:
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from jose import jwt
-from passlib.hash import bcrypt
+from src.utils.passwords import verify_password
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import get_settings
 from src.db.models import User
 from src.db.session import get_db
+from src.utils.jwt import encode
 
 from src.api.deps import get_current_user
 from src.api.schemas import LoginRequest, TokenResponse, UserResponse
@@ -39,7 +39,7 @@ async def login(
     user = result.scalar_one_or_none()
 
     # Validar existencia y contraseña
-    if user is None or not bcrypt.verify(body.password, user.hashed_password):
+    if user is None or not verify_password(body.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
@@ -62,7 +62,7 @@ async def login(
         "iat": now,
         "exp": expire,
     }
-    token = jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
+    token = encode(payload, settings.secret_key, algorithm=settings.algorithm)
 
     # Actualizar last_login
     user.last_login = now

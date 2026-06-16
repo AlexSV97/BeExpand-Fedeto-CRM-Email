@@ -10,7 +10,7 @@ yet. They WILL fail until the routers are implemented (RED → GREEN).
 
 import pytest
 from httpx import AsyncClient, ASGITransport
-from passlib.hash import bcrypt
+from src.utils.passwords import hash_password
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -55,7 +55,7 @@ async def client():
         admin = User(
             id="admin-uuid-1",
             username="admin",
-            hashed_password=bcrypt.hash("admin123"),
+            hashed_password=hash_password("admin123"),
             role="admin",
             active=True,
         )

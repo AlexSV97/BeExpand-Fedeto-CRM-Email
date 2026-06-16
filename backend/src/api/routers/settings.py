@@ -22,7 +22,7 @@ from typing import Optional
 
 import imaplib
 from fastapi import APIRouter, Depends, HTTPException, status
-from passlib.hash import bcrypt
+from src.utils.passwords import hash_password, verify_password
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -424,7 +424,7 @@ async def change_password(
     db: AsyncSession = Depends(get_db),
 ):
     """Cambia la contrasena del usuario autenticado."""
-    if not bcrypt.verify(body.current_password, current_user.hashed_password):
+    if not verify_password(body.current_password, current_user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="La contrasena actual no es correcta",
@@ -436,7 +436,7 @@ async def change_password(
             detail="La nueva contrasena debe tener al menos 6 caracteres",
         )
 
-    current_user.hashed_password = bcrypt.hash(body.new_password)
+    current_user.hashed_password = hash_password(body.new_password)
     await db.flush()
     await db.commit()
 

@@ -89,6 +89,65 @@ class Article(BaseModel):
         return next((ref for ref in self.external_refs if ref.matches(system, entity_type)), None)
 
 
+class ArticleDraft(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    author_kind: ActorKind = ActorKind.SYSTEM
+    author_name: str
+    author_email: str | None = None
+    subject: str | None = None
+    body_text: str | None = None
+    body_html: str | None = None
+    is_visible_to_customer: bool = True
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class TicketCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    subject: str
+    queue: Queue
+    state: TicketState = TicketState.NEW
+    priority: TicketPriority = TicketPriority.NORMAL
+    customer_email: str | None = None
+    owner: str | None = None
+    assigned_to: str | None = None
+    sla: SLA | None = None
+    articles: list[ArticleDraft] = Field(default_factory=list)
+    external_refs: list[ExternalRef] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class TicketUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    state: TicketState | None = None
+    priority: TicketPriority | None = None
+    owner: str | None = None
+    assigned_to: str | None = None
+    queue: Queue | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class TicketIngestionInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    subject: str
+    body_text: str
+    sender_name: str
+    sender_email: str
+    body_html: str | None = None
+    recipients: list[str] = Field(default_factory=list)
+    message_id: str | None = None
+    received_at: datetime | None = None
+    queue: Queue | None = None
+    priority: TicketPriority = TicketPriority.NORMAL
+    state: TicketState = TicketState.NEW
+    comment_text: str | None = None
+    comment_visible_to_customer: bool = False
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 class Ticket(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

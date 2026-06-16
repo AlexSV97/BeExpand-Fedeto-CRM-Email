@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from passlib.hash import bcrypt
+from src.utils.passwords import hash_password
 from sqlalchemy import select
 
 from src.api.routers import (
@@ -27,7 +27,9 @@ from src.api.routers import (
     emails,
     invoices,
     opportunities,
+    queues,
     settings,
+    tickets,
 )
 from src.config import get_settings
 from src.db.models import ReprocessTask, User
@@ -82,7 +84,7 @@ async def seed_admin():
         if result.scalar_one_or_none() is None:
             user = User(
                 username=settings.admin_username,
-                hashed_password=bcrypt.hash(settings.admin_password),
+                hashed_password=hash_password(settings.admin_password),
                 role="admin",
                 active=True,
                 full_name="Administrador",
@@ -167,6 +169,8 @@ app.include_router(dashboard.router, prefix="/api/v1/dashboard")
 app.include_router(invoices.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
 app.include_router(settings.router, prefix="/api/v1")
+app.include_router(queues.router, prefix="/api/v1")
+app.include_router(tickets.router, prefix="/api/v1")
 
 # CORS: en Docker localhost:5173, en Render la URL del frontend
 _cors_origins = [
