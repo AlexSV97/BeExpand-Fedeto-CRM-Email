@@ -50,6 +50,7 @@ Thumbs.db
 
 # Agent planning files
 .sisyphus/
+.atl/
 
 # Screenshots
 Captura de pantalla*.jpeg
