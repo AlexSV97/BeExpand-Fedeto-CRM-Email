@@ -46,6 +46,43 @@ class LLMClient:
 
         self.timeout = timeout or settings.openrouter_timeout or 120
 
+    async def generate_embedding(self, text: str) -> list[float]:
+        """Generate an embedding vector for the given text using OpenRouter.
+
+        Uses text-embedding-3-small (OpenAI-compatible via OpenRouter).
+        Falls back to a zero vector if the API call fails.
+        """
+        headers = {
+            "Authorization": f"Bearer {self._settings.openrouter_api_key}",
+            "Content-Type": "application/json",
+        }
+
+        payload = {
+            "model": "text-embedding-3-small",
+            "input": text,
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.post(
+                    f"{self._settings.openrouter_base_url}/embeddings",
+                    headers=headers,
+                    json=payload,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    return data["data"][0]["embedding"]
+                else:
+                    logger.warning(
+                        "Embedding API returned %d: %s",
+                        resp.status_code,
+                        resp.text[:200],
+                    )
+                    return [0.0] * 768
+        except Exception:
+            logger.exception("Embedding generation failed, returning zero vector")
+            return [0.0] * 768  # zero vector = no semantic match
+
     # ── API Pública ──────────────────────────────────────────────────────────
 
     async def generate(

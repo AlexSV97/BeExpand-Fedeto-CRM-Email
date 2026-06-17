@@ -73,13 +73,106 @@ def get_ticket_lifecycle(request: Request) -> TicketLifecycleService:
     return svc
 
 
-def get_knowledge_vault(request: Request) -> KnowledgeVaultService:
+async def get_knowledge_vault(request: Request) -> KnowledgeVaultService:
     svc = getattr(request.app.state, "knowledge_vault_service", None)
     if isinstance(svc, KnowledgeVaultService):
         return svc
-    svc = KnowledgeVaultService()
+
+    from src.llm_client import LLMClient
+    from src.services.vector_store import VectorStore
+
+    # Add seed documents if vault is empty
+    documents = _seed_knowledge_documents()
+    llm_client = LLMClient(use_chat_model=True)
+    vector_store = VectorStore()
+
+    svc = KnowledgeVaultService(
+        documents=documents,
+        vector_store=vector_store,
+        llm_client=llm_client,
+    )
+
+    # Pre-embed all documents for RAG search
+    await svc.embed_all_documents()
+
     request.app.state.knowledge_vault_service = svc
     return svc
+
+
+def _seed_knowledge_documents() -> list[KnowledgeDocument]:
+    """Return seed documents for the knowledge vault."""
+    from src.services.knowledge_vault import KnowledgeDocument
+
+    return [
+        KnowledgeDocument(
+            id="KB-001",
+            title="Password Reset Procedure",
+            body=(
+                "Step-by-step guide for resetting user passwords in the OTRS portal. "
+                "1. Verify user identity via security questions. "
+                "2. Generate temporary password. "
+                "3. Force password change on next login."
+            ),
+            document_type="case",
+            tags=["password", "security", "authentication"],
+        ),
+        KnowledgeDocument(
+            id="KB-002",
+            title="SLA Breach Response Runbook",
+            body=(
+                "Standard operating procedure for SLA breach notifications. "
+                "When SLA exceeds 90% of threshold, notify team lead. "
+                "At 100%, escalate to N2 immediately."
+            ),
+            document_type="runbook",
+            tags=["sla", "breach", "escalation", "urgent"],
+        ),
+        KnowledgeDocument(
+            id="KB-003",
+            title="VPN Access Troubleshooting",
+            body=(
+                "Common VPN connection issues and solutions. "
+                "Check client version, verify credentials, test network connectivity, "
+                "check firewall rules."
+            ),
+            document_type="faq",
+            tags=["vpn", "network", "connectivity"],
+        ),
+        KnowledgeDocument(
+            id="KB-004",
+            title="Email Classification Guidelines",
+            body=(
+                "Rules for classifying incoming emails: "
+                "SPAM (unsolicited bulk), PHISHING (suspicious links), "
+                "SUPPORT (service requests), BILLING (invoice queries)."
+            ),
+            document_type="case",
+            tags=["email", "classification", "security"],
+        ),
+        KnowledgeDocument(
+            id="KB-005",
+            title="Incident Response Plan",
+            body=(
+                "Tier 1: Acknowledge and categorize. "
+                "Tier 2: Investigate and contain. "
+                "Tier 3: Eradicate and recover. "
+                "Post-incident: Document lessons learned."
+            ),
+            document_type="runbook",
+            tags=["incident", "security", "response"],
+        ),
+        KnowledgeDocument(
+            id="KB-006",
+            title="New User Onboarding Checklist",
+            body=(
+                "Create account, assign mailbox, configure OTRS profile, "
+                "set up VPN access, schedule security training, "
+                "grant initial permissions."
+            ),
+            document_type="faq",
+            tags=["onboarding", "user", "setup"],
+        ),
+    ]
 
 
 def _get_agent_governance_service(request: Request) -> AgentGovernanceService:
@@ -778,12 +871,14 @@ async def get_knowledge_vault(
     current_user: User = Depends(get_current_user),
     vault: KnowledgeVaultService = Depends(get_knowledge_vault),
 ):
-    """Search the knowledge vault for articles."""
-    search_result = vault.search(KnowledgeSearchRequest(
-        query=search,
-        limit=limit,
-        document_type=category if category else None,
-    ))
+    """Search the knowledge vault using hybrid RAG (keyword + semantic)."""
+    search_result = await vault.search_rag(
+        KnowledgeSearchRequest(
+            query=search,
+            limit=limit,
+            document_type=category if category else None,
+        ),
+    )
 
     articles = [
         KnowledgeArticle(
@@ -798,13 +893,13 @@ async def get_knowledge_vault(
     ]
 
     categories = sorted(set(
-        item.document.document_type for item in vault.documents
+        item.document.document_type for item in vault._documents
     )) or ["case", "runbook", "faq"]
 
     search_suggestions = sorted(set(
         term for item in search_result.items
         for term in item.matched_terms
-    ))
+    )) if search else []
 
     return KnowledgeVaultResponse(
         articles=articles,

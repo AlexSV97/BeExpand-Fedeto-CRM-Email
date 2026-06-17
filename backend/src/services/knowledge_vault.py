@@ -7,6 +7,9 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.llm_client import LLMClient
+from src.services.vector_store import VectorStore
+
 
 _STOPWORDS = {
     "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
@@ -93,8 +96,16 @@ class _DocumentScore:
 
 
 class KnowledgeVaultService:
-    def __init__(self, documents: list[KnowledgeDocument] | None = None):
+    def __init__(
+        self,
+        documents: list[KnowledgeDocument] | None = None,
+        vector_store: VectorStore | None = None,
+        llm_client: LLMClient | None = None,
+    ):
         self._documents = documents or []
+        self._vector_store = vector_store or VectorStore()
+        self._llm_client = llm_client
+        self._embeddings_done = False
 
     @property
     def documents(self) -> list[KnowledgeDocument]:
@@ -102,6 +113,123 @@ class KnowledgeVaultService:
 
     def add_document(self, document: KnowledgeDocument) -> None:
         self._documents.append(document)
+
+    def add_document_with_embedding(self, document: KnowledgeDocument) -> None:
+        """Add a document and schedule embedding generation."""
+        self._documents.append(document)
+        # Embedding will be generated on next embed_all_documents() call
+        self._embeddings_done = False
+
+    async def embed_all_documents(self) -> int:
+        """Generate embeddings for all documents that don't have one yet."""
+        if not self._llm_client:
+            return 0
+
+        count = 0
+        for doc in self._documents:
+            if doc.id in self._vector_store._vectors:
+                continue  # Already indexed
+
+            text = f"{doc.title}\n{doc.body}"
+            embedding = await self._llm_client.generate_embedding(text)
+            self._vector_store.add(doc.id, embedding)
+            count += 1
+
+        self._embeddings_done = True
+        return count
+
+    async def search_rag(
+        self,
+        request: KnowledgeSearchRequest,
+        *,
+        semantic_weight: float = 0.7,
+        keyword_weight: float = 0.3,
+    ) -> KnowledgeSearchResponse:
+        """Hybrid search: keyword + semantic (embedding) with reranking.
+
+        Args:
+            semantic_weight: Weight for embedding-based similarity (0-1)
+            keyword_weight: Weight for keyword-based score (0-1)
+
+        Returns:
+            Reranked search results combining both signals.
+        """
+        if not self._llm_client or not request.query:
+            # Fall back to keyword-only search
+            return self.search(request)
+
+        # Ensure embeddings are generated
+        if not self._embeddings_done:
+            await self.embed_all_documents()
+
+        # 1. Get keyword results
+        keyword_results = self._rank_documents(request.query, request)
+        keyword_map = {r.document.id: r.score for r in keyword_results}
+
+        # 2. Get embedding
+        query_embedding = await self._llm_client.generate_embedding(request.query)
+
+        # 3. Get semantic results from vector store (only for indexed docs)
+        semantic_results = self._vector_store.search(
+            query_embedding,
+            limit=request.limit * 3,
+            threshold=0.1,
+        )
+        semantic_map = {doc_id: score for doc_id, score in semantic_results}
+
+        # 4. Hybrid reranking
+        all_ids = set(keyword_map.keys()) | set(semantic_map.keys())
+
+        # Normalize scores to 0-1 range for fair combination
+        kw_max = max(keyword_map.values()) if keyword_map else 1.0
+        sem_max = max(semantic_map.values()) if semantic_map else 1.0
+
+        combined: list[tuple[str, float, list[str]]] = []
+        doc_lookup = {d.id: d for d in self._documents}
+
+        for doc_id in all_ids:
+            doc = doc_lookup.get(doc_id)
+            if not doc:
+                continue
+
+            kw_score = keyword_map.get(doc_id, 0.0) / kw_max
+            sem_score = semantic_map.get(doc_id, 0.0) / sem_max if sem_max > 0 else 0.0
+
+            hybrid = (kw_score * keyword_weight) + (sem_score * semantic_weight)
+
+            # Find matched terms from keyword search
+            matched: list[str] = []
+            kw_result = next(
+                (r for r in keyword_results if r.document.id == doc_id), None
+            )
+            if kw_result:
+                matched = kw_result.matched_terms
+
+            combined.append((doc_id, hybrid, matched))
+
+        # 5. Sort by hybrid score
+        combined.sort(key=lambda x: (-x[1], x[0]))
+        top = combined[: request.limit]
+
+        # 6. Build response
+        doc_map = {d.id: d for d in self._documents}
+        items = []
+        for doc_id, score, matched in top:
+            doc = doc_map.get(doc_id)
+            if not doc:
+                continue
+            items.append(KnowledgeSearchResult(
+                document=doc,
+                score=round(score, 3),
+                matched_terms=matched,
+                explanation=(
+                    f"hybrid(keyword={keyword_weight},semantic={semantic_weight})"
+                ),
+            ))
+
+        return KnowledgeSearchResponse(
+            query=request.query, total=len(items), items=items
+        )
 
     def search(self, request: KnowledgeSearchRequest) -> KnowledgeSearchResponse:
         scored = self._rank_documents(request.query, request)
