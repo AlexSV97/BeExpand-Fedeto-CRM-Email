@@ -1,18 +1,19 @@
-/**
+﻿/**
  * SmartTicketQueueSurface — ticket queue / list view.
  *
  * Features a filter bar (status, priority, search), a ticket table,
  * pagination, and row-click navigation to the TicketCopilot surface.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSocShell } from '../../services/soc/SocShellProvider'
 import { SURFACE_IDS } from '../../services/soc/contracts'
 import type { SocError } from '../../services/soc/contracts'
-import { socFetch } from '../../services/soc/client'
 import { SOC_ENDPOINTS } from '../../services/soc/endpoints'
+import { useSocResource } from '../../services/soc/useSocResource'
 import { normalizeTicketQueue } from '../../services/soc/normalize/ticketQueue'
-import type { TicketQueueView, TicketItemView } from '../../services/soc/normalize/ticketQueue'
+import type { TicketItemView } from '../../services/soc/normalize/ticketQueue'
+import { MOCK_TICKET_QUEUE } from '../../services/soc/mockData'
 import { SocLoadingState, SocEmptyState, SocErrorState } from '../../components/soc'
 import { applyNeutralCopy, t } from '../../content/socCopy'
 import { cn } from '../../lib/utils'
@@ -27,6 +28,7 @@ import {
   Square,
   Filter,
   X,
+  AlertTriangle,
 } from 'lucide-react'
 
 // ─── Constants ───────────────────────────────────────────────────────────
@@ -132,12 +134,14 @@ function FilterChip({
 // ─── Main surface ─────────────────────────────────────────────────────────
 
 export default function SmartTicketQueueSurface() {
-  const { navigate, setSurfaceStatus } = useSocShell()
+  const { navigate } = useSocShell()
 
-  // Data
-  const [view, setView] = useState<TicketQueueView | null>(null)
-  const [error, setError] = useState<SocError | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { data: view, loading, error, source, refresh } = useSocResource(
+    SOC_ENDPOINTS[SURFACE_IDS.SMART_TICKET_QUEUE],
+    normalizeTicketQueue,
+    MOCK_TICKET_QUEUE,
+    SURFACE_ID,
+  )
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
@@ -148,42 +152,9 @@ export default function SmartTicketQueueSurface() {
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
-  // ── Fetch data ────────────────────────────────────────────────────
-
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    setSurfaceStatus(SURFACE_ID, 'loading')
-
-    try {
-      const raw = await socFetch<Record<string, unknown>>(SOC_ENDPOINTS[SURFACE_ID])
-      const normalized = normalizeTicketQueue(raw)
-      setView(normalized)
-      setSurfaceStatus(SURFACE_ID, 'ready')
-    } catch (err: unknown) {
-      const socErr: SocError = {
-        code:
-          err instanceof Error && 'code' in err
-            ? (err as { code: string }).code
-            : 'UNKNOWN_ERROR',
-        message: err instanceof Error ? err.message : String(err),
-        retry: fetchData,
-      }
-      setError(socErr)
-      setSurfaceStatus(SURFACE_ID, 'error')
-    } finally {
-      setLoading(false)
-    }
-  }, [setSurfaceStatus])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
-
   // ── Derived: filtered tickets ─────────────────────────────────────
 
   const filteredTickets = useMemo(() => {
-    if (!view) return []
     let tickets = view.tickets
 
     if (statusFilter) {
@@ -264,23 +235,30 @@ export default function SmartTicketQueueSurface() {
   // ── Error ─────────────────────────────────────────────────────────
 
   if (error) {
-    return <SocErrorState error={error} />
+    const socErr: SocError = { code: 'FETCH_ERROR', message: error, retry: refresh }
+    return <SocErrorState error={socErr} />
   }
 
   // ── Main content ──────────────────────────────────────────────────
 
   return (
     <div className="space-y-4">
+      {/* Demo badge when source is mock */}
+      {source === 'mock' && (
+        <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-warning/10 border border-warning/20 text-warning text-xs font-medium">
+          <AlertTriangle className="h-3.5 w-3.5" />
+          {"Demo mode — data shown from local cache"}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Ticket className="h-5 w-5 text-chart-1" />
           <h2 className="text-lg font-semibold">{t('surfaces.smartTicketQueue')}</h2>
-          {view && (
-            <span className="text-xs text-muted-foreground">
-              ({view.total} {t('ticket.total')})
-            </span>
-          )}
+          <span className="text-xs text-muted-foreground">
+            ({view.total} {t('ticket.total')})
+          </span>
         </div>
       </div>
 
@@ -374,11 +352,7 @@ export default function SmartTicketQueueSurface() {
           <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
             {/* Column headers */}
             <div className="hidden md:flex items-center gap-3 px-4 py-3 text-[10px] font-medium text-muted-foreground uppercase tracking-wider border-b border-border/20 bg-muted/30">
-              {/* Checkbox */}
-              <button
-                onClick={handleSelectAll}
-                className="shrink-0 cursor-pointer"
-              >
+              <button onClick={handleSelectAll} className="shrink-0 cursor-pointer">
                 {selectedIds.size === paginatedTickets.length ? (
                   <CheckSquare className="h-3.5 w-3.5 text-primary" />
                 ) : (
@@ -405,12 +379,8 @@ export default function SmartTicketQueueSurface() {
                     selectedIds.has(ticket.id) && 'bg-chart-1/5',
                   )}
                 >
-                  {/* Checkbox (click won't navigate) */}
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleSelectOne(ticket.id)
-                    }}
+                    onClick={(e) => { e.stopPropagation(); handleSelectOne(ticket.id) }}
                     className="shrink-0 hidden md:block cursor-pointer"
                   >
                     {selectedIds.has(ticket.id) ? (
@@ -420,7 +390,6 @@ export default function SmartTicketQueueSurface() {
                     )}
                   </button>
 
-                  {/* Mobile layout */}
                   <div className="flex md:hidden items-center gap-2 w-full">
                     <span className="font-mono text-xs font-medium text-foreground">{ticket.id}</span>
                     <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded border', statusBadgeClass(ticket.status))}>
@@ -431,12 +400,10 @@ export default function SmartTicketQueueSurface() {
                     </span>
                   </div>
 
-                  {/* Subject */}
                   <span className="flex-1 text-sm text-foreground truncate md:ml-0">
                     {applyNeutralCopy(ticket.subject)}
                   </span>
 
-                  {/* Desktop badges */}
                   <span className={cn(
                     'hidden md:inline-flex text-[10px] font-medium px-2 py-0.5 rounded border w-24 shrink-0 text-center justify-center',
                     statusBadgeClass(ticket.status),
@@ -450,12 +417,10 @@ export default function SmartTicketQueueSurface() {
                     {priorityLabel(ticket.priority)}
                   </span>
 
-                  {/* Assignee */}
                   <span className="hidden md:block text-xs text-muted-foreground w-28 shrink-0 truncate">
                     {ticket.assignee ?? '—'}
                   </span>
 
-                  {/* Updated */}
                   <span className="hidden md:block text-xs text-muted-foreground w-28 shrink-0 text-right">
                     {formatTimeAgo(ticket.updatedAt)}
                   </span>
@@ -475,22 +440,15 @@ export default function SmartTicketQueueSurface() {
             </span>
 
             <div className="flex items-center gap-1">
-              <button
-                onClick={() => setCurrentPage(1)}
-                disabled={safePage === 1}
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-              >
+              <button onClick={() => setCurrentPage(1)} disabled={safePage === 1}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer">
                 <ChevronsLeft className="h-3.5 w-3.5" />
               </button>
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={safePage === 1}
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-              >
+              <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={safePage === 1}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer">
                 <ChevronLeft className="h-3.5 w-3.5" />
               </button>
 
-              {/* Page numbers */}
               <div className="flex items-center gap-1 mx-1">
                 {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
                   let pageNum: number
@@ -504,34 +462,25 @@ export default function SmartTicketQueueSurface() {
                     pageNum = safePage - 3 + i
                   }
                   return (
-                    <button
-                      key={pageNum}
-                      onClick={() => setCurrentPage(pageNum)}
+                    <button key={pageNum} onClick={() => setCurrentPage(pageNum)}
                       className={cn(
                         'min-w-[28px] h-7 text-xs font-medium rounded-lg transition-colors cursor-pointer',
                         pageNum === safePage
                           ? 'bg-primary text-primary-foreground'
                           : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-                      )}
-                    >
+                      )}>
                       {pageNum}
                     </button>
                   )
                 })}
               </div>
 
-              <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={safePage === totalPages}
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-              >
+              <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer">
                 <ChevronRight className="h-3.5 w-3.5" />
               </button>
-              <button
-                onClick={() => setCurrentPage(totalPages)}
-                disabled={safePage === totalPages}
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-              >
+              <button onClick={() => setCurrentPage(totalPages)} disabled={safePage === totalPages}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer">
                 <ChevronsRight className="h-3.5 w-3.5" />
               </button>
             </div>
@@ -541,3 +490,4 @@ export default function SmartTicketQueueSurface() {
     </div>
   )
 }
+

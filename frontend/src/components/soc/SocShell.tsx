@@ -46,7 +46,7 @@ export default function SocShell() {
   // Sync browser back/forward with surface navigation
   useHistorySync()
 
-  const { activeSurfaceId, navigate, featureEnabled } = useSocShell()
+  const { activeSurfaceId, navigate, featureEnabled, dataSource } = useSocShell()
 
   // Safety guard — if the flag somehow flips off while mounted, render nothing
   if (!featureEnabled) return null
@@ -81,6 +81,11 @@ export default function SocShell() {
               <span className="font-semibold text-lg tracking-tight font-display text-foreground">
                 {t('Aiuken SOC')}
               </span>
+              {dataSource[activeSurfaceId] !== 'backend' && (
+                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20 leading-none">
+                  Demo Data
+                </span>
+              )}
             </motion.div>
           </div>
 

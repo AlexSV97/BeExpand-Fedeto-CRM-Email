@@ -1,4 +1,4 @@
-/**
+﻿/**
  * AgentGovernanceSurface — agent roster and governance dashboard.
  *
  * Shows an agent table with status, role, queue, tickets handled,
@@ -6,14 +6,14 @@
  * controls, and a top-level compliance summary bar.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useSocShell } from '../../services/soc/SocShellProvider'
+import { useState, useMemo } from 'react'
 import { SURFACE_IDS } from '../../services/soc/contracts'
 import type { SocError } from '../../services/soc/contracts'
-import { socFetch } from '../../services/soc/client'
 import { SOC_ENDPOINTS } from '../../services/soc/endpoints'
+import { useSocResource } from '../../services/soc/useSocResource'
 import { normalizeAgentGovernance } from '../../services/soc/normalize/agentGovernance'
-import type { AgentGovernanceView } from '../../services/soc/normalize/agentGovernance'
+import { MOCK_AGENT_GOVERNANCE, MOCK_AGENTS_DATA } from '../../services/soc/mockData'
+import type { AgentRowData } from '../../services/soc/mockData'
 import { SocLoadingState, SocEmptyState, SocErrorState } from '../../components/soc'
 import { t } from '../../content/socCopy'
 import { cn } from '../../lib/utils'
@@ -31,30 +31,6 @@ import {
 const SURFACE_ID = SURFACE_IDS.AGENT_GOVERNANCE
 
 const ROLES = ['all', 'senior', 'junior', 'supervisor'] as const
-
-// ─── Mock data ────────────────────────────────────────────────────────────
-
-interface AgentRowData {
-  id: string
-  name: string
-  role: string
-  status: string
-  queue: string
-  ticketsToday: number
-  complianceScore: number
-  lastActive: string
-}
-
-const MOCK_AGENTS: AgentRowData[] = [
-  { id: 'ag-1', name: 'Ana López', role: 'senior', status: 'online', queue: 'Network', ticketsToday: 12, complianceScore: 94, lastActive: '2026-06-17T09:15:00Z' },
-  { id: 'ag-2', name: 'Carlos Ruiz', role: 'senior', status: 'busy', queue: 'Security', ticketsToday: 8, complianceScore: 88, lastActive: '2026-06-17T09:30:00Z' },
-  { id: 'ag-3', name: 'Miguel Torres', role: 'junior', status: 'online', queue: 'Network', ticketsToday: 15, complianceScore: 76, lastActive: '2026-06-17T09:20:00Z' },
-  { id: 'ag-4', name: 'Laura García', role: 'junior', status: 'idle', queue: 'Applications', ticketsToday: 6, complianceScore: 92, lastActive: '2026-06-17T08:45:00Z' },
-  { id: 'ag-5', name: 'Pedro Martínez', role: 'supervisor', status: 'online', queue: '—', ticketsToday: 3, complianceScore: 100, lastActive: '2026-06-17T09:28:00Z' },
-  { id: 'ag-6', name: 'Sofía Ramírez', role: 'senior', status: 'offline', queue: 'Infrastructure', ticketsToday: 0, complianceScore: 91, lastActive: '2026-06-16T18:00:00Z' },
-  { id: 'ag-7', name: 'Diego Fernández', role: 'junior', status: 'busy', queue: 'Security', ticketsToday: 10, complianceScore: 71, lastActive: '2026-06-17T09:25:00Z' },
-  { id: 'ag-8', name: 'Valentina Ortiz', role: 'junior', status: 'online', queue: 'Applications', ticketsToday: 9, complianceScore: 83, lastActive: '2026-06-17T09:22:00Z' },
-]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -151,44 +127,18 @@ function OverrideMenu({ agentId }: { agentId: string }) {
 // ─── Main surface ─────────────────────────────────────────────────────────
 
 export default function AgentGovernanceSurface() {
-  const { setSurfaceStatus } = useSocShell()
-  const [data, setData] = useState<AgentGovernanceView | null>(null)
-  const [error, setError] = useState<SocError | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { data, loading, error, source, refresh } = useSocResource(
+    SOC_ENDPOINTS[SURFACE_IDS.AGENT_GOVERNANCE],
+    normalizeAgentGovernance,
+    MOCK_AGENT_GOVERNANCE,
+    SURFACE_ID,
+  )
 
   // UI state
   const [roleFilter, setRoleFilter] = useState<string>('all')
-  const [agents] = useState<AgentRowData[]>(MOCK_AGENTS)
-
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    setSurfaceStatus(SURFACE_ID, 'loading')
-
-    try {
-      const raw = await socFetch<Record<string, unknown>>(SOC_ENDPOINTS[SURFACE_ID])
-      const view = normalizeAgentGovernance(raw)
-      setData(view)
-      setSurfaceStatus(SURFACE_ID, 'ready')
-    } catch (err: unknown) {
-      const socErr: SocError = {
-        code: err instanceof Error && 'code' in err ? (err as { code: string }).code : 'UNKNOWN_ERROR',
-        message: err instanceof Error ? err.message : String(err),
-        retry: fetchData,
-      }
-      setError(socErr)
-      setSurfaceStatus(SURFACE_ID, 'error')
-    } finally {
-      setLoading(false)
-    }
-  }, [setSurfaceStatus])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
+  const [agents] = useState<AgentRowData[]>(MOCK_AGENTS_DATA)
 
   // ── Derived ──
-
   const filteredAgents = useMemo(() => {
     if (roleFilter === 'all') return agents
     return agents.filter((a) => a.role === roleFilter)
@@ -204,35 +154,40 @@ export default function AgentGovernanceSurface() {
     return agents.filter((a) => a.complianceScore < 80).length
   }, [agents])
 
-  // ── Loading ──
+  const isDemo = source === 'mock'
 
+  // ── Loading ──
   if (loading) {
     return <SocLoadingState surfaceLabel={t('surfaces.agentGovernance')} />
   }
 
   // ── Error ──
-
   if (error) {
-    return <SocErrorState error={error} />
+    const socErr: SocError = { code: 'FETCH_ERROR', message: error, retry: refresh }
+    return <SocErrorState error={socErr} />
   }
 
-  // ── Empty ──
-
-  if (!data || (data.agents.length === 0 && agents.length === 0)) {
+  // ── Empty (only when source is backend and data is empty) ──
+  if (source === 'backend' && data.agents.length === 0 && agents.length === 0) {
     return <SocEmptyState surfaceId={SURFACE_ID} />
   }
 
   // ── Content ──
-
   return (
     <div className="space-y-4">
-      {/* Header */}
+      {/* Header + demo badge */}
       <div className="flex items-center gap-2">
         <Users className="h-5 w-5 text-chart-3" />
         <h2 className="text-lg font-semibold">{t('surfaces.agentGovernance')}</h2>
         <span className="text-xs text-muted-foreground">
           ({agents.length} {t('agent.agents')})
         </span>
+        {isDemo && (
+          <div className="ml-auto flex items-center gap-2 px-3 py-1 rounded-lg bg-warning/10 border border-warning/20 text-warning text-xs font-medium">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            {"Demo"}
+          </div>
+        )}
       </div>
 
       {/* Compliance summary bar */}
@@ -295,7 +250,6 @@ export default function AgentGovernanceSurface() {
         </div>
       ) : (
         <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
-          {/* Column headers */}
           <div className="hidden md:flex items-center gap-3 px-4 py-3 text-[10px] font-medium text-muted-foreground uppercase tracking-wider border-b border-border/20 bg-muted/30">
             <span className="flex-1">{t('agent.name')}</span>
             <span className="w-20 text-center">{t('agent.roleCol')}</span>
@@ -307,14 +261,9 @@ export default function AgentGovernanceSurface() {
             <span className="w-10" />
           </div>
 
-          {/* Rows */}
           <div className="divide-y divide-border/30">
             {filteredAgents.map((agent) => (
-              <div
-                key={agent.id}
-                className="flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-3 px-4 py-3 hover:bg-muted/50 transition-colors"
-              >
-                {/* Mobile header row */}
+              <div key={agent.id} className="flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-3 px-4 py-3 hover:bg-muted/50 transition-colors">
                 <div className="flex md:hidden items-center gap-2 w-full">
                   <div className={cn('w-2 h-2 rounded-full', statusDotColor(agent.status))} />
                   <span className="text-sm font-medium text-foreground">{agent.name}</span>
@@ -323,46 +272,35 @@ export default function AgentGovernanceSurface() {
                   </span>
                 </div>
 
-                {/* Name */}
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <div className={cn('w-2 h-2 rounded-full shrink-0 hidden md:block', statusDotColor(agent.status))} />
                   <span className="text-sm font-medium text-foreground truncate">{agent.name}</span>
                 </div>
 
-                {/* Role */}
                 <span className="text-xs text-muted-foreground w-20 shrink-0 text-center">
                   {roleLabel(agent.role)}
                 </span>
 
-                {/* Status */}
                 <span className="text-[10px] font-medium px-2 py-0.5 rounded border w-20 shrink-0 text-center hidden md:block bg-muted/50 text-muted-foreground border-border/50">
                   {statusLabel(agent.status)}
                 </span>
 
-                {/* Queue */}
                 <span className="text-xs text-muted-foreground w-24 shrink-0 text-center truncate">
                   {agent.queue}
                 </span>
 
-                {/* Tickets today */}
                 <span className="text-xs text-foreground font-medium w-24 shrink-0 text-center">
                   {agent.ticketsToday}
                 </span>
 
-                {/* Compliance */}
-                <span className={cn(
-                  'text-xs font-medium w-20 shrink-0 text-center',
-                  complianceColor(agent.complianceScore),
-                )}>
+                <span className={cn('text-xs font-medium w-20 shrink-0 text-center', complianceColor(agent.complianceScore))}>
                   {agent.complianceScore}%
                 </span>
 
-                {/* Last active */}
                 <span className="text-xs text-muted-foreground w-28 shrink-0 truncate">
                   {formatTimeAgo(agent.lastActive)}
                 </span>
 
-                {/* Override menu */}
                 <div className="shrink-0">
                   <OverrideMenu agentId={agent.id} />
                 </div>
@@ -374,3 +312,4 @@ export default function AgentGovernanceSurface() {
     </div>
   )
 }
+

@@ -12,23 +12,27 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_current_user
+from src.audit.models import AuditActorKind, AuditEvent, AuditOutcome
 from src.db.models import OperationalRecord, User
 from src.db.session import get_db
 from src.domain.ticketing import Queue, SLA, Ticket, TicketPriority, TicketState
 from src.services.agent_governance import (
+    AgentApprovalRequest,
     AgentGovernanceService,
     AgentRecommendationRequest,
+    ApprovalDecision,
 )
 from src.services.knowledge_vault import (
     KnowledgeSearchRequest,
     KnowledgeVaultService,
 )
 from src.services.queue_strategy import (
+    QueueDecisionRequest,
     QueueStrategyService,
     QueueTier,
 )
@@ -40,8 +44,13 @@ from src.services.reporting import (
 from src.services.ticket_lifecycle import (
     TicketLifecycleService,
 )
+from src.api.middleware.rate_limit import RateLimiter
+from src.api.middleware.error_handler import soc_error_handler
 
 router = APIRouter(tags=["soc"])
+
+# Register safe error handler for all SOC endpoints
+router.exception_handler(Exception)(soc_error_handler)
 
 
 # ---------------------------------------------------------------------------
@@ -353,6 +362,100 @@ class ConfigurationResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Action endpoint models (Ticket Copilot)
+# ---------------------------------------------------------------------------
+
+
+class ReclassifyRequest(BaseModel):
+    priority: str | None = None
+    queue_slug: str | None = None
+    reason: str = ""
+
+    @field_validator('priority')
+    @classmethod
+    def validate_priority(cls, v):
+        if v is not None and v not in ('low', 'normal', 'high', 'urgent'):
+            raise ValueError('priority must be one of: low, normal, high, urgent')
+        return v
+
+    @field_validator('queue_slug')
+    @classmethod
+    def validate_queue_slug(cls, v):
+        if v is not None and not v.replace('-', '').isalnum():
+            raise ValueError('queue_slug must be alphanumeric with hyphens only')
+        return v
+
+    @field_validator('reason')
+    @classmethod
+    def validate_reason_length(cls, v):
+        if len(v) > 500:
+            raise ValueError('reason must not exceed 500 characters')
+        return v
+
+
+class ReclassifyResponse(BaseModel):
+    ticket_id: str
+    new_priority: str | None
+    new_queue: str | None
+    status: str = "reclassified"
+
+
+class EscalateRequest(BaseModel):
+    reason: str
+    target_tier: str | None = None
+
+    @field_validator('reason')
+    @classmethod
+    def validate_reason(cls, v):
+        if not v or not v.strip():
+            raise ValueError('reason must not be empty')
+        if len(v) > 500:
+            raise ValueError('reason must not exceed 500 characters')
+        return v
+
+    @field_validator('target_tier')
+    @classmethod
+    def validate_target_tier(cls, v):
+        if v is not None and v not in ('n1', 'n2', 'n3', 'special'):
+            raise ValueError('target_tier must be one of: n1, n2, n3, special')
+        return v
+
+
+class EscalateResponse(BaseModel):
+    ticket_id: str
+    escalation_level: int
+    target_queue: str
+    status: str = "escalated"
+
+
+class AddNoteRequest(BaseModel):
+    content: str
+    visibility: str = "internal"
+
+    @field_validator('content')
+    @classmethod
+    def validate_content(cls, v):
+        if not v or not v.strip():
+            raise ValueError('content must not be empty')
+        if len(v) > 5000:
+            raise ValueError('content must not exceed 5000 characters')
+        return v
+
+    @field_validator('visibility')
+    @classmethod
+    def validate_visibility(cls, v):
+        if v not in ('internal', 'customer'):
+            raise ValueError('visibility must be "internal" or "customer"')
+        return v
+
+
+class AddNoteResponse(BaseModel):
+    ticket_id: str
+    note_id: str
+    status: str = "created"
+
+
+# ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 
@@ -384,11 +487,12 @@ async def get_command_center(
         ),
         CommandCenterKpiCard(
             label="Open Incidents", value=metrics.open_tickets,
-            trend="down" if metrics.open_tickets < 5 else "stable", change=-5.2,
+            trend="down" if metrics.open_tickets < 5 else "up" if metrics.open_tickets > 15 else "stable",
+            change=-5.2,
         ),
         CommandCenterKpiCard(
             label="SLA Breaches", value=metrics.sla_breaches,
-            trend="critical" if metrics.sla_breaches > 2 else "stable",
+            trend="up" if metrics.sla_breaches > 2 else "stable",
             change=float(metrics.sla_breaches),
         ),
         CommandCenterKpiCard(
@@ -866,4 +970,159 @@ async def get_configuration(
             FeatureFlag(key="knowledge_search", enabled=True, description="Enable knowledge vault search in copilot"),
             FeatureFlag(key="agent_auto_approve", enabled=False, description="Auto-approve low-risk agent recommendations"),
         ],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Ticket Copilot Action Endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.post("/soc/tickets/{ticket_id}/reclassify", response_model=ReclassifyResponse)
+async def post_reclassify_ticket(
+    ticket_id: str,
+    body: ReclassifyRequest,
+    current_user: User = Depends(get_current_user),
+    _rate_limit: None = Depends(RateLimiter(30)),
+    queue_svc: QueueStrategyService = Depends(get_queue_strategy),
+    agent_svc: AgentGovernanceService = Depends(get_agent_governance),
+):
+    """Reclassify a ticket — validate priority/queue change via QueueStrategyService."""
+    tickets = _synthetic_tickets(25)
+    ticket = next((t for t in tickets if t.id == ticket_id), tickets[0])
+
+    # Validate via queue strategy
+    decision = queue_svc.recommend(QueueDecisionRequest(
+        subject=ticket.subject,
+        body_text=body.reason or ticket.subject,
+        urgency=body.priority or ticket.priority.value,
+        current_tier=QueueTier.N1,
+        current_locked=False,
+    ))
+
+    new_priority = body.priority or ticket.priority.value
+    new_queue = body.queue_slug or decision.routing.queue.slug or ticket.queue.slug or "n1-triage"
+
+    # Log the action
+    agent_svc.log_event(
+        actor_name=current_user.username,
+        action="ticket.reclassified",
+        resource_type="ticket",
+        resource_id=ticket_id,
+        details={
+            "reason": body.reason,
+            "new_priority": new_priority,
+            "new_queue": new_queue,
+            "previous_priority": ticket.priority.value,
+            "previous_queue": ticket.queue.slug,
+        },
+    )
+
+    return ReclassifyResponse(
+        ticket_id=ticket_id,
+        new_priority=new_priority,
+        new_queue=new_queue,
+    )
+
+
+@router.post("/soc/tickets/{ticket_id}/escalate", response_model=EscalateResponse)
+async def post_escalate_ticket(
+    ticket_id: str,
+    body: EscalateRequest,
+    current_user: User = Depends(get_current_user),
+    _rate_limit: None = Depends(RateLimiter(30)),
+    queue_svc: QueueStrategyService = Depends(get_queue_strategy),
+    agent_svc: AgentGovernanceService = Depends(get_agent_governance),
+):
+    """Escalate a ticket — get recommendation and create approval record."""
+    tickets = _synthetic_tickets(25)
+    ticket = next((t for t in tickets if t.id == ticket_id), tickets[0])
+
+    # Get escalation recommendation via queue strategy
+    decision = queue_svc.recommend(QueueDecisionRequest(
+        subject=ticket.subject,
+        body_text=body.reason,
+        urgency=ticket.priority.value,
+        current_tier=QueueTier.N1,
+        current_locked=False,
+    ))
+
+    escalation_level = {
+        "n1": 1,
+        "n2": 2,
+        "n3": 3,
+        "special": 4,
+    }.get(decision.routing.tier.value, 2)
+
+    target_queue = decision.routing.queue.slug or "n2-resolucion"
+
+    # Create an approval record via AgentGovernanceService
+    rec_response = agent_svc.recommend(AgentRecommendationRequest(
+        subject=ticket.subject,
+        body_text=body.reason,
+        customer=ticket.customer_email,
+        current_tier=decision.routing.tier,
+        current_state=ticket.state,
+        sla_minutes=ticket.sla.solution_time_minutes if ticket.sla else 480,
+        ticket_created_at=ticket.created_at,
+        ticket_updated_at=ticket.updated_at,
+        requested_action="escalate",
+    ))
+
+    # Auto-approve the escalation recommendation
+    agent_svc.approve(AgentApprovalRequest(
+        recommendation_id=rec_response.recommendation_id,
+        decision=ApprovalDecision.APPROVE,
+        approver_name=current_user.username,
+        comment=body.reason,
+    ))
+
+    # Log the action
+    agent_svc.log_event(
+        actor_name=current_user.username,
+        action="ticket.escalated",
+        resource_type="ticket",
+        resource_id=ticket_id,
+        details={
+            "reason": body.reason,
+            "target_tier": body.target_tier or decision.routing.tier.value,
+            "escalation_level": escalation_level,
+            "target_queue": target_queue,
+        },
+    )
+
+    return EscalateResponse(
+        ticket_id=ticket_id,
+        escalation_level=escalation_level,
+        target_queue=target_queue,
+    )
+
+
+@router.post("/soc/tickets/{ticket_id}/notes", response_model=AddNoteResponse)
+async def post_add_note(
+    ticket_id: str,
+    body: AddNoteRequest,
+    current_user: User = Depends(get_current_user),
+    _rate_limit: None = Depends(RateLimiter(30)),
+    agent_svc: AgentGovernanceService = Depends(get_agent_governance),
+):
+    """Add an internal note to a ticket and record the audit event."""
+    note_id = str(uuid4())
+
+    # Create audit event via AgentGovernanceService
+    agent_svc.log_event(
+        actor_name=current_user.username,
+        action="ticket.note_added",
+        resource_type="ticket",
+        resource_id=ticket_id,
+        details={
+            "note_id": note_id,
+            "content_preview": body.content[:100],
+            "visibility": body.visibility,
+        },
+    )
+
+    return AddNoteResponse(
+        ticket_id=ticket_id,
+        note_id=note_id,
     )

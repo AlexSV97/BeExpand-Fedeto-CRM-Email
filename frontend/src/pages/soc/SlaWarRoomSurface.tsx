@@ -1,18 +1,28 @@
-/**
+﻿/**
  * SlaWarRoomSurface — SLA monitoring dashboard.
  *
  * Shows active SLA timers with countdown colour coding, breach alerts
  * with escalation status, and a priority × queue compliance matrix.
  */
 
-import { useState, useEffect, useCallback } from 'react'
-import { useSocShell } from '../../services/soc/SocShellProvider'
+import { useState } from 'react'
 import { SURFACE_IDS } from '../../services/soc/contracts'
 import type { SocError } from '../../services/soc/contracts'
-import { socFetch } from '../../services/soc/client'
 import { SOC_ENDPOINTS } from '../../services/soc/endpoints'
+import { useSocResource } from '../../services/soc/useSocResource'
 import { normalizeSlaWarRoom } from '../../services/soc/normalize/slaWarRoom'
-import type { SlaWarRoomView } from '../../services/soc/normalize/slaWarRoom'
+import {
+  MOCK_SLA_WAR_ROOM,
+  MOCK_SLA_TIMERS,
+  MOCK_SLA_BREACHES,
+  MOCK_SLA_MATRIX,
+  QUEUES,
+} from '../../services/soc/mockData'
+import type {
+  ActiveSlaTimer,
+  BreachAlert,
+  PriorityComplianceCell,
+} from '../../services/soc/mockData'
 import { SocLoadingState, SocEmptyState, SocErrorState } from '../../components/soc'
 import { applyNeutralCopy, t } from '../../content/socCopy'
 import { cn } from '../../lib/utils'
@@ -81,71 +91,6 @@ function priorityBadgeClass(priority: string): string {
   }
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────
-
-interface ActiveSlaTimer {
-  ticketId: string
-  subject: string
-  priority: string
-  deadline: string
-  remainingSeconds: number
-  totalSeconds: number
-}
-
-interface BreachAlert {
-  id: string
-  ticketId: string
-  subject: string
-  priority: string
-  status: 'breached' | 'near-breach'
-  timeSinceBreach: string
-  escalationLevel: number
-  assignedAgent: string
-}
-
-interface PriorityComplianceCell {
-  priority: string
-  queue: string
-  compliance: number // 0–100
-  total: number
-  breached: number
-}
-
-const QUEUES = ['Network', 'Security', 'Applications', 'Infrastructure']
-
-const MOCK_TIMERS: ActiveSlaTimer[] = [
-  { ticketId: 'TKT-1024', subject: 'Circuit timeout on MX-480 edge router', priority: 'critical', deadline: '2026-06-17T18:00:00Z', remainingSeconds: 1800, totalSeconds: 3600 },
-  { ticketId: 'TKT-1021', subject: 'BGP flap recurrence — Tier-1 ISP peer', priority: 'high', deadline: '2026-06-17T20:00:00Z', remainingSeconds: 5400, totalSeconds: 14400 },
-  { ticketId: 'TKT-1018', subject: 'Port security violation — access switch', priority: 'medium', deadline: '2026-06-18T06:00:00Z', remainingSeconds: 28800, totalSeconds: 28800 },
-  { ticketId: 'TKT-1015', subject: 'SSL certificate renewal — *.fedeto.com', priority: 'low', deadline: '2026-06-19T12:00:00Z', remainingSeconds: 72000, totalSeconds: 86400 },
-  { ticketId: 'TKT-1027', subject: 'DDoS mitigation rule deployment', priority: 'critical', deadline: '2026-06-17T16:30:00Z', remainingSeconds: -600, totalSeconds: 3600 },
-]
-
-const MOCK_BREACHES: BreachAlert[] = [
-  { id: 'br-1', ticketId: 'TKT-1027', subject: 'DDoS mitigation rule deployment', priority: 'critical', status: 'breached', timeSinceBreach: '12 min', escalationLevel: 2, assignedAgent: 'Carlos Ruiz' },
-  { id: 'br-2', ticketId: 'TKT-1024', subject: 'Circuit timeout on MX-480 edge router', priority: 'critical', status: 'near-breach', timeSinceBreach: '—', escalationLevel: 1, assignedAgent: 'Ana López' },
-  { id: 'br-3', ticketId: 'TKT-1021', subject: 'BGP flap recurrence — Tier-1 ISP peer', priority: 'high', status: 'near-breach', timeSinceBreach: '—', escalationLevel: 0, assignedAgent: 'Miguel Torres' },
-]
-
-const MOCK_MATRIX: PriorityComplianceCell[] = [
-  { priority: 'critical', queue: 'Network', compliance: 78, total: 45, breached: 10 },
-  { priority: 'critical', queue: 'Security', compliance: 92, total: 38, breached: 3 },
-  { priority: 'critical', queue: 'Applications', compliance: 65, total: 20, breached: 7 },
-  { priority: 'critical', queue: 'Infrastructure', compliance: 85, total: 32, breached: 5 },
-  { priority: 'high', queue: 'Network', compliance: 82, total: 62, breached: 11 },
-  { priority: 'high', queue: 'Security', compliance: 88, total: 55, breached: 7 },
-  { priority: 'high', queue: 'Applications', compliance: 73, total: 40, breached: 11 },
-  { priority: 'high', queue: 'Infrastructure', compliance: 90, total: 48, breached: 5 },
-  { priority: 'medium', queue: 'Network', compliance: 91, total: 80, breached: 7 },
-  { priority: 'medium', queue: 'Security', compliance: 95, total: 72, breached: 4 },
-  { priority: 'medium', queue: 'Applications', compliance: 87, total: 65, breached: 8 },
-  { priority: 'medium', queue: 'Infrastructure', compliance: 93, total: 70, breached: 5 },
-  { priority: 'low', queue: 'Network', compliance: 97, total: 120, breached: 4 },
-  { priority: 'low', queue: 'Security', compliance: 99, total: 98, breached: 1 },
-  { priority: 'low', queue: 'Applications', compliance: 96, total: 110, breached: 4 },
-  { priority: 'low', queue: 'Infrastructure', compliance: 98, total: 105, breached: 2 },
-]
-
 // ─── Sub-components ───────────────────────────────────────────────────────
 
 function TimerCard({ timer }: { timer: ActiveSlaTimer }) {
@@ -174,7 +119,6 @@ function TimerCard({ timer }: { timer: ActiveSlaTimer }) {
           {Math.max(0, Math.round(pct))}%
         </span>
       </div>
-      {/* Progress bar */}
       <div className="mt-2 h-1.5 w-full bg-muted rounded-full overflow-hidden">
         <div
           className={cn(
@@ -220,10 +164,7 @@ function BreachRow({ breach }: { breach: BreachAlert }) {
         <p className="text-xs text-muted-foreground truncate mt-0.5">{applyNeutralCopy(breach.subject)}</p>
       </div>
       <div className="text-right shrink-0">
-        <p className={cn(
-          'text-xs font-medium',
-          breach.status === 'breached' ? 'text-destructive' : 'text-warning',
-        )}>
+        <p className={cn('text-xs font-medium', breach.status === 'breached' ? 'text-destructive' : 'text-warning')}>
           {breach.status === 'breached' ? breach.timeSinceBreach : t('sla.nearBreach')}
         </p>
         <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5 justify-end">
@@ -255,75 +196,48 @@ function ComplianceCell({ cell }: { cell: PriorityComplianceCell }) {
 // ─── Main surface ─────────────────────────────────────────────────────────
 
 export default function SlaWarRoomSurface() {
-  const { setSurfaceStatus } = useSocShell()
-  const [data, setData] = useState<SlaWarRoomView | null>(null)
-  const [error, setError] = useState<SocError | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { data, loading, error, source, refresh } = useSocResource(
+    SOC_ENDPOINTS[SURFACE_IDS.SLA_WAR_ROOM],
+    normalizeSlaWarRoom,
+    MOCK_SLA_WAR_ROOM,
+    SURFACE_ID,
+  )
 
-  // Richer UI data from mock fallback
-  const [timers] = useState<ActiveSlaTimer[]>(MOCK_TIMERS)
-  const [breaches] = useState<BreachAlert[]>(MOCK_BREACHES)
-  const [matrix] = useState<PriorityComplianceCell[]>(MOCK_MATRIX)
-
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    setSurfaceStatus(SURFACE_ID, 'loading')
-
-    try {
-      const raw = await socFetch<Record<string, unknown>>(SOC_ENDPOINTS[SURFACE_ID])
-      const view = normalizeSlaWarRoom(raw)
-      setData(view)
-      setSurfaceStatus(SURFACE_ID, 'ready')
-    } catch (err: unknown) {
-      // Fallback: use mock data when backend is unavailable
-      setSurfaceStatus(SURFACE_ID, 'ready')
-      const socErr: SocError = {
-        code: 'FALLBACK_MODE',
-        message: err instanceof Error ? err.message : String(err),
-      }
-      setError(socErr)
-    } finally {
-      setLoading(false)
-    }
-  }, [setSurfaceStatus])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
-
-  const isFallback = error?.code === 'FALLBACK_MODE'
+  // Supplementary rich data (always from mock — no backend endpoint)
+  const [timers] = useState<ActiveSlaTimer[]>(MOCK_SLA_TIMERS)
+  const [breaches] = useState<BreachAlert[]>(MOCK_SLA_BREACHES)
+  const [matrix] = useState<PriorityComplianceCell[]>(MOCK_SLA_MATRIX)
 
   // ── Loading ──
-
   if (loading) {
     return <SocLoadingState surfaceLabel={t('surfaces.slaWarRoom')} />
   }
 
-  // ── Error (only when NOT in fallback mode) ──
-
-  if (error && !isFallback) {
-    return <SocErrorState error={error} />
+  // ── Error ──
+  if (error) {
+    const socErr: SocError = { code: 'FETCH_ERROR', message: error, retry: refresh }
+    return <SocErrorState error={socErr} />
   }
 
-  // ── Empty (skip in fallback mode — show mock data) ──
-
-  if (!isFallback && (!data || (data.breachTimers.length === 0 && data.activeSLAs.length === 0))) {
+  // ── Empty (only when source is backend and data is empty) ──
+  if (source === 'backend' && data.breachTimers.length === 0 && data.activeSLAs.length === 0) {
     return <SocEmptyState surfaceId={SURFACE_ID} />
   }
 
-  // ── Content ──
+  const isDemo = source === 'mock'
 
+  // ── Content ──
   return (
     <div className="space-y-6">
-      {/* Page header */}
+      {/* Page header + demo badge */}
       <div className="flex items-center gap-2">
         <Gauge className="h-5 w-5 text-chart-1" />
         <h2 className="text-lg font-semibold">{t('surfaces.slaWarRoom')}</h2>
-        {isFallback && (
-          <span className="ml-auto text-[10px] font-medium px-2 py-0.5 rounded bg-warning/10 text-warning border border-warning/20">
-            Fallback Mode
-          </span>
+        {isDemo && (
+          <div className="ml-auto flex items-center gap-2 px-3 py-1 rounded-lg bg-warning/10 border border-warning/20 text-warning text-xs font-medium">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            {"Demo"}
+          </div>
         )}
       </div>
 
@@ -375,14 +289,12 @@ export default function SlaWarRoomSurface() {
             <h3 className="text-sm font-semibold">{t('sla.priorityMatrix')}</h3>
           </div>
           <div className="p-4 space-y-3">
-            {/* Header row */}
             <div className="grid grid-cols-4 gap-2 text-[10px] font-medium text-muted-foreground uppercase tracking-wider text-center">
               <div />
               {QUEUES.map((q) => (
                 <span key={q}>{q}</span>
               ))}
             </div>
-            {/* Data rows */}
             {PRIORITY_MATRIX_ROWS.map((priority) => (
               <div key={priority} className="grid grid-cols-4 gap-2 items-center">
                 <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded', priorityBadgeClass(priority))}>
@@ -406,3 +318,4 @@ export default function SlaWarRoomSurface() {
     </div>
   )
 }
+

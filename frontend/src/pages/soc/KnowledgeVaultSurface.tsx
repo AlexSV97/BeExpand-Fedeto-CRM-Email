@@ -1,18 +1,18 @@
-/**
+﻿/**
  * KnowledgeVaultSurface — knowledge base browser.
  *
  * Features a search bar, category filter pills, and a results list
  * of article cards with excerpt, category badge, date, and relevance.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useSocShell } from '../../services/soc/SocShellProvider'
+import { useState, useMemo } from 'react'
 import { SURFACE_IDS } from '../../services/soc/contracts'
 import type { SocError } from '../../services/soc/contracts'
-import { socFetch } from '../../services/soc/client'
 import { SOC_ENDPOINTS } from '../../services/soc/endpoints'
+import { useSocResource } from '../../services/soc/useSocResource'
 import { normalizeKnowledgeVault } from '../../services/soc/normalize/knowledgeVault'
-import type { KnowledgeVaultView } from '../../services/soc/normalize/knowledgeVault'
+import { MOCK_KNOWLEDGE_VAULT, MOCK_ARTICLES } from '../../services/soc/mockData'
+import type { MockArticle } from '../../services/soc/mockData'
 import { SocLoadingState, SocEmptyState, SocErrorState } from '../../components/soc'
 import { applyNeutralCopy, t } from '../../content/socCopy'
 import { cn } from '../../lib/utils'
@@ -27,6 +27,7 @@ import {
   Lightbulb,
   GitFork,
   Megaphone,
+  AlertTriangle,
 } from 'lucide-react'
 
 // ─── Constants ───────────────────────────────────────────────────────────
@@ -41,93 +42,6 @@ const CATEGORY_ICONS: Record<string, typeof FileText> = {
   'Known Issues': Lightbulb,
   'Release Notes': Megaphone,
 }
-
-// ─── Mock data ────────────────────────────────────────────────────────────
-
-interface MockArticle {
-  id: string
-  title: string
-  excerpt: string
-  category: string
-  tags: string[]
-  updatedAt: string
-  relevance: number // 0–100
-}
-
-const MOCK_ARTICLES: MockArticle[] = [
-  {
-    id: 'KB-001',
-    title: 'BGP Route Flap Mitigation — Standard Operating Procedure',
-    excerpt: 'Step-by-step SOP for identifying and mitigating BGP route flaps across all managed peers. Covers monitoring, confirmation, rollback, and post-mortem.',
-    category: 'SOPs',
-    tags: ['bgp', 'routing', 'flap', 'mitigation'],
-    updatedAt: '2026-06-15T10:30:00Z',
-    relevance: 98,
-  },
-  {
-    id: 'KB-002',
-    title: 'DDoS Mitigation Playbook — Layer 3/4 Attacks',
-    excerpt: 'Comprehensive playbook for detecting, classifying, and mitigating volumetric DDoS attacks targeting customer-facing infrastructure.',
-    category: 'Playbooks',
-    tags: ['ddos', 'mitigation', 'layer3', 'layer4'],
-    updatedAt: '2026-06-14T08:00:00Z',
-    relevance: 95,
-  },
-  {
-    id: 'KB-003',
-    title: 'Known Issue: MX-480 Line Card LC-4XGE-XFP Hard Lockup',
-    excerpt: 'Under sustained 90%+ throughput, LC-4XGE-XFP line cards may enter a hard lockup state requiring manual OIR. Affected firmware versions: 18.2R1–18.4R2.',
-    category: 'Known Issues',
-    tags: ['mx-480', 'line-card', 'lockup', 'hardware'],
-    updatedAt: '2026-06-13T14:15:00Z',
-    relevance: 91,
-  },
-  {
-    id: 'KB-004',
-    title: 'Release Notes — v3.2.0 Security Policy Engine',
-    excerpt: 'New security policy engine introduces zone-based firewalling, application-layer inspection, and TLS 1.3 termination. Backward-compatible config migration.',
-    category: 'Release Notes',
-    tags: ['release', 'security', 'policy', 'engine'],
-    updatedAt: '2026-06-12T16:45:00Z',
-    relevance: 88,
-  },
-  {
-    id: 'KB-005',
-    title: 'SOP: SSL/TLS Certificate Renewal via ACME Automation',
-    excerpt: 'Automated certificate lifecycle management using ACME protocol with Let\'s Encrypt and Sectigo. Covers validation, renewal, and revocation workflows.',
-    category: 'SOPs',
-    tags: ['ssl', 'tls', 'certificate', 'acme', 'renewal'],
-    updatedAt: '2026-06-11T09:00:00Z',
-    relevance: 85,
-  },
-  {
-    id: 'KB-006',
-    title: 'Incident Response Playbook — Ransomware Detection',
-    excerpt: 'Detection, containment, eradication, and recovery steps for ransomware incidents affecting customer environments. Includes IOC indicators and C2 blocklists.',
-    category: 'Playbooks',
-    tags: ['ransomware', 'incident', 'response', 'security'],
-    updatedAt: '2026-06-10T11:30:00Z',
-    relevance: 92,
-  },
-  {
-    id: 'KB-007',
-    title: 'Known Issue: SNMP BulkWalk Timeout on Large OID Trees',
-    excerpt: 'SNMP bulkwalk operations against OID trees exceeding 10,000 nodes may time out after 30s. Workaround: use walk with max-repetitions 25 or split queries.',
-    category: 'Known Issues',
-    tags: ['snmp', 'bulkwalk', 'timeout', 'monitoring'],
-    updatedAt: '2026-06-09T13:20:00Z',
-    relevance: 78,
-  },
-  {
-    id: 'KB-008',
-    title: 'Release Notes — v2.1.0 Log Aggregation Pipeline',
-    excerpt: 'New log aggregation pipeline with Elasticsearch 8.x backend, improved indexing performance, and support for structured syslog over TCP/TLS.',
-    category: 'Release Notes',
-    tags: ['release', 'logging', 'elasticsearch', 'pipeline'],
-    updatedAt: '2026-06-08T10:00:00Z',
-    relevance: 82,
-  },
-]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -178,7 +92,6 @@ function ArticleCard({ article }: { article: MockArticle }) {
               <h4 className="text-sm font-semibold text-foreground leading-snug">{applyNeutralCopy(article.title)}</h4>
               <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{applyNeutralCopy(article.excerpt)}</p>
             </div>
-            {/* Relevance score */}
             <div className={cn('flex items-center gap-1 text-xs font-medium shrink-0', relevanceColor(article.relevance))}>
               <Star className="h-3 w-3 fill-current" />
               {article.relevance}%
@@ -196,10 +109,7 @@ function ArticleCard({ article }: { article: MockArticle }) {
           {article.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2">
               {article.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
-                >
+                <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                   {tag}
                 </span>
               ))}
@@ -214,45 +124,19 @@ function ArticleCard({ article }: { article: MockArticle }) {
 // ─── Main surface ─────────────────────────────────────────────────────────
 
 export default function KnowledgeVaultSurface() {
-  const { setSurfaceStatus } = useSocShell()
-  const [data, setData] = useState<KnowledgeVaultView | null>(null)
-  const [error, setError] = useState<SocError | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { data, loading, error, source, refresh } = useSocResource(
+    SOC_ENDPOINTS[SURFACE_IDS.KNOWLEDGE_VAULT],
+    normalizeKnowledgeVault,
+    MOCK_KNOWLEDGE_VAULT,
+    SURFACE_ID,
+  )
 
   // UI state
   const [searchQuery, setSearchQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
   const [articles] = useState<MockArticle[]>(MOCK_ARTICLES)
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    setSurfaceStatus(SURFACE_ID, 'loading')
-
-    try {
-      const raw = await socFetch<Record<string, unknown>>(SOC_ENDPOINTS[SURFACE_ID])
-      const view = normalizeKnowledgeVault(raw)
-      setData(view)
-      setSurfaceStatus(SURFACE_ID, 'ready')
-    } catch (err: unknown) {
-      // Fallback: use mock data when backend is unavailable
-      setSurfaceStatus(SURFACE_ID, 'ready')
-      const socErr: SocError = {
-        code: 'FALLBACK_MODE',
-        message: err instanceof Error ? err.message : String(err),
-      }
-      setError(socErr)
-    } finally {
-      setLoading(false)
-    }
-  }, [setSurfaceStatus])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
-
   // ── Derived: filtered articles ──
-
   const filteredArticles = useMemo(() => {
     let result = articles
 
@@ -270,11 +154,8 @@ export default function KnowledgeVaultSurface() {
       )
     }
 
-    // Sort by relevance descending
     return [...result].sort((a, b) => b.relevance - a.relevance)
   }, [articles, activeCategory, searchQuery])
-
-  const isFallback = error?.code === 'FALLBACK_MODE'
 
   const hasActiveFilters = activeCategory !== null || searchQuery.trim() !== ''
 
@@ -283,39 +164,39 @@ export default function KnowledgeVaultSurface() {
     setSearchQuery('')
   }
 
-  // ── Loading ──
+  const isDemo = source === 'mock'
 
+  // ── Loading ──
   if (loading) {
     return <SocLoadingState surfaceLabel={t('surfaces.knowledgeVault')} />
   }
 
-  // ── Error (only when NOT in fallback mode) ──
-
-  if (error && !isFallback) {
-    return <SocErrorState error={error} />
+  // ── Error ──
+  if (error) {
+    const socErr: SocError = { code: 'FETCH_ERROR', message: error, retry: refresh }
+    return <SocErrorState error={socErr} />
   }
 
-  // ── Empty (skip in fallback mode — show mock data) ──
-
-  if (!isFallback && (!data || (data.articles.length === 0 && articles.length === 0))) {
+  // ── Empty (only when source is backend and data is empty) ──
+  if (source === 'backend' && data.articles.length === 0 && articles.length === 0) {
     return <SocEmptyState surfaceId={SURFACE_ID} />
   }
 
   // ── Content ──
-
   return (
     <div className="space-y-4">
-      {/* Header */}
+      {/* Header + demo badge */}
       <div className="flex items-center gap-2">
         <BookOpen className="h-5 w-5 text-chart-2" />
         <h2 className="text-lg font-semibold">{t('surfaces.knowledgeVault')}</h2>
         <span className="text-xs text-muted-foreground">
           ({articles.length} {t('knowledge.articles')})
         </span>
-        {isFallback && (
-          <span className="ml-auto text-[10px] font-medium px-2 py-0.5 rounded bg-warning/10 text-warning border border-warning/20">
-            Fallback Mode
-          </span>
+        {isDemo && (
+          <div className="ml-auto flex items-center gap-2 px-3 py-1 rounded-lg bg-warning/10 border border-warning/20 text-warning text-xs font-medium">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            {"Demo"}
+          </div>
         )}
       </div>
 
@@ -379,10 +260,7 @@ export default function KnowledgeVaultSurface() {
           <Search className="h-10 w-10 mb-3 text-muted-foreground/40" />
           <p className="text-sm">{t('knowledge.noResults')}</p>
           {hasActiveFilters && (
-            <button
-              onClick={clearFilters}
-              className="mt-3 text-xs text-primary hover:underline cursor-pointer"
-            >
+            <button onClick={clearFilters} className="mt-3 text-xs text-primary hover:underline cursor-pointer">
               {t('knowledge.clearFilters')}
             </button>
           )}
@@ -397,3 +275,4 @@ export default function KnowledgeVaultSurface() {
     </div>
   )
 }
+

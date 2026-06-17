@@ -31,6 +31,9 @@ interface TicketContextView {
 // ── Normalizer ──
 
 function normalizeTicketCopilot(raw: Record<string, unknown>): TicketCopilotView {
+  if (!raw || typeof raw !== 'object') {
+    return { conversation: [], suggestedActions: [], ticketContext: { ticketId: '', subject: '', status: '' } }
+  }
   return {
     conversation: (raw.conversation as CopilotMessageView[]) ?? [],
     suggestedActions: (raw.suggestedActions as SuggestionItemView[]) ?? [],

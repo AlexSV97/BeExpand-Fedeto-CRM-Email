@@ -211,6 +211,26 @@ class AgentGovernanceService:
     def audit_log(self) -> list[AuditEvent]:
         return list(self._audit_events)
 
+    def log_event(
+        self,
+        actor_name: str,
+        action: str,
+        resource_type: str,
+        resource_id: str,
+        details: dict[str, Any] | None = None,
+    ) -> AuditEvent:
+        """Record a human-driven audit event (e.g. note added, reclassification, escalation)."""
+        event = AuditEvent(
+            actor_kind=AuditActorKind.HUMAN,
+            actor_name=actor_name,
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            outcome=AuditOutcome.SUCCESS,
+            details=details or {},
+        )
+        self._audit_events.append(event)
+        return event
 
     async def persist_recommendation(
         self,

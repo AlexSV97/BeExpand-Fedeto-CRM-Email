@@ -30,6 +30,9 @@ interface TicketFiltersView {
 // ── Normalizer ──
 
 function normalizeTicketQueue(raw: Record<string, unknown>): TicketQueueView {
+  if (!raw || typeof raw !== 'object') {
+    return { tickets: [], total: 0, page: 1, filters: {} }
+  }
   return {
     tickets: (raw.tickets as TicketItemView[]) ?? [],
     total: (raw.total as number) ?? 0,

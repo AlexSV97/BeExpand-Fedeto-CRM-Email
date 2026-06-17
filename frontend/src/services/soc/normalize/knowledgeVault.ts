@@ -22,6 +22,9 @@ interface KnowledgeArticleView {
 // ── Normalizer ──
 
 function normalizeKnowledgeVault(raw: Record<string, unknown>): KnowledgeVaultView {
+  if (!raw || typeof raw !== 'object') {
+    return { articles: [], categories: [], searchSuggestions: [] }
+  }
   return {
     articles: (raw.articles as KnowledgeArticleView[]) ?? [],
     categories: (raw.categories as string[]) ?? [],

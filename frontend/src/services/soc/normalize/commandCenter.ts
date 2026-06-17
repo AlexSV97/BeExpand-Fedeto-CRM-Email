@@ -28,6 +28,9 @@ interface AlertItemView {
 // ── Normalizer ──
 
 function normalizeCommandCenter(raw: Record<string, unknown>): CommandCenterView {
+  if (!raw || typeof raw !== 'object') {
+    return { kpiCards: [], recentAlerts: [], queuePressure: 0, surfaceStatus: 'error' }
+  }
   return {
     kpiCards: (raw.kpiCards as CommandCenterKpiCardView[]) ?? [],
     recentAlerts: (raw.recentAlerts as AlertItemView[]) ?? [],

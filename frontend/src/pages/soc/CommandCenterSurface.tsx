@@ -1,19 +1,24 @@
-/**
+﻿/**
  * CommandCenterSurface — SOC landing page.
  *
  * Shows KPI cards, recent alerts feed, queue pressure gauge,
- * and SLA risk summary.  Fetches data from SOC_ENDPOINTS.commandCenter
- * and normalises via normalizeCommandCenter().
+ * and SLA risk summary.  Uses useSocResource for data fetching
+ * with automatic mock fallback.
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import { useSocShell } from '../../services/soc/SocShellProvider'
 import { SURFACE_IDS } from '../../services/soc/contracts'
 import type { SocError } from '../../services/soc/contracts'
-import { socFetch } from '../../services/soc/client'
 import { SOC_ENDPOINTS } from '../../services/soc/endpoints'
+import { useSocResource } from '../../services/soc/useSocResource'
 import { normalizeCommandCenter } from '../../services/soc/normalize/commandCenter'
-import type { CommandCenterView, CommandCenterKpiCardView, AlertItemView } from '../../services/soc/normalize/commandCenter'
+import type {
+  CommandCenterKpiCardView,
+  AlertItemView,
+} from '../../services/soc/normalize/commandCenter'
+import { MOCK_COMMAND_CENTER, MOCK_SLA_RISKS } from '../../services/soc/mockData'
+import type { SlaRiskItem } from '../../services/soc/mockData'
 import { SocLoadingState, SocEmptyState, SocErrorState } from '../../components/soc'
 import { applyNeutralCopy, t } from '../../content/socCopy'
 import { cn } from '../../lib/utils'
@@ -29,10 +34,6 @@ import {
   Gauge,
   AlertOctagon,
 } from 'lucide-react'
-
-// ─── Constants ───────────────────────────────────────────────────────────
-
-const SURFACE_ID = SURFACE_IDS.COMMAND_CENTER
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -84,9 +85,6 @@ function trendIcon(trend: 'up' | 'down' | 'stable') {
 }
 
 function trendColor(trend: 'up' | 'down' | 'stable'): string {
-  // For KPI cards, "up" in a SOC context is generally bad
-  // (more tickets, more incidents) unless it's something like "resolved"
-  // We let the trend color be neutral by default — consumers can override.
   switch (trend) {
     case 'up':
       return 'text-destructive'
@@ -103,28 +101,9 @@ function queuePressureTextColor(pct: number): string {
   return 'text-success'
 }
 
-// ─── Mock SLA data (fallback when backend doesn't provide it) ─────────────
-
-interface SlaRiskItem {
-  ticketId: string
-  subject: string
-  deadline: string
-  remainingSeconds: number
-}
-
-const MOCK_SLA_RISKS: SlaRiskItem[] = [
-  { ticketId: 'TKT-1024', subject: applyNeutralCopy('Circuit timeout on MX-480'), deadline: '2026-06-17T18:00:00Z', remainingSeconds: 5400 },
-  { ticketId: 'TKT-1021', subject: applyNeutralCopy('Lap 5 — BGP flap recurrence'), deadline: '2026-06-17T20:00:00Z', remainingSeconds: 10800 },
-  { ticketId: 'TKT-1018', subject: applyNeutralCopy('Garage port security violation'), deadline: '2026-06-18T06:00:00Z', remainingSeconds: 32400 },
-]
-
 // ─── Sub-components ───────────────────────────────────────────────────────
 
-function KpiCard({
-  card,
-}: {
-  card: CommandCenterKpiCardView
-}) {
+function KpiCard({ card }: { card: CommandCenterKpiCardView }) {
   const animatedValue = card.value
 
   return (
@@ -183,7 +162,7 @@ function AlertFeedItem({ alert }: { alert: AlertItemView }) {
 
 function SlaRiskRow({ item }: { item: SlaRiskItem }) {
   const isBreached = item.remainingSeconds <= 0
-  const isWarning = !isBreached && item.remainingSeconds < 7200 // < 2h
+  const isWarning = !isBreached && item.remainingSeconds < 7200
 
   return (
     <div className={cn(
@@ -218,48 +197,37 @@ function SlaRiskRow({ item }: { item: SlaRiskItem }) {
 
 // ─── Main surface ─────────────────────────────────────────────────────────
 
+const SURFACE_ID = SURFACE_IDS.COMMAND_CENTER
+
 export default function CommandCenterSurface() {
   const { setSurfaceStatus } = useSocShell()
-  const [data, setData] = useState<CommandCenterView | null>(null)
-  const [error, setError] = useState<SocError | null>(null)
-  const [loading, setLoading] = useState(true)
 
-  // Raw response for extra fields not covered by the normaliser
-  const [slaRisks, setSlaRisks] = useState<SlaRiskItem[]>(MOCK_SLA_RISKS)
-
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    setSurfaceStatus(SURFACE_ID, 'loading')
-
-    try {
-      const raw = await socFetch<Record<string, unknown>>(SOC_ENDPOINTS[SURFACE_ID])
-      const view = normalizeCommandCenter(raw)
-      setData(view)
-
-      // Extract SLA risk items if backend provides them
-      const rawSla = raw.slaRiskSummary as unknown as SlaRiskItem[] | undefined
+  const { data, loading, error, source, refresh } = useSocResource(
+    SOC_ENDPOINTS[SURFACE_IDS.COMMAND_CENTER],
+    normalizeCommandCenter,
+    MOCK_COMMAND_CENTER,
+    SURFACE_ID,
+    // Extract SLA risk items from raw response if available
+    (raw) => {
+      const rawRecord = raw as Record<string, unknown>
+      const rawSla = rawRecord.slaRiskSummary as unknown as SlaRiskItem[] | undefined
       if (rawSla && rawSla.length > 0) {
         setSlaRisks(rawSla)
       }
+    },
+  )
 
-      setSurfaceStatus(SURFACE_ID, 'ready')
-    } catch (err: unknown) {
-      const socErr: SocError = {
-        code: err instanceof Error && 'code' in err ? (err as { code: string }).code : 'UNKNOWN_ERROR',
-        message: err instanceof Error ? err.message : String(err),
-        retry: fetchData,
-      }
-      setError(socErr)
-      setSurfaceStatus(SURFACE_ID, 'error')
-    } finally {
-      setLoading(false)
-    }
-  }, [setSurfaceStatus])
+  // SLA risks start as mock; updated if backend provides them via onSuccess
+  const [slaRisks, setSlaRisks] = useState<SlaRiskItem[]>(MOCK_SLA_RISKS)
 
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
+  // Sync surface status for the shell
+  if (loading) {
+    setSurfaceStatus(SURFACE_ID, 'loading')
+  } else if (error) {
+    setSurfaceStatus(SURFACE_ID, 'error')
+  } else {
+    setSurfaceStatus(SURFACE_ID, 'ready')
+  }
 
   // ── Loading state ─────────────────────────────────────────────────
 
@@ -270,12 +238,13 @@ export default function CommandCenterSurface() {
   // ── Error state ───────────────────────────────────────────────────
 
   if (error) {
-    return <SocErrorState error={error} />
+    const socErr: SocError = { code: 'FETCH_ERROR', message: error, retry: refresh }
+    return <SocErrorState error={socErr} />
   }
 
   // ── Empty state ───────────────────────────────────────────────────
 
-  if (!data || (data.kpiCards.length === 0 && data.recentAlerts.length === 0)) {
+  if (data.kpiCards.length === 0 && data.recentAlerts.length === 0) {
     return <SocEmptyState surfaceId={SURFACE_ID} />
   }
 
@@ -283,6 +252,14 @@ export default function CommandCenterSurface() {
 
   return (
     <div className="space-y-6">
+      {/* Demo badge when source is mock */}
+      {source === 'mock' && (
+        <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-warning/10 border border-warning/20 text-warning text-xs font-medium">
+          <AlertTriangle className="h-3.5 w-3.5" />
+          {"Demo mode — data shown from local cache"}
+        </div>
+      )}
+
       {/* KPI Cards row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {data.kpiCards.map((card, i) => (
@@ -322,26 +299,11 @@ export default function CommandCenterSurface() {
             <h3 className="text-sm font-semibold">{t('commandCenter.queuePressure')}</h3>
           </div>
           <div className="p-6 flex flex-col items-center justify-center gap-4">
-            {/* Circular gauge */}
             <div className="relative w-32 h-32">
               <svg className="w-32 h-32 -rotate-90" viewBox="0 0 120 120">
-                {/* Background circle */}
+                <circle cx="60" cy="60" r="52" fill="none" stroke="oklch(0.9 0.002 90)" strokeWidth="10" />
                 <circle
-                  cx="60"
-                  cy="60"
-                  r="52"
-                  fill="none"
-                  stroke="oklch(0.9 0.002 90)"
-                  strokeWidth="10"
-                />
-                {/* Value circle */}
-                <circle
-                  cx="60"
-                  cy="60"
-                  r="52"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="10"
+                  cx="60" cy="60" r="52" fill="none" stroke="currentColor" strokeWidth="10"
                   strokeLinecap="round"
                   strokeDasharray={`${(data.queuePressure / 100) * 326.73} 326.73`}
                   className={queuePressureTextColor(data.queuePressure)}
@@ -356,8 +318,6 @@ export default function CommandCenterSurface() {
                 </span>
               </div>
             </div>
-
-            {/* Label */}
             <p className="text-xs text-muted-foreground text-center leading-relaxed max-w-[180px]">
               {data.queuePressure >= 80
                 ? t('commandCenter.pressureCritical')
@@ -386,7 +346,6 @@ export default function CommandCenterSurface() {
           )}
         </div>
 
-        {/* Table header */}
         <div className="hidden sm:flex items-center gap-4 px-4 py-2 text-[10px] font-medium text-muted-foreground uppercase tracking-wider border-b border-border/20 bg-muted/30">
           <span className="w-28 shrink-0">{t('commandCenter.ticketId')}</span>
           <span className="flex-1">{t('commandCenter.subject')}</span>
@@ -409,3 +368,4 @@ export default function CommandCenterSurface() {
     </div>
   )
 }
+

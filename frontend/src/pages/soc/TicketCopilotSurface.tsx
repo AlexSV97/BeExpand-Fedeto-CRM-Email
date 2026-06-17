@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TicketCopilotSurface — split-view AI copilot for working on a ticket.
  *
  * Left panel: ticket detail with conversation timeline.
@@ -6,35 +6,40 @@
  * context summary, and escalation options.
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useSocShell } from '../../services/soc/SocShellProvider'
 import { SURFACE_IDS } from '../../services/soc/contracts'
 import type { SocError } from '../../services/soc/contracts'
 import { socFetch } from '../../services/soc/client'
 import { SOC_ENDPOINTS } from '../../services/soc/endpoints'
+import { useSocResource } from '../../services/soc/useSocResource'
 import { normalizeTicketCopilot } from '../../services/soc/normalize/ticketCopilot'
 import type {
-  TicketCopilotView,
   CopilotMessageView,
   SuggestionItemView,
 } from '../../services/soc/normalize/ticketCopilot'
+import { MOCK_TICKET_COPILOT } from '../../services/soc/mockData'
 import { SocLoadingState, SocErrorState } from '../../components/soc'
 import { applyNeutralCopy, t } from '../../content/socCopy'
 import { cn } from '../../lib/utils'
 import { getSelectedTicketId } from './SmartTicketQueueSurface'
 import {
   ArrowLeft,
-  Bot,
-  MessageSquare,
-  Send,
   ArrowUpRight,
-  PenSquare,
-  User,
-  Sparkles,
+  Bot,
+  Check,
   Clock,
-  Shield,
   Flag,
   FileText,
+  Loader2,
+  MessageSquare,
+  PenSquare,
+  Send,
+  Shield,
+  Sparkles,
+  User,
+  X,
+  AlertTriangle,
 } from 'lucide-react'
 
 // ─── Constants ───────────────────────────────────────────────────────────
@@ -92,12 +97,7 @@ function ConversationMessage({ msg }: { msg: CopilotMessageView }) {
   const isSystem = msg.role === 'system'
 
   return (
-    <div
-      className={cn(
-        'flex gap-3 px-4 py-3',
-        isSystem && 'bg-muted/30',
-      )}
-    >
+    <div className={cn('flex gap-3 px-4 py-3', isSystem && 'bg-muted/30')}>
       <div
         className={cn(
           'mt-0.5 rounded-full p-1.5 shrink-0',
@@ -155,112 +155,119 @@ function SuggestionCard({
   )
 }
 
-// ─── Mock fallback conversations (for demo / resilience) ──────────────────
-
-function buildMockCopilot(ticketId: string): TicketCopilotView {
-  return {
-    conversation: [
-      {
-        role: 'system',
-        content: `Ticket ${ticketId} opened for ${applyNeutralCopy('circuit latency on MX-480 edge router')}. Priority: High. Assigned to Network Ops.`,
-        timestamp: new Date(Date.now() - 3600000).toISOString(),
-      },
-      {
-        role: 'assistant',
-        content: applyNeutralCopy('I\'ve analysed the recent BGP logs for this circuit. There\'s a pattern of route flapping starting around 02:30 UTC. Recommended: check peer AS 64512 for recent config changes.'),
-        timestamp: new Date(Date.now() - 1800000).toISOString(),
-      },
-      {
-        role: 'user',
-        content: applyNeutralCopy('Confirmed — peer AS64512 had a maintenance window last night. Rolling back the BGP community change.'),
-        timestamp: new Date(Date.now() - 600000).toISOString(),
-      },
-      {
-        role: 'assistant',
-        content: applyNeutralCopy('Good catch. After rollback, monitor the circuit for 30 min and verify the flap count drops to zero. I\'ll draft the post-mortem summary.'),
-        timestamp: new Date(Date.now() - 300000).toISOString(),
-      },
-    ],
-    suggestedActions: [
-      { id: 's1', label: applyNeutralCopy('Apply BGP rollback command'), action: 'apply_bgp_rollback' },
-      { id: 's2', label: applyNeutralCopy('Draft post-mortem summary'), action: 'draft_post_mortem' },
-      { id: 's3', label: applyNeutralCopy('Notify affected customers'), action: 'notify_customers' },
-      { id: 's4', label: applyNeutralCopy('Escalate to Tier-3 NOC'), action: 'escalate_tier3' },
-    ],
-    ticketContext: {
-      ticketId,
-      subject: applyNeutralCopy('Circuit latency on MX-480 edge router — possible BGP flap'),
-      status: 'in_progress',
-    },
-  }
-}
-
 // ─── Main surface ─────────────────────────────────────────────────────────
 
 export default function TicketCopilotSurface() {
-  const { goBack, setSurfaceStatus } = useSocShell()
+  const { goBack } = useSocShell()
 
   // Resolve ticket ID from module-level state or fallback
   const ticketId = getSelectedTicketId() ?? FALLBACK_TICKET_ID
 
-  const [data, setData] = useState<TicketCopilotView | null>(null)
-  const [error, setError] = useState<SocError | null>(null)
-  const [loading, setLoading] = useState(true)
+  // The copilot endpoint uses :id which we resolve here
+  const endpoint = SOC_ENDPOINTS[SURFACE_IDS.TICKET_COPILOT].replace(':id', ticketId)
 
-  // ── Fetch data ────────────────────────────────────────────────────
+  const { data, loading, error, source, refresh } = useSocResource(
+    endpoint,
+    normalizeTicketCopilot,
+    MOCK_TICKET_COPILOT,
+    SURFACE_ID,
+  )
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    setSurfaceStatus(SURFACE_ID, 'loading')
+  // ── Action state ──────────────────────────────────────────────────
 
-    try {
-      const endpoint = SOC_ENDPOINTS[SURFACE_ID].replace(':id', ticketId)
-      const raw = await socFetch<Record<string, unknown>>(endpoint)
-      const normalized = normalizeTicketCopilot(raw)
-      setData(normalized)
-      setSurfaceStatus(SURFACE_ID, 'ready')
-    } catch (err: unknown) {
-      // Fallback: if the backend is not available, use mock data
-      // (same resilience pattern as Dashboard.tsx)
-      const mockData = buildMockCopilot(ticketId)
-      setData(mockData)
-      setSurfaceStatus(SURFACE_ID, 'ready')
-
-      // Still register a soft error so the user knows data is mocked
-      const socErr: SocError = {
-        code: 'FALLBACK_MODE',
-        message: err instanceof Error ? err.message : String(err),
-      }
-      setError(socErr)
-    } finally {
-      setLoading(false)
-    }
-  }, [ticketId, setSurfaceStatus])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
+  const [actionLoading, setActionLoading] = useState(false)
+  const [actionFeedback, setActionFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null)
+  const [newNote, setNewNote] = useState('')
+  const [showNoteInput, setShowNoteInput] = useState(false)
 
   // ── Handlers ──────────────────────────────────────────────────────
 
+  async function handleAction(action: string, suggestion?: SuggestionItemView) {
+    if (!ticketId) return
+
+    try {
+      setActionLoading(true)
+      setActionFeedback(null)
+
+      switch (action) {
+        case 'apply':
+          await socFetch(endpoint, {
+            method: 'POST',
+            body: JSON.stringify({ action: suggestion?.action, message: suggestion?.label }),
+          })
+          break
+
+        case 'reclassify':
+          await socFetch(`/soc/tickets/${ticketId}/reclassify`, {
+            method: 'POST',
+            body: JSON.stringify({ reason: suggestion?.action || 'Reclassification requested' }),
+          })
+          break
+
+        case 'escalate':
+          await socFetch(`/soc/tickets/${ticketId}/escalate`, {
+            method: 'POST',
+            body: JSON.stringify({ reason: suggestion?.action || 'Escalation requested' }),
+          })
+          break
+      }
+
+      setActionFeedback({ type: 'success', message: `${action} executed successfully` })
+    } catch (err) {
+      setActionFeedback({
+        type: 'error',
+        message: `Failed to ${action}: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      })
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   const handleApplySuggestion = (suggestion: SuggestionItemView) => {
-    // In a real implementation, this would call the API
-    // For now, it's a UI-only action
-    console.log(`[TicketCopilot] Apply suggestion: ${suggestion.action}`)
+    handleAction('apply', suggestion)
   }
 
   const handleReclassification = () => {
-    console.log('[TicketCopilot] Request reclassification')
+    if (!window.confirm('Are you sure you want to reclassify this ticket?')) return
+    handleAction('reclassify')
   }
 
   const handleEscalate = () => {
-    console.log('[TicketCopilot] Escalate ticket')
+    if (!window.confirm('Are you sure you want to escalate this ticket?')) return
+    handleAction('escalate')
   }
 
-  const handleAddNote = () => {
-    console.log('[TicketCopilot] Add note')
+  async function handleAddNote() {
+    if (!newNote.trim() || !ticketId) return
+
+    try {
+      setActionLoading(true)
+      setActionFeedback(null)
+      await socFetch(`/soc/tickets/${ticketId}/notes`, {
+        method: 'POST',
+        body: JSON.stringify({ content: newNote, visibility: 'internal' }),
+      })
+      setActionFeedback({ type: 'success', message: 'Note added successfully' })
+      setNewNote('')
+      setShowNoteInput(false)
+    } catch (err) {
+      setActionFeedback({
+        type: 'error',
+        message: `Failed to add note: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      })
+    } finally {
+      setActionLoading(false)
+    }
   }
+
+  // ── Auto-dismiss feedback ─────────────────────────────────────────
+
+  useEffect(() => {
+    if (actionFeedback) {
+      const timer = setTimeout(() => setActionFeedback(null), 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [actionFeedback])
 
   // ── Loading ───────────────────────────────────────────────────────
 
@@ -268,16 +275,17 @@ export default function TicketCopilotSurface() {
     return <SocLoadingState surfaceLabel={t('surfaces.ticketCopilot')} />
   }
 
-  // ── Hard error (no data at all) ───────────────────────────────────
+  // ── Hard error (no data at all) — with mock fallback this is rare ──
 
-  if (error && !data) {
-    return <SocErrorState error={error} />
+  if (error && source === 'error') {
+    const socErr: SocError = { code: 'FETCH_ERROR', message: error, retry: refresh }
+    return <SocErrorState error={socErr} />
   }
 
   // ── Content ───────────────────────────────────────────────────────
 
-  const ctx = data?.ticketContext
-  const isFallback = error?.code === 'FALLBACK_MODE'
+  const ctx = data.ticketContext
+  const isDemo = source === 'mock'
 
   return (
     <div className="space-y-4">
@@ -294,12 +302,21 @@ export default function TicketCopilotSurface() {
         <h2 className="text-lg font-semibold">
           {ctx?.subject ? applyNeutralCopy(ctx.subject) : t('surfaces.ticketCopilot')}
         </h2>
-        {isFallback && (
+        {isDemo && (
           <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-warning/10 text-warning border border-warning/20">
-            {t('copilot.fallbackMode')}
+            {"Demo"}
           </span>
         )}
       </div>
+
+      {/* Demo banner when source is mock */}
+      {isDemo && (
+        <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-warning/10 border border-warning/20 text-warning text-xs font-medium">
+          <AlertTriangle className="h-3.5 w-3.5" />
+          {"Demo mode — data shown from local cache"}
+          {error && <span className="ml-auto text-muted-foreground">({error})</span>}
+        </div>
+      )}
 
       {/* Status bar */}
       {ctx && (
@@ -309,7 +326,7 @@ export default function TicketCopilotSurface() {
           <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded border', statusBadgeClass(ctx.status))}>
             {t(`ticket.status.${ctx.status.toLowerCase()}`)}
           </span>
-          <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded border', priorityBadgeClass(data?.ticketContext?.status ?? ''))}>
+          <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded border', priorityBadgeClass(ctx.status))}>
             {t('ticket.priority.high')}
           </span>
         </div>
@@ -325,11 +342,11 @@ export default function TicketCopilotSurface() {
               <MessageSquare className="h-4 w-4 text-chart-1" />
               <h3 className="text-sm font-semibold">{t('copilot.conversation')}</h3>
               <span className="ml-auto text-xs text-muted-foreground">
-                {data?.conversation.length ?? 0} {t('copilot.messages')}
+                {data.conversation.length} {t('copilot.messages')}
               </span>
             </div>
             <div className="divide-y divide-border/20 max-h-[420px] overflow-y-auto">
-              {data?.conversation.map((msg, i) => (
+              {data.conversation.map((msg, i) => (
                 <ConversationMessage key={`${msg.role}-${i}`} msg={msg} />
               ))}
             </div>
@@ -354,7 +371,6 @@ export default function TicketCopilotSurface() {
               <h3 className="text-sm font-semibold">{t('copilot.activity')}</h3>
             </div>
             <div className="px-5 py-4 space-y-3">
-              {/* These would come from the API in a real implementation */}
               <div className="flex items-center gap-3 text-sm">
                 <div className="w-1.5 h-1.5 rounded-full bg-chart-1/50" />
                 <span className="text-muted-foreground">{applyNeutralCopy('Ticket assigned to Network Operations')}</span>
@@ -383,12 +399,8 @@ export default function TicketCopilotSurface() {
               <h3 className="text-sm font-semibold">{t('copilot.suggestedActions')}</h3>
             </div>
             <div className="p-3 space-y-2">
-              {data?.suggestedActions.map((s) => (
-                <SuggestionCard
-                  key={s.id}
-                  suggestion={s}
-                  onApply={handleApplySuggestion}
-                />
+              {data.suggestedActions.map((s) => (
+                <SuggestionCard key={s.id} suggestion={s} onApply={handleApplySuggestion} />
               ))}
             </div>
           </div>
@@ -400,27 +412,104 @@ export default function TicketCopilotSurface() {
               <h3 className="text-sm font-semibold">{t('copilot.actions')}</h3>
             </div>
             <div className="p-4 space-y-2">
+              {actionFeedback && (
+                <div
+                  className={cn(
+                    'flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg border transition-all',
+                    actionFeedback.type === 'success'
+                      ? 'bg-success/10 text-success border-success/20'
+                      : 'bg-destructive/10 text-destructive border-destructive/20',
+                  )}
+                >
+                  {actionFeedback.type === 'success' ? (
+                    <Check className="h-3.5 w-3.5 shrink-0" />
+                  ) : (
+                    <X className="h-3.5 w-3.5 shrink-0" />
+                  )}
+                  <span className="flex-1">{actionFeedback.message}</span>
+                </div>
+              )}
+
               <button
                 onClick={handleReclassification}
-                className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border border-border/50 hover:border-border hover:bg-muted/50 transition-colors cursor-pointer"
+                disabled={actionLoading}
+                className={cn(
+                  'w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border transition-colors cursor-pointer',
+                  actionLoading
+                    ? 'border-border/30 text-muted-foreground/60 pointer-events-none'
+                    : 'border-border/50 hover:border-border hover:bg-muted/50',
+                )}
               >
-                <PenSquare className="h-4 w-4 text-chart-1" />
+                {actionLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-chart-1" />
+                ) : (
+                  <PenSquare className="h-4 w-4 text-chart-1" />
+                )}
                 {t('copilot.reclassify')}
               </button>
               <button
                 onClick={handleEscalate}
-                className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border border-border/50 hover:border-border hover:bg-muted/50 transition-colors cursor-pointer"
+                disabled={actionLoading}
+                className={cn(
+                  'w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border transition-colors cursor-pointer',
+                  actionLoading
+                    ? 'border-border/30 text-muted-foreground/60 pointer-events-none'
+                    : 'border-border/50 hover:border-border hover:bg-muted/50',
+                )}
               >
-                <ArrowUpRight className="h-4 w-4 text-warning" />
+                {actionLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-warning" />
+                ) : (
+                  <ArrowUpRight className="h-4 w-4 text-warning" />
+                )}
                 {t('copilot.escalate')}
               </button>
-              <button
-                onClick={handleAddNote}
-                className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border border-border/50 hover:border-border hover:bg-muted/50 transition-colors cursor-pointer"
-              >
-                <FileText className="h-4 w-4 text-muted-foreground" />
-                {t('copilot.addNote')}
-              </button>
+
+              {!showNoteInput ? (
+                <button
+                  onClick={() => setShowNoteInput(true)}
+                  disabled={actionLoading}
+                  className={cn(
+                    'w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border transition-colors cursor-pointer',
+                    actionLoading
+                      ? 'border-border/30 text-muted-foreground/60 pointer-events-none'
+                      : 'border-border/50 hover:border-border hover:bg-muted/50',
+                  )}
+                >
+                  {actionLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  ) : (
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  {t('copilot.addNote')}
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                    placeholder="Write a note..."
+                    className="flex-1 text-sm bg-muted/50 border border-border/50 rounded-lg px-3 py-2 placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !actionLoading) handleAddNote()
+                      if (e.key === 'Escape') { setShowNoteInput(false); setNewNote('') }
+                    }}
+                  />
+                  <button
+                    onClick={handleAddNote}
+                    disabled={actionLoading || !newNote.trim()}
+                    className="p-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                  >
+                    {actionLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -443,7 +532,7 @@ export default function TicketCopilotSurface() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{t('copilot.conversationAge')}</span>
-                <span className="text-foreground">{data?.conversation.length ?? 0} {t('copilot.messages')}</span>
+                <span className="text-foreground">{data.conversation.length} {t('copilot.messages')}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{t('copilot.assignedTo')}</span>
@@ -456,3 +545,4 @@ export default function TicketCopilotSurface() {
     </div>
   )
 }
+

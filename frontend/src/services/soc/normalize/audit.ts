@@ -27,6 +27,9 @@ interface AuditTimeRange {
 // ── Normalizer ──
 
 function normalizeAudit(raw: Record<string, unknown>): AuditView {
+  if (!raw || typeof raw !== 'object') {
+    return { events: [], actors: [], timeRange: { from: '', to: '' } }
+  }
   return {
     events: (raw.events as AuditEventView[]) ?? [],
     actors: (raw.actors as string[]) ?? [],

@@ -8,6 +8,7 @@ import { surfaceRegistry } from './surfaceRegistry'
 interface SocShellState {
   activeSurfaceId: SurfaceId
   surfaceStatusMap: Record<SurfaceId, SurfaceStatus>
+  dataSource: Record<SurfaceId, 'backend' | 'mock' | 'error'>
   historyStack: SurfaceId[]
   featureEnabled: boolean
 }
@@ -16,6 +17,7 @@ interface SocShellActions {
   navigate: (id: SurfaceId) => void
   goBack: () => void
   setSurfaceStatus: (id: SurfaceId, status: SurfaceStatus) => void
+  setDataSource: (id: SurfaceId, source: 'backend' | 'mock' | 'error') => void
   toggleFeature: () => void
   reset: () => void
 }
@@ -30,9 +32,14 @@ const initialSurfaceStatusMap = Object.fromEntries(
   allSurfaceIds.map((id) => [id, 'loading' as SurfaceStatus]),
 ) as Record<SurfaceId, SurfaceStatus>
 
+const initialDataSource = Object.fromEntries(
+  allSurfaceIds.map((id) => [id, 'mock' as const]),
+) as Record<SurfaceId, 'backend' | 'mock' | 'error'>
+
 const initialState: SocShellState = {
   activeSurfaceId: SURFACE_IDS.COMMAND_CENTER,
   surfaceStatusMap: initialSurfaceStatusMap,
+  dataSource: initialDataSource,
   historyStack: [],
   featureEnabled: false,
 }
@@ -66,6 +73,12 @@ const useSocShellStore = create<SocShellStore>()((set, get) => ({
   setSurfaceStatus: (id: SurfaceId, status: SurfaceStatus) => {
     set((state) => ({
       surfaceStatusMap: { ...state.surfaceStatusMap, [id]: status },
+    }))
+  },
+
+  setDataSource: (id: SurfaceId, source: 'backend' | 'mock' | 'error') => {
+    set((state) => ({
+      dataSource: { ...state.dataSource, [id]: source },
     }))
   },
 

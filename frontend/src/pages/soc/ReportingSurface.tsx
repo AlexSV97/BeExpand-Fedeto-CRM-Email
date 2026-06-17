@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ReportingSurface — reporting and metrics dashboard.
  *
  * Features report type selector tabs, date range presets, recharts
@@ -6,14 +6,13 @@
  * metrics summary sidebar.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useSocShell } from '../../services/soc/SocShellProvider'
+import { useState, useMemo } from 'react'
 import { SURFACE_IDS } from '../../services/soc/contracts'
 import type { SocError } from '../../services/soc/contracts'
-import { socFetch } from '../../services/soc/client'
 import { SOC_ENDPOINTS } from '../../services/soc/endpoints'
+import { useSocResource } from '../../services/soc/useSocResource'
 import { normalizeReporting } from '../../services/soc/normalize/reporting'
-import type { ReportingView } from '../../services/soc/normalize/reporting'
+import { MOCK_REPORTING, MOCK_REPORTS_DATA } from '../../services/soc/mockData'
 import { SocLoadingState, SocEmptyState, SocErrorState } from '../../components/soc'
 import { t } from '../../content/socCopy'
 import { cn } from '../../lib/utils'
@@ -27,6 +26,7 @@ import {
   Users,
   FileText,
   Calendar,
+  AlertTriangle,
 } from 'lucide-react'
 import {
   BarChart,
@@ -54,88 +54,20 @@ const DATE_RANGES = [
   { key: 'year', labelKey: 'report.thisYear' },
 ] as const
 
-// ─── Mock chart data ──────────────────────────────────────────────────────
+// ─── Map string icon names to lucide components ─────────────────────────
 
-interface ChartDataPoint {
-  name: string
-  value: number
-  secondary?: number
+const ICON_MAP: Record<string, typeof BarChart3> = {
+  CheckCircle,
+  Users,
+  BarChart3,
+  LineChart,
+  TrendingUp,
+  Clock,
+  FileText,
 }
 
-interface MockReportData {
-  title: string
-  icon: typeof BarChart3
-  data: ChartDataPoint[]
-  metrics: { label: string; value: string | number; icon: typeof BarChart3 }[]
-}
-
-const MOCK_REPORTS: Record<string, MockReportData> = {
-  slaCompliance: {
-    title: t('report.slaCompliance'),
-    icon: CheckCircle,
-    data: [
-      { name: 'Network', value: 87 },
-      { name: 'Security', value: 93 },
-      { name: 'Applications', value: 82 },
-      { name: 'Infrastructure', value: 91 },
-      { name: 'Cloud', value: 78 },
-    ],
-    metrics: [
-      { label: t('report.overallCompliance'), value: '86.2%', icon: CheckCircle },
-      { label: t('report.totalTickets'), value: '1,284', icon: FileText },
-      { label: t('report.breached'), value: '42', icon: Clock },
-    ],
-  },
-  agentPerformance: {
-    title: t('report.agentPerformance'),
-    icon: Users,
-    data: [
-      { name: 'Ana L.', value: 94, secondary: 12 },
-      { name: 'Carlos R.', value: 88, secondary: 8 },
-      { name: 'Miguel T.', value: 76, secondary: 15 },
-      { name: 'Laura G.', value: 92, secondary: 6 },
-      { name: 'Diego F.', value: 71, secondary: 10 },
-      { name: 'Valentina O.', value: 83, secondary: 9 },
-    ],
-    metrics: [
-      { label: t('report.avgCompliance'), value: '84.0%', icon: TrendingUp },
-      { label: t('report.activeAgents'), value: '6', icon: Users },
-      { label: t('report.totalTickets'), value: '60', icon: FileText },
-    ],
-  },
-  ticketVolume: {
-    title: t('report.ticketVolume'),
-    icon: BarChart3,
-    data: [
-      { name: 'Mon', value: 42 },
-      { name: 'Tue', value: 56 },
-      { name: 'Wed', value: 38 },
-      { name: 'Thu', value: 61 },
-      { name: 'Fri', value: 47 },
-      { name: 'Sat', value: 22 },
-      { name: 'Sun', value: 18 },
-    ],
-    metrics: [
-      { label: t('report.totalTickets'), value: '284', icon: FileText },
-      { label: t('report.dailyAvg'), value: '40.6', icon: BarChart3 },
-      { label: t('report.peakDay'), value: 'Thu (61)', icon: TrendingUp },
-    ],
-  },
-  queueTrends: {
-    title: t('report.queueTrends'),
-    icon: LineChart,
-    data: [
-      { name: 'Week 1', value: 45, secondary: 38 },
-      { name: 'Week 2', value: 52, secondary: 42 },
-      { name: 'Week 3', value: 38, secondary: 35 },
-      { name: 'Week 4', value: 61, secondary: 48 },
-    ],
-    metrics: [
-      { label: t('report.totalTickets'), value: '196', icon: FileText },
-      { label: t('report.avgResolution'), value: '4.2h', icon: Clock },
-      { label: t('report.slaCompliance'), value: '87%', icon: CheckCircle },
-    ],
-  },
+function resolveIcon(name: string): typeof BarChart3 {
+  return ICON_MAP[name] ?? BarChart3
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────
@@ -216,51 +148,25 @@ function MetricBadge({
 // ─── Main surface ─────────────────────────────────────────────────────────
 
 export default function ReportingSurface() {
-  const { setSurfaceStatus } = useSocShell()
-  const [data, setData] = useState<ReportingView | null>(null)
-  const [error, setError] = useState<SocError | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { data, loading, error, source, refresh } = useSocResource(
+    SOC_ENDPOINTS[SURFACE_IDS.REPORTING],
+    normalizeReporting,
+    MOCK_REPORTING,
+    SURFACE_ID,
+  )
 
   // UI state
   const [activeReport, setActiveReport] = useState<string>('slaCompliance')
   const [activeRange, setActiveRange] = useState('30d')
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    setSurfaceStatus(SURFACE_ID, 'loading')
-
-    try {
-      const raw = await socFetch<Record<string, unknown>>(SOC_ENDPOINTS[SURFACE_ID])
-      const view = normalizeReporting(raw)
-      setData(view)
-      setSurfaceStatus(SURFACE_ID, 'ready')
-    } catch (err: unknown) {
-      const socErr: SocError = {
-        code: err instanceof Error && 'code' in err ? (err as { code: string }).code : 'UNKNOWN_ERROR',
-        message: err instanceof Error ? err.message : String(err),
-        retry: fetchData,
-      }
-      setError(socErr)
-      setSurfaceStatus(SURFACE_ID, 'error')
-    } finally {
-      setLoading(false)
-    }
-  }, [setSurfaceStatus])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
-
   // ── Handlers ──
-
   const handleExport = () => {
     console.log(`[Reporting] Export report: ${activeReport} (range: ${activeRange})`)
   }
 
   // ── Derived ──
-
-  const currentReport = MOCK_REPORTS[activeReport]
+  const currentReport = MOCK_REPORTS_DATA[activeReport]
+  const ActiveIconComponent = currentReport ? resolveIcon(currentReport.icon) : BarChart3
 
   const chartContent = useMemo(() => {
     if (!currentReport) return null
@@ -281,19 +187,9 @@ export default function ReportingSurface() {
                 fontSize: '12px',
               }}
             />
-            <Bar
-              dataKey="value"
-              fill="var(--chart-1)"
-              radius={[4, 4, 0, 0]}
-              name={t('report.value')}
-            />
+            <Bar dataKey="value" fill="var(--chart-1)" radius={[4, 4, 0, 0]} name={t('report.value')} />
             {activeReport === 'agentPerformance' && (
-              <Bar
-                dataKey="secondary"
-                fill="var(--chart-2)"
-                radius={[4, 4, 0, 0]}
-                name={t('report.ticketsHandled')}
-              />
+              <Bar dataKey="secondary" fill="var(--chart-2)" radius={[4, 4, 0, 0]} name={t('report.ticketsHandled')} />
             )}
           </BarChart>
         ) : (
@@ -310,54 +206,45 @@ export default function ReportingSurface() {
               }}
             />
             <Legend />
-            <Line
-              type="monotone"
-              dataKey="value"
-              stroke="var(--chart-1)"
-              strokeWidth={2}
-              dot={{ r: 3 }}
-              name={t('report.queueA')}
-            />
-            <Line
-              type="monotone"
-              dataKey="secondary"
-              stroke="var(--chart-2)"
-              strokeWidth={2}
-              dot={{ r: 3 }}
-              name={t('report.queueB')}
-            />
+            <Line type="monotone" dataKey="value" stroke="var(--chart-1)" strokeWidth={2} dot={{ r: 3 }} name={t('report.queueA')} />
+            <Line type="monotone" dataKey="secondary" stroke="var(--chart-2)" strokeWidth={2} dot={{ r: 3 }} name={t('report.queueB')} />
           </ReLineChart>
         )}
       </ResponsiveContainer>
     )
   }, [currentReport, activeReport])
 
-  // ── Loading ──
+  const isDemo = source === 'mock'
 
+  // ── Loading ──
   if (loading) {
     return <SocLoadingState surfaceLabel={t('surfaces.reporting')} />
   }
 
   // ── Error ──
-
   if (error) {
-    return <SocErrorState error={error} />
+    const socErr: SocError = { code: 'FETCH_ERROR', message: error, retry: refresh }
+    return <SocErrorState error={socErr} />
   }
 
-  // ── Empty ──
-
-  if (!data || (data.metrics.length === 0 && data.reportTypes.length === 0)) {
+  // ── Empty (only when source is backend and data is empty) ──
+  if (source === 'backend' && data.metrics.length === 0 && data.reportTypes.length === 0) {
     return <SocEmptyState surfaceId={SURFACE_ID} />
   }
 
   // ── Content ──
-
   return (
     <div className="space-y-4">
-      {/* Header */}
+      {/* Header + demo badge */}
       <div className="flex items-center gap-2">
         <BarChart3 className="h-5 w-5 text-chart-1" />
         <h2 className="text-lg font-semibold">{t('surfaces.reporting')}</h2>
+        {isDemo && (
+          <div className="ml-auto flex items-center gap-2 px-3 py-1 rounded-lg bg-warning/10 border border-warning/20 text-warning text-xs font-medium">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            {"Demo"}
+          </div>
+        )}
       </div>
 
       {/* Report type selector */}
@@ -367,7 +254,7 @@ export default function ReportingSurface() {
             key={type}
             active={activeReport === type}
             label={t(`report.${type}`)}
-            icon={MOCK_REPORTS[type].icon}
+            icon={resolveIcon(MOCK_REPORTS_DATA[type]?.icon ?? 'BarChart3')}
             onClick={() => setActiveReport(type)}
           />
         ))}
@@ -398,18 +285,14 @@ export default function ReportingSurface() {
       {/* Main content */}
       {currentReport && (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Chart area */}
           <div className="lg:col-span-3 bg-card rounded-2xl border border-border/50 shadow-sm p-5">
             <div className="flex items-center gap-2 mb-4">
-              <currentReport.icon className="h-4 w-4 text-chart-1" />
+              <ActiveIconComponent className="h-4 w-4 text-chart-1" />
               <h3 className="text-sm font-semibold">{currentReport.title}</h3>
             </div>
-            <div className="h-[320px]">
-              {chartContent}
-            </div>
+            <div className="h-[320px]">{chartContent}</div>
           </div>
 
-          {/* Metrics summary */}
           <div className="space-y-3">
             <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               {t('report.metricsSummary')}
@@ -419,7 +302,7 @@ export default function ReportingSurface() {
                 key={i}
                 label={metric.label}
                 value={metric.value}
-                icon={metric.icon}
+                icon={resolveIcon(metric.icon)}
               />
             ))}
           </div>
@@ -428,3 +311,4 @@ export default function ReportingSurface() {
     </div>
   )
 }
+

@@ -173,12 +173,12 @@ app.include_router(tickets.router, prefix="/api/v1")
 app.include_router(soc.router, prefix="/api/v1")
 
 # CORS
+import os
 _cors_origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "https://beconnect-frontend.onrender.com",
 ]
-import os
 _env_origins = os.getenv("CORS_ORIGINS", "")
 if _env_origins:
     _cors_origins.extend(_env_origins.split(","))
@@ -187,8 +187,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 

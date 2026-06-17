@@ -1,4 +1,4 @@
-/**
+﻿/**
  * AuditSurface — immutable audit event log.
  *
  * Chronological timeline of audit events with actor, action type,
@@ -6,14 +6,13 @@
  * action type, and date range.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useSocShell } from '../../services/soc/SocShellProvider'
+import { useState, useMemo } from 'react'
 import { SURFACE_IDS } from '../../services/soc/contracts'
 import type { SocError } from '../../services/soc/contracts'
-import { socFetch } from '../../services/soc/client'
 import { SOC_ENDPOINTS } from '../../services/soc/endpoints'
+import { useSocResource } from '../../services/soc/useSocResource'
 import { normalizeAudit } from '../../services/soc/normalize/audit'
-import type { AuditView } from '../../services/soc/normalize/audit'
+import { MOCK_AUDIT } from '../../services/soc/mockData'
 import { SocLoadingState, SocEmptyState, SocErrorState } from '../../components/soc'
 import { applyNeutralCopy, t } from '../../content/socCopy'
 import { cn } from '../../lib/utils'
@@ -30,6 +29,7 @@ import {
   ChevronDown,
   ChevronUp,
   Calendar,
+  AlertTriangle,
 } from 'lucide-react'
 
 // ─── Constants ───────────────────────────────────────────────────────────
@@ -51,7 +51,7 @@ const ACTION_ICONS: Record<string, typeof LogIn> = {
   Escalation: ArrowUpRight,
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────
+// ─── Types for supplementary audit data ────────────────────────────────
 
 interface MockAuditEvent {
   id: string
@@ -128,11 +128,7 @@ function AuditEventRow({ event }: { event: MockAuditEvent }) {
 
   return (
     <div className="border-b border-border/30 last:border-b-0 hover:bg-muted/30 transition-colors">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-start gap-4 px-4 py-3.5 text-left cursor-pointer"
-      >
-        {/* Timeline dot */}
+      <button onClick={() => setExpanded(!expanded)} className="w-full flex items-start gap-4 px-4 py-3.5 text-left cursor-pointer">
         <div className="flex flex-col items-center gap-1 shrink-0 pt-0.5">
           <div className={cn('rounded-full p-1.5', actionColor(event.action))}>
             {actionIcon(event.action)}
@@ -158,7 +154,6 @@ function AuditEventRow({ event }: { event: MockAuditEvent }) {
         )}
       </button>
 
-      {/* Expandable details */}
       {expanded && hasDetails && event.details && (
         <div className="px-4 pb-3 pl-[60px]">
           <pre className="text-[10px] text-muted-foreground bg-muted/50 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap font-mono">
@@ -173,10 +168,12 @@ function AuditEventRow({ event }: { event: MockAuditEvent }) {
 // ─── Main surface ─────────────────────────────────────────────────────────
 
 export default function AuditSurface() {
-  const { setSurfaceStatus } = useSocShell()
-  const [data, setData] = useState<AuditView | null>(null)
-  const [error, setError] = useState<SocError | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { data, loading, error, source, refresh } = useSocResource(
+    SOC_ENDPOINTS[SURFACE_IDS.AUDIT],
+    normalizeAudit,
+    MOCK_AUDIT,
+    SURFACE_ID,
+  )
 
   // UI state
   const [actorSearch, setActorSearch] = useState('')
@@ -185,35 +182,7 @@ export default function AuditSurface() {
   const [endDate, setEndDate] = useState('')
   const [events] = useState<MockAuditEvent[]>(MOCK_EVENTS)
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    setSurfaceStatus(SURFACE_ID, 'loading')
-
-    try {
-      const raw = await socFetch<Record<string, unknown>>(SOC_ENDPOINTS[SURFACE_ID])
-      const view = normalizeAudit(raw)
-      setData(view)
-      setSurfaceStatus(SURFACE_ID, 'ready')
-    } catch (err: unknown) {
-      const socErr: SocError = {
-        code: err instanceof Error && 'code' in err ? (err as { code: string }).code : 'UNKNOWN_ERROR',
-        message: err instanceof Error ? err.message : String(err),
-        retry: fetchData,
-      }
-      setError(socErr)
-      setSurfaceStatus(SURFACE_ID, 'error')
-    } finally {
-      setLoading(false)
-    }
-  }, [setSurfaceStatus])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
-
   // ── Derived ──
-
   const filteredEvents = useMemo(() => {
     let result = events
 
@@ -249,41 +218,45 @@ export default function AuditSurface() {
     setEndDate('')
   }
 
-  // ── Loading ──
+  const isDemo = source === 'mock'
 
+  // ── Loading ──
   if (loading) {
     return <SocLoadingState surfaceLabel={t('surfaces.audit')} />
   }
 
   // ── Error ──
-
   if (error) {
-    return <SocErrorState error={error} />
+    const socErr: SocError = { code: 'FETCH_ERROR', message: error, retry: refresh }
+    return <SocErrorState error={socErr} />
   }
 
-  // ── Empty ──
-
-  if (!data || (data.events.length === 0 && events.length === 0)) {
+  // ── Empty (only when source is backend and data is empty) ──
+  if (source === 'backend' && data.events.length === 0 && events.length === 0) {
     return <SocEmptyState surfaceId={SURFACE_ID} />
   }
 
   // ── Content ──
-
   return (
     <div className="space-y-4">
-      {/* Header */}
+      {/* Header + demo badge */}
       <div className="flex items-center gap-2">
         <ScrollText className="h-5 w-5 text-chart-3" />
         <h2 className="text-lg font-semibold">{t('surfaces.audit')}</h2>
         <span className="text-xs text-muted-foreground">
           ({events.length} {t('audit.events')})
         </span>
+        {isDemo && (
+          <div className="ml-auto flex items-center gap-2 px-3 py-1 rounded-lg bg-warning/10 border border-warning/20 text-warning text-xs font-medium">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            {"Demo"}
+          </div>
+        )}
       </div>
 
       {/* Filters bar */}
       <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-4 space-y-3">
         <div className="flex flex-wrap items-center gap-3">
-          {/* Actor search */}
           <div className="relative flex-1 min-w-[180px] max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <input
@@ -297,62 +270,32 @@ export default function AuditSurface() {
               )}
             />
             {actorSearch && (
-              <button
-                onClick={() => setActorSearch('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
-              >
+              <button onClick={() => setActorSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer">
                 <X className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
 
-          {/* Action type dropdown */}
-          <select
-            value={actionFilter}
-            onChange={(e) => setActionFilter(e.target.value)}
-            className={cn(
-              'px-3 py-2 text-sm bg-muted/50 border border-border/50 rounded-lg',
-              'text-foreground focus:outline-none focus:ring-1 focus:ring-ring',
-            )}
-          >
+          <select value={actionFilter} onChange={(e) => setActionFilter(e.target.value)}
+            className="px-3 py-2 text-sm bg-muted/50 border border-border/50 rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
             {ACTION_TYPES.map((at) => (
-              <option key={at.key} value={at.key}>
-                {at.label}
-              </option>
+              <option key={at.key} value={at.key}>{at.label}</option>
             ))}
           </select>
 
-          {/* Date range */}
           <div className="flex items-center gap-2">
             <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className={cn(
-                'px-3 py-2 text-sm bg-muted/50 border border-border/50 rounded-lg',
-                'text-foreground focus:outline-none focus:ring-1 focus:ring-ring',
-              )}
-              placeholder={t('audit.fromDate')}
-            />
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
+              className="px-3 py-2 text-sm bg-muted/50 border border-border/50 rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
             <span className="text-[10px] text-muted-foreground">{t('audit.to')}</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className={cn(
-                'px-3 py-2 text-sm bg-muted/50 border border-border/50 rounded-lg',
-                'text-foreground focus:outline-none focus:ring-1 focus:ring-ring',
-              )}
-              placeholder={t('audit.toDate')}
-            />
+            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
+              className="px-3 py-2 text-sm bg-muted/50 border border-border/50 rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
           </div>
 
           {hasActiveFilters && (
-            <button
-              onClick={clearFilters}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-            >
+            <button onClick={clearFilters}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
               <Filter className="h-3 w-3" />
               {t('audit.clearFilters')}
             </button>
@@ -366,10 +309,7 @@ export default function AuditSurface() {
           <ScrollText className="h-10 w-10 mb-3 text-muted-foreground/40" />
           <p className="text-sm">{t('empty.audit')}</p>
           {hasActiveFilters && (
-            <button
-              onClick={clearFilters}
-              className="mt-3 text-xs text-primary hover:underline cursor-pointer"
-            >
+            <button onClick={clearFilters} className="mt-3 text-xs text-primary hover:underline cursor-pointer">
               {t('audit.clearFilters')}
             </button>
           )}
@@ -386,3 +326,4 @@ export default function AuditSurface() {
     </div>
   )
 }
+

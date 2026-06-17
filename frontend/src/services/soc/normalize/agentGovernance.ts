@@ -31,6 +31,9 @@ interface ComplianceReportView {
 // ── Normalizer ──
 
 function normalizeAgentGovernance(raw: Record<string, unknown>): AgentGovernanceView {
+  if (!raw || typeof raw !== 'object') {
+    return { agents: [], permissions: [], compliance: { passed: 0, failed: 0, lastCheck: '' } }
+  }
   return {
     agents: (raw.agents as AgentItemView[]) ?? [],
     permissions: (raw.permissions as PermissionSetView[]) ?? [],

@@ -36,6 +36,9 @@ interface SlaItemView {
 // ── Normalizer ──
 
 function normalizeSlaWarRoom(raw: Record<string, unknown>): SlaWarRoomView {
+  if (!raw || typeof raw !== 'object') {
+    return { breachTimers: [], escalations: [], activeSLAs: [] }
+  }
   return {
     breachTimers: (raw.breachTimers as BreachTimerView[]) ?? [],
     escalations: (raw.escalations as EscalationItemView[]) ?? [],

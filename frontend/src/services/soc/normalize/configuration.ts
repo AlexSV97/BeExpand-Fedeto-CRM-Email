@@ -31,6 +31,9 @@ interface FeatureFlagView {
 // ── Normalizer ──
 
 function normalizeConfiguration(raw: Record<string, unknown>): ConfigurationView {
+  if (!raw || typeof raw !== 'object') {
+    return { settings: [], thresholds: [], featureFlags: [] }
+  }
   return {
     settings: (raw.settings as ConfigSettingView[]) ?? [],
     thresholds: (raw.thresholds as ConfigThresholdView[]) ?? [],

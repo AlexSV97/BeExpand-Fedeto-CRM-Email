@@ -25,6 +25,9 @@ interface TrendItemView {
 // ── Normalizer ──
 
 function normalizeReporting(raw: Record<string, unknown>): ReportingView {
+  if (!raw || typeof raw !== 'object') {
+    return { metrics: [], trends: [], reportTypes: [] }
+  }
   return {
     metrics: (raw.metrics as MetricItemView[]) ?? [],
     trends: (raw.trends as TrendItemView[]) ?? [],
