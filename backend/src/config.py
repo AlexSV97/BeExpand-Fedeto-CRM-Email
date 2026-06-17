@@ -45,8 +45,8 @@ class Settings(BaseSettings):
     #       La contraseña se hashea al almacenarse (seed_admin en main.py),
     #       pero el valor plano en Settings NO debe usarse como secreto compartido.
     #       Considera mover la gestión de credenciales a un secret manager externo.
-    admin_username: str = ""
-    admin_password: str = ""
+    admin_username: str = "admin"
+    admin_password: str = "admin123"
 
     # ── IMAP (Gmail) ──
     imap_server: str = "imap.gmail.com"

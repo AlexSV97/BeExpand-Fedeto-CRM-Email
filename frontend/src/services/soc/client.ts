@@ -62,7 +62,21 @@ function sleep(ms: number): Promise<void> {
 
 // ── Base fetcher ──
 
-const SOC_API_BASE = import.meta.env.VITE_SOC_API_URL || '/api/v1'
+const RENDER_FRONTEND_HOST = 'beconnect-frontend.onrender.com'
+const RENDER_SOC_BACKEND_BASE = 'https://beexpand-fedeto-crm-email.onrender.com/api/v1'
+
+function resolveSocApiBase(): string {
+  const envBase = import.meta.env.VITE_SOC_API_URL?.trim()
+  if (envBase) return envBase
+
+  if (typeof window !== 'undefined' && window.location.hostname === RENDER_FRONTEND_HOST) {
+    return RENDER_SOC_BACKEND_BASE
+  }
+
+  return '/api/v1'
+}
+
+const SOC_API_BASE = resolveSocApiBase()
 
 async function socFetch<T>(
   endpoint: string,

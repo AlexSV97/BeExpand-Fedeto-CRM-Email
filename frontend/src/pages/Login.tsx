@@ -61,7 +61,7 @@ export default function Login() {
             <span className="text-lg font-bold text-white">Bx</span>
           </div>
           <div>
-            <h1 className="text-lg font-bold text-white m-0">BeConnect</h1>
+            <h1 className="text-lg font-bold text-white m-0">Aiuken SOC</h1>
             <p className="text-xs m-0" style={{ color: 'var(--color-sidebar-text)' }}>
               Inicia sesión para continuar
             </p>

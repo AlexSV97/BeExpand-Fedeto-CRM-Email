@@ -81,33 +81,44 @@ async def _auto_sync_loop():
 
 
 async def seed_admin():
-    """Crea el usuario admin por defecto si no existe.
+    """Garantiza que exista un usuario admin con las credenciales configuradas.
 
-    Solo se ejecuta si ADMIN_USERNAME y ADMIN_PASSWORD est�n configurados
-    (i.e., no est�n vac�os). En producci�n, estas variables deben definirse
-    en el archivo .env o como variables de entorno.
+    Si el usuario ya existe, sincroniza contraseña, rol y estado para evitar
+    quedar bloqueados en entornos donde no hay acceso al dashboard del deploy.
     """
     settings = get_settings()
     if not settings.admin_username or not settings.admin_password:
         logger.info(
-            "seed_admin: ADMIN_USERNAME o ADMIN_PASSWORD vac�os — "
-            "se omite creaci�n de admin por defecto"
+            "seed_admin: ADMIN_USERNAME o ADMIN_PASSWORD vacíos — "
+            "se omite sincronización de admin por defecto"
         )
         return
     async with async_session_factory() as session:
         result = await session.execute(
             select(User).where(User.username == settings.admin_username)
         )
-        if result.scalar_one_or_none() is None:
+        user = result.scalar_one_or_none()
+        hashed_password = hash_password(settings.admin_password)
+
+        if user is None:
             user = User(
                 username=settings.admin_username,
-                hashed_password=hash_password(settings.admin_password),
+                hashed_password=hashed_password,
                 role="admin",
                 active=True,
                 full_name="Administrador",
             )
             session.add(user)
-            await session.commit()
+            logger.warning("seed_admin: usuario admin creado/sincronizado: %s", settings.admin_username)
+        else:
+            user.hashed_password = hashed_password
+            user.role = "admin"
+            user.active = True
+            if not user.full_name:
+                user.full_name = "Administrador"
+            logger.warning("seed_admin: contraseña admin resincronizada para %s", settings.admin_username)
+
+        await session.commit()
 
 
 async def _recover_orphan_tasks() -> None:
