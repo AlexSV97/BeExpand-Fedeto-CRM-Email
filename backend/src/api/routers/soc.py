@@ -1286,6 +1286,8 @@ async def get_configuration(
     from src.config import get_settings
 
     settings = get_settings()
+    from src.integrations.otrs_znuny import OtrsZnunySettings
+    otrs_settings = OtrsZnunySettings()
 
     return ConfigurationResponse(
         settings=[
@@ -1297,6 +1299,8 @@ async def get_configuration(
             ConfigSetting(key="imap_port", value=settings.imap_port, type="number"),
             ConfigSetting(key="imap_poll_interval_minutes", value=settings.imap_poll_interval_minutes, type="number"),
             ConfigSetting(key="openrouter_model", value=settings.openrouter_model, type="string"),
+            ConfigSetting(key="otrs_configured", value=otrs_settings.is_configured, type="boolean"),
+            ConfigSetting(key="otrs_base_url", value=otrs_settings.base_url if otrs_settings.is_configured else "", type="string"),
         ],
         thresholds=[
             ConfigThreshold(name="sla_warning", warning=75.0, critical=50.0),

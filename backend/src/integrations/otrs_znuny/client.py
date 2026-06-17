@@ -84,6 +84,25 @@ class OtrsZnunyClient:
                 return candidate
         return payload
 
+    async def health_check(self) -> bool:
+        """Probe OTRS/Znuny API to verify connectivity and authentication.
+
+        Makes a lightweight GET request to the queues endpoint with limit=1.
+        Returns True if the API responds with a 2xx status code.
+        Returns False if not configured or any error occurs.
+        """
+        if not self._settings.is_configured:
+            return False
+        try:
+            response = await self._client.request(
+                "GET",
+                self._settings.queues_path(),
+                params={"limit": 1},
+            )
+            return response.status_code < 400
+        except Exception:
+            return False
+
     async def list_tickets(
         self,
         *,

@@ -322,6 +322,22 @@ class TestGetConfiguration:
         assert isinstance(data["thresholds"], list)
         assert len(data["thresholds"]) > 0
 
+    async def test_otrs_settings_in_config(self, client: AsyncClient, auth_headers: dict[str, str]):
+        response = await client.get("/api/v1/soc/config", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        settings = {s["key"]: s for s in data["settings"]}
+
+        assert "otrs_configured" in settings
+        assert settings["otrs_configured"]["type"] == "boolean"
+        # Without env vars, otrs_configured should be false
+        assert settings["otrs_configured"]["value"] is False
+
+        assert "otrs_base_url" in settings
+        assert settings["otrs_base_url"]["type"] == "string"
+        # Without env vars, base_url should be empty
+        assert settings["otrs_base_url"]["value"] == ""
+
     async def test_requires_auth(self, client: AsyncClient):
         response = await client.get("/api/v1/soc/config")
         assert response.status_code == 401

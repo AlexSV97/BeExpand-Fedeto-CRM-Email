@@ -248,11 +248,64 @@ async def root():
 
 @app.get("/api/v1/health")
 async def health():
-    """Health check detallado."""
+    """Health check with real per-dependency probes."""
+    from sqlalchemy import text
     from src.config import get_settings
-    db_url = get_settings().database_url
-    db_type = "postgresql" if "postgresql" in db_url else "sqlite"
+    from src.db.session import async_session_factory
+    from src.integrations.otrs_znuny import OtrsZnunyClient, OtrsZnunySettings
+    from src.llm_client import LLMClient
+
+    import asyncio
+
+    settings = get_settings()
+
+    async def _check_db() -> dict:
+        try:
+            async with async_session_factory() as session:
+                await session.execute(text("SELECT 1"))
+            return {"status": "ok"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    async def _check_otrs() -> dict:
+        otrs_settings = OtrsZnunySettings()
+        if not otrs_settings.is_configured:
+            return {"status": "not_configured", "message": "OTRS_ZNUNY_BASE_URL or OTRS_ZNUNY_API_TOKEN not set"}
+        client = OtrsZnunyClient(settings=otrs_settings)
+        try:
+            ok = await client.health_check()
+            await client.close()
+            if ok:
+                return {"status": "ok"}
+            return {"status": "error", "message": "OTRS API returned error status"}
+        except Exception as e:
+            await client.close()
+            return {"status": "error", "message": str(e)}
+
+    async def _check_ai() -> dict:
+        try:
+            llm = LLMClient(use_chat_model=True)
+            result = await llm.check_health()
+            return {"status": "ok" if result else "error", "message": None if result else "AI model not responding"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    db_result, otrs_result, ai_result = await asyncio.gather(
+        _check_db(), _check_otrs(), _check_ai(), return_exceptions=True
+    )
+
+    services = {
+        "database": db_result if not isinstance(db_result, BaseException) else {"status": "error", "message": str(db_result)},
+        "otrs": otrs_result if not isinstance(otrs_result, BaseException) else {"status": "error", "message": str(otrs_result)},
+        "ai": ai_result if not isinstance(ai_result, BaseException) else {"status": "error", "message": str(ai_result)},
+    }
+
+    all_ok = all(s.get("status") == "ok" for s in services.values())
+    overall = "ok" if all_ok else "degraded"
+
     return {
-        "status": "healthy",
-        "database": db_type,
+        "status": overall,
+        "services": services,
+        "app": "BeExpand CRM Email",
+        "version": "0.1.0",
     }

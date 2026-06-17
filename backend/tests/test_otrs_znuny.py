@@ -300,6 +300,53 @@ async def test_otrs_connector_update_ticket_patches_priority_and_state():
     assert ticket.priority is TicketPriority.NORMAL
 
 
+@pytest.mark.asyncio
+async def test_otrs_health_check_returns_true_when_configured_and_api_responds_ok():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/v1/queues"
+        assert request.url.params["limit"] == "1"
+        return httpx.Response(200, json={"queues": []})
+
+    settings = OtrsZnunySettings(base_url="https://otrs.example.com", api_token="secret-token")
+    async with OtrsZnunyClient(settings=settings, transport=httpx.MockTransport(handler)) as client:
+        result = await client.health_check()
+
+    assert result is True
+
+
+@pytest.mark.asyncio
+async def test_otrs_health_check_returns_false_when_api_returns_error():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, text="Internal Server Error")
+
+    settings = OtrsZnunySettings(base_url="https://otrs.example.com", api_token="secret-token")
+    async with OtrsZnunyClient(settings=settings, transport=httpx.MockTransport(handler)) as client:
+        result = await client.health_check()
+
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_otrs_health_check_returns_false_when_not_configured():
+    settings = OtrsZnunySettings()
+    async with OtrsZnunyClient(settings=settings, transport=httpx.MockTransport(handler=lambda r: httpx.Response(200))) as client:
+        result = await client.health_check()
+
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_otrs_health_check_returns_false_on_network_error():
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.TimeoutException("Connection timed out")
+
+    settings = OtrsZnunySettings(base_url="https://otrs.example.com", api_token="secret-token")
+    async with OtrsZnunyClient(settings=settings, transport=httpx.MockTransport(handler)) as client:
+        result = await client.health_check()
+
+    assert result is False
+
+
 def test_audit_event_identifies_human_actor():
     event = AuditEvent(
         actor_kind=AuditActorKind.HUMAN,

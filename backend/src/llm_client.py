@@ -96,6 +96,32 @@ class LLMClient:
             max_tokens=max_tokens,
         )
 
+    async def check_health(self) -> bool:
+        """Check if the configured LLM backend is reachable.
+
+        For Ollama: GET /api/tags (list models).
+        For OpenRouter: GET /v1/models with auth header.
+        Returns True if the backend responds, False otherwise.
+        """
+        try:
+            if self._use_ollama:
+                async with httpx.AsyncClient(timeout=10) as client:
+                    resp = await client.get(f"{_OLLAMA_BASE}/api/tags")
+                    return resp.status_code < 400
+            else:
+                headers = {
+                    "Authorization": f"Bearer {self._settings.openrouter_api_key}",
+                }
+                async with httpx.AsyncClient(timeout=10) as client:
+                    resp = await client.get(
+                        f"{self._settings.openrouter_base_url}/models",
+                        headers=headers,
+                    )
+                    return resp.status_code < 400
+        except Exception:
+            logger.warning("LLM health check failed", exc_info=True)
+            return False
+
     # ── Interno ──────────────────────────────────────────────────────────────
 
     async def _chat_completion(
