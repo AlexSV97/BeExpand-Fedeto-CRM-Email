@@ -31,8 +31,9 @@ from src.api.routers import (
     opportunities,
     reporting,
     queues,
-    sla,
     settings,
+    sla,
+    soc,
     tickets,
 )
 from src.config import get_settings
@@ -98,13 +99,7 @@ async def seed_admin():
 
 
 async def _recover_orphan_tasks() -> None:
-    """Resetea tareas de reprocess que quedaron 'processing' tras un reinicio.
-
-    En Render el servicio puede reiniciarse en cualquier momento (cold start,
-    deploy, idle timeout, etc.). Las asyncio.create_task se pierden, pero la DB
-    queda marcada como 'processing' para siempre. Esta función recupera esas
-    tareas huérfanas marcándolas como 'failed'.
-    """
+    """Resetea tareas de reprocess que quedaron 'processing' tras un reinicio."""
     try:
         async with async_session_factory() as db:
             result = await db.execute(
@@ -123,7 +118,7 @@ async def _recover_orphan_tasks() -> None:
                 t.completed_at = now
             await db.commit()
             logger.warning(
-                "Recuperadas %d tareas de reprocess huérfanas (processing→failed)",
+                "Recuperadas %d tareas de reprocess huérfanas (processing failed)",
                 len(orphaned),
             )
     except Exception as exc:
@@ -133,20 +128,16 @@ async def _recover_orphan_tasks() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Ciclo de vida: se ejecuta al arrancar y al cerrar la app."""
-    # Forzar logging INFO + handler para que se vean los logs del auto-sync
     logging.basicConfig(level=logging.INFO, force=True)
 
-    # Al arrancar: crear tablas si no existen + seed admin + recuperar tareas
     await init_db()
     await seed_admin()
     await _recover_orphan_tasks()
 
-    # Arrancar auto-sync en background
     task = asyncio.create_task(_auto_sync_loop())
     _background_tasks.append(task)
     yield
 
-    # Al cerrar: cancelar background tasks
     for t in _background_tasks:
         t.cancel()
     if _background_tasks:
@@ -161,7 +152,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# ── Routers ─────────────────────────────────────────────────────────────────
+# ── Routers ────────────────────────────────────────────────────────────────
 app.include_router(auth.router, prefix="/api/v1/auth")
 app.include_router(accounts.router, prefix="/api/v1/accounts")
 app.include_router(emails.router, prefix="/api/v1/emails")
@@ -179,14 +170,14 @@ app.include_router(reporting.router, prefix="/api/v1")
 app.include_router(queues.router, prefix="/api/v1")
 app.include_router(sla.router, prefix="/api/v1")
 app.include_router(tickets.router, prefix="/api/v1")
+app.include_router(soc.router, prefix="/api/v1")
 
-# CORS: en Docker localhost:5173, en Render la URL del frontend
+# CORS
 _cors_origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "https://beconnect-frontend.onrender.com",
 ]
-# Si hay variable de entorno CORS_ORIGINS, añadir las que vengan
 import os
 _env_origins = os.getenv("CORS_ORIGINS", "")
 if _env_origins:
