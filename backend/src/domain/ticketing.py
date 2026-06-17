@@ -16,7 +16,9 @@ class ActorKind(str, Enum):
 class TicketState(str, Enum):
     NEW = "new"
     OPEN = "open"
+    IN_PROGRESS = "in_progress"
     PENDING = "pending"
+    RESOLVED = "resolved"
     CLOSED = "closed"
     MERGED = "merged"
 
@@ -24,8 +26,10 @@ class TicketState(str, Enum):
 class TicketPriority(str, Enum):
     LOW = "low"
     NORMAL = "normal"
+    MEDIUM = "medium"
     HIGH = "high"
     URGENT = "urgent"
+    CRITICAL = "critical"
 
 
 class ExternalRef(BaseModel):

@@ -8,13 +8,13 @@
 
 import { useState, useMemo } from 'react'
 import { SURFACE_IDS } from '../../services/soc/contracts'
-import type { SocError } from '../../services/soc/contracts'
+
 import { SOC_ENDPOINTS } from '../../services/soc/endpoints'
 import { useSocResource } from '../../services/soc/useSocResource'
 import { normalizeAgentGovernance } from '../../services/soc/normalize/agentGovernance'
 import { MOCK_AGENT_GOVERNANCE, MOCK_AGENTS_DATA } from '../../services/soc/mockData'
 import type { AgentRowData } from '../../services/soc/mockData'
-import { SocLoadingState, SocEmptyState, SocErrorState } from '../../components/soc'
+import { SocLoadingState, SocEmptyState } from '../../components/soc'
 import { t } from '../../content/socCopy'
 import { cn } from '../../lib/utils'
 import {
@@ -127,7 +127,7 @@ function OverrideMenu({ agentId }: { agentId: string }) {
 // ─── Main surface ─────────────────────────────────────────────────────────
 
 export default function AgentGovernanceSurface() {
-  const { data, loading, error, source, refresh } = useSocResource(
+  const { data, loading, error: _error, source, refresh } = useSocResource(
     SOC_ENDPOINTS[SURFACE_IDS.AGENT_GOVERNANCE],
     normalizeAgentGovernance,
     MOCK_AGENT_GOVERNANCE,
@@ -162,10 +162,8 @@ export default function AgentGovernanceSurface() {
   }
 
   // ── Error ──
-  if (error) {
-    const socErr: SocError = { code: 'FETCH_ERROR', message: error, retry: refresh }
-    return <SocErrorState error={socErr} />
-  }
+  // NOTE: no early return — useSocResource always provides mock data,
+  // so we show data + error banner instead of a hard error block.
 
   // ── Empty (only when source is backend and data is empty) ──
   if (source === 'backend' && data.agents.length === 0 && agents.length === 0) {
@@ -175,6 +173,17 @@ export default function AgentGovernanceSurface() {
   // ── Content ──
   return (
     <div className="space-y-4">
+      {/* Error fallback banner when API failed */}
+      {source === 'error' && (
+        <div className="flex items-center justify-between px-4 py-2 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            <span>Failed to load data from server. Showing cached/demo data.</span>
+          </div>
+          <button onClick={refresh} className="underline hover:no-underline cursor-pointer">Retry</button>
+        </div>
+      )}
+
       {/* Header + demo badge */}
       <div className="flex items-center gap-2">
         <Users className="h-5 w-5 text-chart-3" />

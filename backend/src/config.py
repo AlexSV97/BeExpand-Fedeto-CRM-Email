@@ -8,17 +8,23 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    # ── Base de datos ──
+    # 🔐 Base de datos 🔐
     database_url: str = "sqlite+aiosqlite:///./beexpand.db"
 
-    # ── JWT ──
-    secret_key: str = "dev-secret-key-change-in-production"
+    # 🔐 JWT 🔐
+    # TODO: SECRET_KEY debe configurarse mediante variable de entorno.
+    #       El valor vacío fuerza error si no se define explícitamente.
+    secret_key: str = ""
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 480  # 8 horas
 
-    # ── Admin por defecto ──
-    admin_username: str = "admin"
-    admin_password: str = "admin123"
+    # 🔐 Admin por defecto 🔐
+    # TODO: En producción, admin_password se define mediante variable de entorno.
+    #       La contraseña se hashea al almacenarse (seed_admin en main.py),
+    #       pero el valor plano en Settings NO debe usarse como secreto compartido.
+    #       Considera mover la gestión de credenciales a un secret manager externo.
+    admin_username: str = ""
+    admin_password: str = ""
 
     # ── IMAP (Gmail) ──
     imap_server: str = "imap.gmail.com"
@@ -103,7 +109,7 @@ class Settings(BaseSettings):
     60 = cada minuto. 0 = desactivado."""
 
     # ── Entorno ──
-    debug: bool = True
+    debug: bool = False
 
     class Config:
         env_file = ".env"
@@ -112,5 +118,17 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    """Singleton: la configuración se carga una sola vez."""
-    return Settings()
+    """Singleton: la configuraci�n se carga una sola vez.
+
+    Valida que SECRET_KEY no sea el valor por defecto en producci�n.
+    """
+    settings = Settings()
+    if not settings.secret_key or "dev" in settings.secret_key.lower():
+        import warnings
+        warnings.warn(
+            "SECRET_KEY no est� configurada o usa un valor de desarrollo. "
+            "Define SECRET_KEY en el archivo .env o en variables de entorno.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+    return settings

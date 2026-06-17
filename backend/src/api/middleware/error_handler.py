@@ -8,6 +8,7 @@ async def soc_error_handler(request: Request, exc: Exception) -> JSONResponse:
         status_code=HTTP_500_INTERNAL_SERVER_ERROR,
         content={
             'error': 'An internal error occurred',
+            'message': 'An internal error occurred',
             'code': 'INTERNAL_ERROR',
             'trace_id': str(id(exc))[-8:],
         }

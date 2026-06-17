@@ -6,7 +6,7 @@ from typing import Any
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.audit.models import AuditActorKind, AuditEvent, AuditOutcome
@@ -309,6 +309,20 @@ class AgentGovernanceService:
         await db.refresh(record)
         return record
 
+    async def persist_and_log_event(
+        self,
+        db: AsyncSession,
+        actor_name: str,
+        action: str,
+        resource_type: str,
+        resource_id: str,
+        details: dict[str, Any] | None = None,
+    ) -> AuditEvent:
+        """Log an audit event in memory AND persist to database."""
+        event = self.log_event(actor_name, action, resource_type, resource_id, details)
+        await self.persist_audit_event(db, event)
+        return event
+
     async def list_history(self, db: AsyncSession, limit: int = 20) -> list[OperationalRecord]:
         result = await db.execute(
             select(OperationalRecord)
@@ -317,6 +331,47 @@ class AgentGovernanceService:
             .limit(limit)
         )
         return list(result.scalars().all())
+
+    async def query_audit_events(
+        self,
+        db: AsyncSession,
+        *,
+        actor: str | None = None,
+        action: str | None = None,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[list[OperationalRecord], int]:
+        """Query persisted audit events from OperationalRecord with filtering."""
+        conditions = [OperationalRecord.record_kind == "audit_event"]
+
+        if actor:
+            conditions.append(OperationalRecord.actor_name.ilike(f"%{actor}%"))
+        if action:
+            conditions.append(OperationalRecord.title.ilike(f"%{action}%"))
+        if from_date:
+            conditions.append(OperationalRecord.created_at >= from_date)
+        if to_date:
+            conditions.append(OperationalRecord.created_at <= to_date)
+
+        # Count total
+        count_q = select(func.count()).select_from(OperationalRecord).where(*conditions)
+        total_result = await db.execute(count_q)
+        total = total_result.scalar() or 0
+
+        # Fetch page
+        q = (
+            select(OperationalRecord)
+            .where(*conditions)
+            .order_by(OperationalRecord.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        result = await db.execute(q)
+        events = list(result.scalars().all())
+
+        return events, total
 
     def _triage(self, request: AgentRecommendationRequest) -> AgentRecommendationItem:
         decision = self._queue_strategy.recommend(

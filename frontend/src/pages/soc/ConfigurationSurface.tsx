@@ -8,13 +8,13 @@
 
 import { useState } from 'react'
 import { SURFACE_IDS } from '../../services/soc/contracts'
-import type { SocError } from '../../services/soc/contracts'
+
 import { SOC_ENDPOINTS } from '../../services/soc/endpoints'
 import { useSocResource } from '../../services/soc/useSocResource'
 import { normalizeConfiguration } from '../../services/soc/normalize/configuration'
 import { MOCK_CONFIGURATION } from '../../services/soc/mockData'
 import { surfaceRegistry } from '../../services/soc/surfaceRegistry'
-import { SocLoadingState, SocErrorState } from '../../components/soc'
+import { SocLoadingState } from '../../components/soc'
 import { t } from '../../content/socCopy'
 import { cn } from '../../lib/utils'
 import {
@@ -187,7 +187,7 @@ function SliderInput({
 // ─── Main surface ─────────────────────────────────────────────────────────
 
 export default function ConfigurationSurface() {
-  const { loading, error, source, refresh } = useSocResource(
+  const { loading, error: _error, source, refresh } = useSocResource(
     SOC_ENDPOINTS[SURFACE_IDS.CONFIGURATION],
     normalizeConfiguration,
     MOCK_CONFIGURATION,
@@ -249,14 +249,23 @@ export default function ConfigurationSurface() {
   }
 
   // ── Error ──
-  if (error) {
-    const socErr: SocError = { code: 'FETCH_ERROR', message: error, retry: refresh }
-    return <SocErrorState error={socErr} />
-  }
+  // NOTE: no early return — useSocResource always provides mock data,
+  // so we show data + error banner instead of a hard error block.
 
   // ── Content ──
   return (
     <div className="space-y-4">
+      {/* Error fallback banner when API failed */}
+      {source === 'error' && (
+        <div className="flex items-center justify-between px-4 py-2 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            <span>Failed to load data from server. Showing cached/demo data.</span>
+          </div>
+          <button onClick={refresh} className="underline hover:no-underline cursor-pointer">Retry</button>
+        </div>
+      )}
+
       {/* Header + demo badge */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">

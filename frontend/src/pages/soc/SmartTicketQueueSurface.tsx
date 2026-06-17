@@ -8,13 +8,13 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useSocShell } from '../../services/soc/SocShellProvider'
 import { SURFACE_IDS } from '../../services/soc/contracts'
-import type { SocError } from '../../services/soc/contracts'
+
 import { SOC_ENDPOINTS } from '../../services/soc/endpoints'
 import { useSocResource } from '../../services/soc/useSocResource'
 import { normalizeTicketQueue } from '../../services/soc/normalize/ticketQueue'
 import type { TicketItemView } from '../../services/soc/normalize/ticketQueue'
 import { MOCK_TICKET_QUEUE } from '../../services/soc/mockData'
-import { SocLoadingState, SocEmptyState, SocErrorState } from '../../components/soc'
+import { SocLoadingState, SocEmptyState } from '../../components/soc'
 import { applyNeutralCopy, t } from '../../content/socCopy'
 import { cn } from '../../lib/utils'
 import {
@@ -36,7 +36,7 @@ import {
 const SURFACE_ID = SURFACE_IDS.SMART_TICKET_QUEUE
 const PAGE_SIZE = 15
 
-const STATUS_OPTIONS = ['open', 'in_progress', 'resolved', 'closed'] as const
+const STATUS_OPTIONS = ['open', 'in_progress', 'pending', 'resolved', 'closed'] as const
 const PRIORITY_OPTIONS = ['critical', 'high', 'medium', 'low'] as const
 
 // ─── Module-level selected ticket (shared with TicketCopilot) ────────────
@@ -73,6 +73,8 @@ function statusBadgeClass(status: string): string {
     case 'in_progress':
     case 'in progress':
       return 'bg-warning/10 text-warning border-warning/20'
+    case 'pending':
+      return 'bg-chart-2/10 text-chart-2 border-chart-2/20'
     case 'resolved':
       return 'bg-success/10 text-success border-success/20'
     case 'closed':
@@ -136,7 +138,7 @@ function FilterChip({
 export default function SmartTicketQueueSurface() {
   const { navigate } = useSocShell()
 
-  const { data: view, loading, error, source, refresh } = useSocResource(
+  const { data: view, loading, error: _error, source, refresh } = useSocResource(
     SOC_ENDPOINTS[SURFACE_IDS.SMART_TICKET_QUEUE],
     normalizeTicketQueue,
     MOCK_TICKET_QUEUE,
@@ -233,16 +235,24 @@ export default function SmartTicketQueueSurface() {
   }
 
   // ── Error ─────────────────────────────────────────────────────────
-
-  if (error) {
-    const socErr: SocError = { code: 'FETCH_ERROR', message: error, retry: refresh }
-    return <SocErrorState error={socErr} />
-  }
+  // NOTE: no early return — useSocResource always provides mock data,
+  // so we show data + error banner instead of a hard error block.
 
   // ── Main content ──────────────────────────────────────────────────
 
   return (
     <div className="space-y-4">
+      {/* Error fallback banner when API failed */}
+      {source === 'error' && (
+        <div className="flex items-center justify-between px-4 py-2 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            <span>Failed to load data from server. Showing cached/demo data.</span>
+          </div>
+          <button onClick={refresh} className="underline hover:no-underline cursor-pointer">Retry</button>
+        </div>
+      )}
+
       {/* Demo badge when source is mock */}
       {source === 'mock' && (
         <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-warning/10 border border-warning/20 text-warning text-xs font-medium">

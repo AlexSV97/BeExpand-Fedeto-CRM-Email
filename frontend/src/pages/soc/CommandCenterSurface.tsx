@@ -9,7 +9,6 @@
 import { useState } from 'react'
 import { useSocShell } from '../../services/soc/SocShellProvider'
 import { SURFACE_IDS } from '../../services/soc/contracts'
-import type { SocError } from '../../services/soc/contracts'
 import { SOC_ENDPOINTS } from '../../services/soc/endpoints'
 import { useSocResource } from '../../services/soc/useSocResource'
 import { normalizeCommandCenter } from '../../services/soc/normalize/commandCenter'
@@ -19,7 +18,7 @@ import type {
 } from '../../services/soc/normalize/commandCenter'
 import { MOCK_COMMAND_CENTER, MOCK_SLA_RISKS } from '../../services/soc/mockData'
 import type { SlaRiskItem } from '../../services/soc/mockData'
-import { SocLoadingState, SocEmptyState, SocErrorState } from '../../components/soc'
+import { SocLoadingState, SocEmptyState } from '../../components/soc'
 import { applyNeutralCopy, t } from '../../content/socCopy'
 import { cn } from '../../lib/utils'
 import {
@@ -236,11 +235,8 @@ export default function CommandCenterSurface() {
   }
 
   // ── Error state ───────────────────────────────────────────────────
-
-  if (error) {
-    const socErr: SocError = { code: 'FETCH_ERROR', message: error, retry: refresh }
-    return <SocErrorState error={socErr} />
-  }
+  // NOTE: no early return — useSocResource always provides mock data,
+  // so we show data + error banner instead of a hard error block.
 
   // ── Empty state ───────────────────────────────────────────────────
 
@@ -252,6 +248,17 @@ export default function CommandCenterSurface() {
 
   return (
     <div className="space-y-6">
+      {/* Error fallback banner when API failed */}
+      {source === 'error' && (
+        <div className="flex items-center justify-between px-4 py-2 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            <span>Failed to load data from server. Showing cached/demo data.</span>
+          </div>
+          <button onClick={refresh} className="underline hover:no-underline cursor-pointer">Retry</button>
+        </div>
+      )}
+
       {/* Demo badge when source is mock */}
       {source === 'mock' && (
         <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-warning/10 border border-warning/20 text-warning text-xs font-medium">

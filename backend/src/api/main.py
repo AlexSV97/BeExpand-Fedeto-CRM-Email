@@ -81,8 +81,19 @@ async def _auto_sync_loop():
 
 
 async def seed_admin():
-    """Crea el usuario admin por defecto si no existe."""
+    """Crea el usuario admin por defecto si no existe.
+
+    Solo se ejecuta si ADMIN_USERNAME y ADMIN_PASSWORD est�n configurados
+    (i.e., no est�n vac�os). En producci�n, estas variables deben definirse
+    en el archivo .env o como variables de entorno.
+    """
     settings = get_settings()
+    if not settings.admin_username or not settings.admin_password:
+        logger.info(
+            "seed_admin: ADMIN_USERNAME o ADMIN_PASSWORD vac�os — "
+            "se omite creaci�n de admin por defecto"
+        )
+        return
     async with async_session_factory() as session:
         result = await session.execute(
             select(User).where(User.username == settings.admin_username)
@@ -126,14 +137,32 @@ async def _recover_orphan_tasks() -> None:
         logger.error("Error recuperando tareas huérfanas: %s", exc)
 
 
+async def _check_production_settings():
+    """Loggea advertencias si se detectan valores por defecto de desarrollo."""
+    settings = get_settings()
+    logger = logging.getLogger("uvicorn")
+    warnings: list[str] = []
+
+    if "dev" in (settings.secret_key or "").lower() or not settings.secret_key:
+        warnings.append("SECRET_KEY est� configurada con un valor de desarrollo o vac�o")
+    if getattr(settings, "admin_password", "") == "admin123":
+        warnings.append("ADMIN_PASSWORD sigue siendo el valor por defecto (admin123)")
+    if settings.debug:
+        warnings.append("DEBUG mode activado — desactivar en producci�n")
+
+    for w in warnings:
+        logger.warning("🔐 PRODUCTION WARNING: %s", w)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Ciclo de vida: se ejecuta al arrancar y al cerrar la app."""
     logging.basicConfig(level=logging.INFO, force=True)
 
     await init_db()
-    await seed_admin()
     await _recover_orphan_tasks()
+    await seed_admin()
+    await _check_production_settings()
 
     task = asyncio.create_task(_auto_sync_loop())
     _background_tasks.append(task)
@@ -176,20 +205,20 @@ app.include_router(soc.router, prefix="/api/v1")
 # ── Safe error handler ──────────────────────────────────────────────────────
 app.exception_handler(Exception)(soc_error_handler)
 
-# CORS
+# CORS — configurable via CORS_ORIGINS env var (comma-separated)
 import os
-_cors_origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "https://beconnect-frontend.onrender.com",
-]
-_env_origins = os.getenv("CORS_ORIGINS", "")
-if _env_origins:
-    _cors_origins.extend(_env_origins.split(","))
+_cors_default = (
+    "http://localhost:5173,"
+    "http://localhost:3000,"
+    "http://127.0.0.1:5173,"
+    "https://beconnect-frontend.onrender.com"
+)
+_cors_origins_str = os.getenv("CORS_ORIGINS", _cors_default)
+_cors_origins_list = [o.strip() for o in _cors_origins_str.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_cors_origins,
+    allow_origins=_cors_origins_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],

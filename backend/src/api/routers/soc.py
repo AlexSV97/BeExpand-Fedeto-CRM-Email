@@ -20,7 +20,8 @@ from src.api.deps import get_current_user
 from src.audit.models import AuditActorKind, AuditEvent, AuditOutcome
 from src.db.models import OperationalRecord, User
 from src.db.session import get_db
-from src.domain.ticketing import Queue, SLA, Ticket, TicketPriority, TicketState
+from src.domain.ticketing import ActorKind, ArticleDraft, Queue, SLA, Ticket, TicketPriority, TicketState
+from src.integrations.otrs_znuny import OtrsZnunyClient, OtrsZnunySettings
 from src.services.agent_governance import (
     AgentApprovalRequest,
     AgentGovernanceService,
@@ -81,7 +82,7 @@ def get_knowledge_vault(request: Request) -> KnowledgeVaultService:
     return svc
 
 
-def get_agent_governance(request: Request) -> AgentGovernanceService:
+def _get_agent_governance_service(request: Request) -> AgentGovernanceService:
     svc = getattr(request.app.state, "agent_governance_service", None)
     if isinstance(svc, AgentGovernanceService):
         return svc
@@ -116,7 +117,7 @@ def _synthetic_tickets(count: int = 25) -> list[Ticket]:
         Queue(name="N3 - Ingenieria", slug="n3-ingenieria", metadata={"tier": "n3"}),
     ]
     statuses = [TicketState.NEW, TicketState.OPEN, TicketState.PENDING, TicketState.CLOSED]
-    priorities = [TicketPriority.LOW, TicketPriority.NORMAL, TicketPriority.HIGH, TicketPriority.URGENT]
+    priorities = [TicketPriority.LOW, TicketPriority.NORMAL, TicketPriority.MEDIUM, TicketPriority.HIGH, TicketPriority.CRITICAL]
     subjects = [
         "Email classification failed for client invoice",
         "Password reset request for portal access",
@@ -156,6 +157,51 @@ def _synthetic_tickets(count: int = 25) -> list[Ticket]:
 
 
 # ---------------------------------------------------------------------------
+# OTRS/Znuny Client Dependency
+# ---------------------------------------------------------------------------
+
+
+async def get_otrs_client(request: Request) -> OtrsZnunyClient | None:
+    """Return a shared OTRS/Znuny client, or None if not configured."""
+    client = getattr(request.app.state, "otrs_client", None)
+    if client is not None:
+        return client
+    settings = OtrsZnunySettings()
+    if settings.is_configured:
+        client = OtrsZnunyClient(settings=settings)
+        request.app.state.otrs_client = client
+        return client
+    return None  # Will trigger synthetic fallback
+
+
+async def _resolve_tickets(
+    otrs: OtrsZnunyClient | None,
+    count: int = 25,
+) -> list[Ticket]:
+    """Try OTRS first, fall back to synthetic tickets."""
+    if otrs is not None:
+        try:
+            return await otrs.list_tickets(limit=count)
+        except Exception:
+            pass  # Fall through to synthetic
+    return _synthetic_tickets(count)
+
+
+async def _resolve_ticket(
+    otrs: OtrsZnunyClient | None,
+    ticket_id: str,
+) -> Ticket | None:
+    """Try OTRS first, fall back to synthetic tickets."""
+    if otrs is not None:
+        try:
+            return await otrs.get_ticket(ticket_id)
+        except Exception:
+            pass  # Fall through to synthetic
+    tickets = _synthetic_tickets(25)
+    return next((t for t in tickets if t.id == ticket_id), tickets[0])
+
+
+# ---------------------------------------------------------------------------
 # Response models (Pydantic mirrors of frontend contracts)
 # ---------------------------------------------------------------------------
 
@@ -192,8 +238,8 @@ class TicketItem(BaseModel):
 
 
 class TicketFilters(BaseModel):
-    status: list[str] = Field(default_factory=lambda: ["new", "open", "pending", "closed"])
-    priority: list[str] = Field(default_factory=lambda: ["low", "normal", "high", "urgent"])
+    status: list[str] = Field(default_factory=lambda: ["new", "open", "in_progress", "pending", "resolved", "closed", "merged"])
+    priority: list[str] = Field(default_factory=lambda: ["low", "medium", "high", "critical"])
     assignee: list[str] = Field(default_factory=list)
 
 
@@ -370,8 +416,8 @@ class ReclassifyRequest(BaseModel):
     @field_validator('priority')
     @classmethod
     def validate_priority(cls, v):
-        if v is not None and v not in ('low', 'normal', 'high', 'urgent'):
-            raise ValueError('priority must be one of: low, normal, high, urgent')
+        if v is not None and v not in ('low', 'medium', 'high', 'critical'):
+            raise ValueError('priority must be one of: low, medium, high, critical')
         return v
 
     @field_validator('queue_slug')
@@ -460,13 +506,14 @@ class AddNoteResponse(BaseModel):
 async def get_command_center(
     period: str = Query("24h", pattern=r"^(24h|7d|30d)$"),
     current_user: User = Depends(get_current_user),
+    otrs: OtrsZnunyClient | None = Depends(get_otrs_client),
     queue_svc: QueueStrategyService = Depends(get_queue_strategy),
     lifecycle_svc: TicketLifecycleService = Depends(get_ticket_lifecycle),
     report_svc: ReportingService = Depends(get_reporting_service),
 ):
     """Aggregate SOC command-center KPIs, alerts, and queue pressure."""
     now = _now()
-    tickets = _synthetic_tickets(25)
+    tickets = await _resolve_tickets(otrs, 25)
     report = report_svc.generate_report(OperationalReportRequest(
         window=ReportWindow.DAILY,
         as_of=now,
@@ -532,12 +579,13 @@ async def get_ticket_queue(
     priority: str | None = Query(None),
     search: str | None = Query(None),
     current_user: User = Depends(get_current_user),
+    otrs: OtrsZnunyClient | None = Depends(get_otrs_client),
     queue_svc: QueueStrategyService = Depends(get_queue_strategy),
     lifecycle_svc: TicketLifecycleService = Depends(get_ticket_lifecycle),
     db: AsyncSession = Depends(get_db),
 ):
-    """Return a paginated ticket list from synthetic data."""
-    tickets = _synthetic_tickets(25)
+    """Return a paginated ticket list."""
+    tickets = await _resolve_tickets(otrs, 25)
 
     filtered = tickets
     if status:
@@ -575,8 +623,8 @@ async def get_ticket_queue(
         total=total,
         page=page,
         filters=TicketFilters(
-            status=["new", "open", "pending", "closed"],
-            priority=["low", "normal", "high", "urgent"],
+            status=["new", "open", "in_progress", "pending", "resolved", "closed", "merged"],
+            priority=["low", "medium", "high", "critical"],
             assignee=assignees,
         ),
     )
@@ -588,12 +636,12 @@ async def get_ticket_copilot(
     message: str | None = Query(None),
     action: str | None = Query(None),
     current_user: User = Depends(get_current_user),
-    agent_svc: AgentGovernanceService = Depends(get_agent_governance),
+    otrs: OtrsZnunyClient | None = Depends(get_otrs_client),
+    agent_svc: AgentGovernanceService = Depends(_get_agent_governance_service),
     knowledge_svc: KnowledgeVaultService = Depends(get_knowledge_vault),
 ):
     """Return copilot data for a specific ticket."""
-    tickets = _synthetic_tickets(25)
-    ticket = next((t for t in tickets if t.id == ticket_id), tickets[0])
+    ticket = await _resolve_ticket(otrs, ticket_id)
 
     rec = agent_svc.recommend(AgentRecommendationRequest(
         subject=ticket.subject,
@@ -662,11 +710,12 @@ async def get_ticket_copilot(
 @router.get("/soc/sla", response_model=SlaWarRoomResponse)
 async def get_sla_war_room(
     current_user: User = Depends(get_current_user),
+    otrs: OtrsZnunyClient | None = Depends(get_otrs_client),
     lifecycle_svc: TicketLifecycleService = Depends(get_ticket_lifecycle),
 ):
     """Aggregate SLA breach timers, escalations, and active SLA definitions."""
     now = _now()
-    tickets = _synthetic_tickets(25)
+    tickets = await _resolve_tickets(otrs, 25)
 
     breach_timers: list[BreachTimer] = []
     escalations: list[EscalationItem] = []
@@ -768,7 +817,7 @@ async def get_knowledge_vault(
 async def get_agent_governance(
     status: str | None = Query(None),
     current_user: User = Depends(get_current_user),
-    agent_svc: AgentGovernanceService = Depends(get_agent_governance),
+    agent_svc: AgentGovernanceService = Depends(_get_agent_governance_service),
     db: AsyncSession = Depends(get_db),
 ):
     """Return agent governance data."""
@@ -878,55 +927,52 @@ async def get_audit(
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=200),
     current_user: User = Depends(get_current_user),
-    agent_svc: AgentGovernanceService = Depends(get_agent_governance),
+    agent_svc: AgentGovernanceService = Depends(_get_agent_governance_service),
     db: AsyncSession = Depends(get_db),
 ):
-    """Return audit trail from agent governance events and operational records."""
-    audit_events = agent_svc.audit_log()
-
+    """Return audit trail from agent governance events and operational records (persisted)."""
     now = _now()
+
+    # Calculate time bounds
+    try:
+        time_from = datetime.fromisoformat(from_) if from_ else None
+    except (ValueError, TypeError):
+        time_from = None
+    try:
+        time_to = datetime.fromisoformat(to) if to else None
+    except (ValueError, TypeError):
+        time_to = None
+
+    # Query from OperationalRecord
+    records, total = await agent_svc.query_audit_events(
+        db,
+        actor=actor,
+        action=eventType,
+        from_date=time_from,
+        to_date=time_to,
+        limit=limit,
+        offset=(page - 1) * limit,
+    )
+
     events: list[AuditEventItem] = []
-    for event in audit_events:
+    for record in records:
+        payload = record.payload or {}
         events.append(AuditEventItem(
-            id=event.id,
-            actor=event.actor_name,
-            action=event.action,
-            target=f"{event.resource_type}:{event.resource_id}",
-            timestamp=event.occurred_at.isoformat(),
-            details=event.details,
+            id=record.id,
+            actor=record.actor_name or "system",
+            action=record.title or "unknown",
+            target=payload.get("resource_type", "unknown") + ":" + record.resource_id if record.resource_id else "unknown",
+            timestamp=record.created_at.isoformat() if record.created_at else now.isoformat(),
+            details=payload.get("details") or payload,
         ))
 
-    if actor:
-        events = [e for e in events if actor.lower() in e.actor.lower()]
-    if eventType:
-        events = [e for e in events if eventType.lower() in e.action.lower()]
-
-    time_from: datetime | None = None
-    time_to: datetime | None = None
-    if from_:
-        try:
-            time_from = datetime.fromisoformat(from_)
-        except ValueError:
-            pass
-    if to:
-        try:
-            time_to = datetime.fromisoformat(to)
-        except ValueError:
-            pass
-
-    if time_from:
-        events = [e for e in events if e.timestamp >= time_from.isoformat()]
-    if time_to:
-        events = [e for e in events if e.timestamp <= time_to.isoformat()]
-
-    total = len(events)
-    start = (page - 1) * limit
-    page_events = events[start:start + limit]
-
-    actors_list = sorted(set(e.actor for e in events))
+    # Build actors list from records
+    actors_list = sorted(set(
+        record.actor_name for record in records if record.actor_name
+    ))
 
     return AuditResponse(
-        events=page_events,
+        events=events,
         actors=actors_list,
         timeRange={
             "from": time_from.isoformat() if time_from else (now - timedelta(days=7)).isoformat(),
@@ -980,8 +1026,10 @@ async def post_reclassify_ticket(
     body: ReclassifyRequest,
     current_user: User = Depends(get_current_user),
     _rate_limit: None = Depends(RateLimiter(30)),
+    otrs: OtrsZnunyClient | None = Depends(get_otrs_client),
     queue_svc: QueueStrategyService = Depends(get_queue_strategy),
-    agent_svc: AgentGovernanceService = Depends(get_agent_governance),
+    agent_svc: AgentGovernanceService = Depends(_get_agent_governance_service),
+    db: AsyncSession = Depends(get_db),
 ):
     """Reclassify a ticket — validate priority/queue change via QueueStrategyService."""
     tickets = _synthetic_tickets(25)
@@ -999,8 +1047,9 @@ async def post_reclassify_ticket(
     new_priority = body.priority or ticket.priority.value
     new_queue = body.queue_slug or decision.routing.queue.slug or ticket.queue.slug or "n1-triage"
 
-    # Log the action
-    agent_svc.log_event(
+    # Log the action and persist to database
+    await agent_svc.persist_and_log_event(
+        db,
         actor_name=current_user.username,
         action="ticket.reclassified",
         resource_type="ticket",
@@ -1013,6 +1062,16 @@ async def post_reclassify_ticket(
             "previous_queue": ticket.queue.slug,
         },
     )
+
+    # Propagate to OTRS if available
+    if otrs is not None:
+        try:
+            await otrs.update_ticket(
+                ticket_id,
+                priority=new_priority,
+            )
+        except Exception:
+            pass  # Best-effort
 
     return ReclassifyResponse(
         ticket_id=ticket_id,
@@ -1027,8 +1086,10 @@ async def post_escalate_ticket(
     body: EscalateRequest,
     current_user: User = Depends(get_current_user),
     _rate_limit: None = Depends(RateLimiter(30)),
+    otrs: OtrsZnunyClient | None = Depends(get_otrs_client),
     queue_svc: QueueStrategyService = Depends(get_queue_strategy),
-    agent_svc: AgentGovernanceService = Depends(get_agent_governance),
+    agent_svc: AgentGovernanceService = Depends(_get_agent_governance_service),
+    db: AsyncSession = Depends(get_db),
 ):
     """Escalate a ticket — get recommendation and create approval record."""
     tickets = _synthetic_tickets(25)
@@ -1073,8 +1134,9 @@ async def post_escalate_ticket(
         comment=body.reason,
     ))
 
-    # Log the action
-    agent_svc.log_event(
+    # Log the action and persist to database
+    await agent_svc.persist_and_log_event(
+        db,
         actor_name=current_user.username,
         action="ticket.escalated",
         resource_type="ticket",
@@ -1086,6 +1148,17 @@ async def post_escalate_ticket(
             "target_queue": target_queue,
         },
     )
+
+    # Propagate to OTRS if available
+    if otrs is not None:
+        try:
+            await otrs.update_ticket(
+                ticket_id,
+                state=TicketState.OPEN,
+                priority=TicketPriority.CRITICAL,
+            )
+        except Exception:
+            pass  # Best-effort
 
     return EscalateResponse(
         ticket_id=ticket_id,
@@ -1100,13 +1173,16 @@ async def post_add_note(
     body: AddNoteRequest,
     current_user: User = Depends(get_current_user),
     _rate_limit: None = Depends(RateLimiter(30)),
-    agent_svc: AgentGovernanceService = Depends(get_agent_governance),
+    otrs: OtrsZnunyClient | None = Depends(get_otrs_client),
+    agent_svc: AgentGovernanceService = Depends(_get_agent_governance_service),
+    db: AsyncSession = Depends(get_db),
 ):
     """Add an internal note to a ticket and record the audit event."""
     note_id = str(uuid4())
 
-    # Create audit event via AgentGovernanceService
-    agent_svc.log_event(
+    # Create audit event via AgentGovernanceService and persist to database
+    await agent_svc.persist_and_log_event(
+        db,
         actor_name=current_user.username,
         action="ticket.note_added",
         resource_type="ticket",
@@ -1117,6 +1193,20 @@ async def post_add_note(
             "visibility": body.visibility,
         },
     )
+
+    # Propagate to OTRS if available — create the article for real
+    if otrs is not None:
+        try:
+            article_draft = ArticleDraft(
+                author_kind=ActorKind.HUMAN,
+                author_name=current_user.username,
+                body_text=body.content,
+                subject=f"Note ({body.visibility})",
+            )
+            article = await otrs.add_article(ticket_id, article_draft)
+            note_id = article.id  # Use the real article ID from OTRS
+        except Exception:
+            pass  # Keep the generated note_id
 
     return AddNoteResponse(
         ticket_id=ticket_id,

@@ -9,7 +9,7 @@
 import { useState, useEffect } from 'react'
 import { useSocShell } from '../../services/soc/SocShellProvider'
 import { SURFACE_IDS } from '../../services/soc/contracts'
-import type { SocError } from '../../services/soc/contracts'
+
 import { socFetch } from '../../services/soc/client'
 import { SOC_ENDPOINTS } from '../../services/soc/endpoints'
 import { useSocResource } from '../../services/soc/useSocResource'
@@ -19,7 +19,7 @@ import type {
   SuggestionItemView,
 } from '../../services/soc/normalize/ticketCopilot'
 import { MOCK_TICKET_COPILOT } from '../../services/soc/mockData'
-import { SocLoadingState, SocErrorState } from '../../components/soc'
+import { SocLoadingState } from '../../components/soc'
 import { applyNeutralCopy, t } from '../../content/socCopy'
 import { cn } from '../../lib/utils'
 import { getSelectedTicketId } from './SmartTicketQueueSurface'
@@ -275,12 +275,9 @@ export default function TicketCopilotSurface() {
     return <SocLoadingState surfaceLabel={t('surfaces.ticketCopilot')} />
   }
 
-  // ── Hard error (no data at all) — with mock fallback this is rare ──
-
-  if (error && source === 'error') {
-    const socErr: SocError = { code: 'FETCH_ERROR', message: error, retry: refresh }
-    return <SocErrorState error={socErr} />
-  }
+  // ── Error ─────────────────────────────────────────────────────────
+  // NOTE: no early return — useSocResource always provides mock data,
+  // so we show data + error banner instead of a hard error block.
 
   // ── Content ───────────────────────────────────────────────────────
 
@@ -308,6 +305,17 @@ export default function TicketCopilotSurface() {
           </span>
         )}
       </div>
+
+      {/* Error fallback banner when API failed */}
+      {source === 'error' && (
+        <div className="flex items-center justify-between px-4 py-2 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            <span>Failed to load data from server. Showing cached/demo data.</span>
+          </div>
+          <button onClick={refresh} className="underline hover:no-underline cursor-pointer">Retry</button>
+        </div>
+      )}
 
       {/* Demo banner when source is mock */}
       {isDemo && (

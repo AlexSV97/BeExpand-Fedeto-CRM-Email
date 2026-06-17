@@ -21,7 +21,6 @@ import {
   MOCK_DATA_REGISTRY,
 } from '../mockData'
 import { SURFACE_IDS } from '../contracts'
-import type { SurfaceId } from '../contracts'
 
 // =========================================================================
 // Registry

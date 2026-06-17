@@ -7,7 +7,7 @@
 
 import { useState } from 'react'
 import { SURFACE_IDS } from '../../services/soc/contracts'
-import type { SocError } from '../../services/soc/contracts'
+
 import { SOC_ENDPOINTS } from '../../services/soc/endpoints'
 import { useSocResource } from '../../services/soc/useSocResource'
 import { normalizeSlaWarRoom } from '../../services/soc/normalize/slaWarRoom'
@@ -23,7 +23,7 @@ import type {
   BreachAlert,
   PriorityComplianceCell,
 } from '../../services/soc/mockData'
-import { SocLoadingState, SocEmptyState, SocErrorState } from '../../components/soc'
+import { SocLoadingState, SocEmptyState } from '../../components/soc'
 import { applyNeutralCopy, t } from '../../content/socCopy'
 import { cn } from '../../lib/utils'
 import {
@@ -196,7 +196,7 @@ function ComplianceCell({ cell }: { cell: PriorityComplianceCell }) {
 // ─── Main surface ─────────────────────────────────────────────────────────
 
 export default function SlaWarRoomSurface() {
-  const { data, loading, error, source, refresh } = useSocResource(
+  const { data, loading, error: _error, source, refresh } = useSocResource(
     SOC_ENDPOINTS[SURFACE_IDS.SLA_WAR_ROOM],
     normalizeSlaWarRoom,
     MOCK_SLA_WAR_ROOM,
@@ -214,10 +214,8 @@ export default function SlaWarRoomSurface() {
   }
 
   // ── Error ──
-  if (error) {
-    const socErr: SocError = { code: 'FETCH_ERROR', message: error, retry: refresh }
-    return <SocErrorState error={socErr} />
-  }
+  // NOTE: no early return — useSocResource always provides mock data,
+  // so we show data + error banner instead of a hard error block.
 
   // ── Empty (only when source is backend and data is empty) ──
   if (source === 'backend' && data.breachTimers.length === 0 && data.activeSLAs.length === 0) {
@@ -229,6 +227,17 @@ export default function SlaWarRoomSurface() {
   // ── Content ──
   return (
     <div className="space-y-6">
+      {/* Error fallback banner when API failed */}
+      {source === 'error' && (
+        <div className="flex items-center justify-between px-4 py-2 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            <span>Failed to load data from server. Showing cached/demo data.</span>
+          </div>
+          <button onClick={refresh} className="underline hover:no-underline cursor-pointer">Retry</button>
+        </div>
+      )}
+
       {/* Page header + demo badge */}
       <div className="flex items-center gap-2">
         <Gauge className="h-5 w-5 text-chart-1" />
