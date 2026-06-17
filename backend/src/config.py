@@ -3,8 +3,30 @@ Configuración centralizada de la aplicación.
 Las variables se leen desde .env y se validan con Pydantic.
 """
 
+from pathlib import Path
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+
+
+def _find_env_file() -> str | None:
+    """Busca .env en múltiples ubicaciones según desde dónde se ejecute.
+
+    Orden de búsqueda:
+    1. CWD/.env                          (backend/ → ejecución con cd backend)
+    2. backend/ (derivado de __file__)    (por si CWD es otro lado)
+    3. raíz del proyecto (parent de backend/)
+    Devuelve la primera que encuentra, o None si no hay ninguna.
+    """
+    backend_dir = Path(__file__).resolve().parent.parent  # backend/src/config.py → backend/
+    candidates = [
+        Path.cwd() / ".env",
+        backend_dir / ".env",
+        backend_dir.parent / ".env",
+    ]
+    for c in candidates:
+        if c.exists():
+            return str(c.resolve())
+    return None
 
 
 class Settings(BaseSettings):
@@ -122,7 +144,8 @@ def get_settings() -> Settings:
 
     Valida que SECRET_KEY no sea el valor por defecto en producci�n.
     """
-    settings = Settings()
+    env_file = _find_env_file()
+    settings = Settings(_env_file=env_file) if env_file else Settings()
     if not settings.secret_key or "dev" in settings.secret_key.lower():
         import warnings
         warnings.warn(
