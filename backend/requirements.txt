@@ -32,9 +32,17 @@ redis>=5.2.0
 transformers>=4.30.0
 onnxruntime>=1.15.0  # Reemplaza a torch: ~130MB RAM, sin GPU
 numpy>=1.24.0  # Para softmax manual en inferencia ONNX
+safetensors>=0.4.0  # Para cargar pesos del modelo
 
 # HuggingFace Hub (descarga modelo ONNX)
 huggingface_hub>=0.20.0
+
+# Training (opcional — solo para re-entrenamiento)
+# torch>=2.0.0
+# datasets>=2.14.0
+# accelerate>=0.25.0
+# scikit-learn>=1.3.0
+# optimum[onnxruntime]>=1.17.0
 
 # PDF processing (invoice extraction)
 pypdf>=5.0.0

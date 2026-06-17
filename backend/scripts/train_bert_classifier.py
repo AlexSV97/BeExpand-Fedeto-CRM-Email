@@ -3,7 +3,7 @@ Fine-tune DistilBERT multilingual para clasificar correos en:
 - cliente
 - lead
 - proveedor
-- pendiente
+- nulo
 
 Genera datos sintéticos basados en reglas de negocio + variaciones realistas,
 entrena el modelo, y lo guarda en backend/src/classifier/model/.
@@ -26,7 +26,6 @@ from transformers import (
     AutoTokenizer,
     Trainer,
     TrainingArguments,
-    EarlyStoppingCallback,
 )
 
 # ── Config ──
@@ -35,7 +34,7 @@ MODEL_NAME = "distilbert-base-multilingual-cased"
 _DEFAULT_MODEL_OUTPUT_DIR = Path(__file__).resolve().parent.parent / "src" / "classifier" / "model"
 MODEL_OUTPUT_DIR = Path(os.getenv("BERT_MODEL_PATH", str(_DEFAULT_MODEL_OUTPUT_DIR)))
 NUM_LABELS = 4
-LABEL_MAP = {"cliente": 0, "lead": 1, "proveedor": 2, "pendiente": 3}
+LABEL_MAP = {"cliente": 0, "lead": 1, "proveedor": 2, "nulo": 3}
 ID2LABEL = {v: k for k, v in LABEL_MAP.items()}
 SEED = 42
 TEST_SIZE = 0.15
@@ -110,11 +109,11 @@ SUBJECT_PATTERNS = {
         "Modificación de pedido",
         "Incidente con proveedor",
         "Condiciones de pago",
-        "Entrega pendiente",
+        "Entrega nulo",  # was "Entrega pendiente"
         "Nuevos productos disponibles",
         "Resolución de incidencia",
     ],
-    "pendiente": [
+    "nulo": [
         "Felicitaciones navidad",
         "Invitación a evento",
         "Comunicado interno",
@@ -163,7 +162,7 @@ BODY_TEMPLATES = {
         "Les informamos de una incidencia con el pedido {num}: {tema}. Estamos trabajando para resolverlo a la mayor brevedad.",
         "Actualizamos nuestras condiciones comerciales para {ano}. Los nuevos precios entrarán en vigor el {fecha}.",
     ],
-    "pendiente": [
+    "nulo": [
         "Gracias por su confianza durante este año. Les deseamos unas felices fiestas y un próspero año nuevo.",
         "Le invitamos al evento anual del sector que tendrá lugar el {fecha}. Confirmar asistencia antes del {fecha_limite}.",
         "Les recordamos que el plazo de presentación de {tema} finaliza el {fecha}. Rogamos no dejen para última hora.",
@@ -293,20 +292,14 @@ if __name__ == "__main__":
     training_args = TrainingArguments(
         output_dir=output_dir,
         eval_strategy="epoch",
-        save_strategy="epoch",
-        save_total_limit=2,
+        save_strategy="no",
         learning_rate=3e-5,
-        per_device_train_batch_size=8,
-        per_device_eval_batch_size=8,
-        num_train_epochs=4,
+        per_device_train_batch_size=4,
+        per_device_eval_batch_size=4,
+        num_train_epochs=2,
         weight_decay=0.01,
         warmup_ratio=0.1,
         logging_steps=20,
-        logging_dir=f"{output_dir}/logs",
-        load_best_model_at_end=True,
-        metric_for_best_model="f1_macro",
-        greater_is_better=True,
-        fp16=False,  # CPU safe
         report_to="none",
         seed=SEED,
     )
@@ -318,7 +311,6 @@ if __name__ == "__main__":
         eval_dataset=test_dataset,
         processing_class=tokenizer,
         compute_metrics=compute_metrics,
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
 
     # 5. Entrenar

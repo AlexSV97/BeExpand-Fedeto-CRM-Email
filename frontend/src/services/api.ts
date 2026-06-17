@@ -1,11 +1,14 @@
 /**
  * API client — comunicación con el backend FastAPI.
  *
- * En desarrollo usa el proxy de Vite (/api/v1 → localhost:8000).
- * En producción (Render) usa VITE_API_URL si está configurada.
+ * En desarrollo usa el proxy de Vite (/api/v1 → localhost:8001).
+ * En producción conviene definir VITE_API_URL con la URL pública del backend.
  */
 
-const API_BASE = import.meta.env.VITE_API_URL || '/api/v1'
+const API_BASE = import.meta.env.VITE_API_URL?.trim() || '/api/v1'
+const API_CONFIG_HINT = import.meta.env.DEV
+  ? 'Verificá que el backend esté corriendo en http://localhost:8001 o definí VITE_API_URL=http://localhost:8001/api/v1.'
+  : 'Configurá VITE_API_URL con la URL pública del backend (por ejemplo https://tu-backend.onrender.com/api/v1).'
 
 let _token: string | null = null
 
@@ -42,21 +45,47 @@ async function request<T>(
     headers['Authorization'] = `Bearer ${token}`
   }
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  })
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    })
+  } catch {
+    throw new Error(`No se pudo conectar con la API. ${API_CONFIG_HINT}`)
+  }
+
+  const contentType = res.headers.get('content-type')?.toLowerCase() || ''
+  const isJson = contentType.includes('application/json')
+  const isHtml = contentType.includes('text/html')
+
+  if (isHtml) {
+    throw new Error(
+      `La ruta API ${API_BASE}${path} está devolviendo HTML en lugar de JSON. ${API_CONFIG_HINT}`,
+    )
+  }
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new Error(error.detail || `HTTP ${res.status}`)
+    if (isJson) {
+      const error = await res.json().catch(() => ({ detail: res.statusText }))
+      throw new Error(error.detail || `HTTP ${res.status}`)
+    }
+
+    const text = await res.text().catch(() => '')
+    throw new Error(text || res.statusText || `HTTP ${res.status}`)
   }
 
   // 204 No Content
   if (res.status === 204) return undefined as T
 
-  return res.json()
+  if (isJson) {
+    return res.json()
+  }
+
+  throw new Error(
+    `La API respondió sin JSON en ${API_BASE}${path}. ${API_CONFIG_HINT}`,
+  )
 }
 
 // ── Auth ──

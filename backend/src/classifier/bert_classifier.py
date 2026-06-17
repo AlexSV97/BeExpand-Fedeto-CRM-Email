@@ -35,7 +35,7 @@ class BertClassifier:
         self.model_dir = model_dir or MODEL_DIR
         self.model = None
         self.tokenizer = None
-        self.labels = {"cliente": 0, "lead": 1, "proveedor": 2, "pendiente": 3}
+        self.labels = {"cliente": 0, "lead": 1, "proveedor": 2, "nulo": 3}
         self.id2label = {v: k for k, v in self.labels.items()}
         self._loaded = False
 
@@ -76,7 +76,7 @@ class BertClassifier:
         """
         self._ensure_loaded()
         if not self._loaded:
-            return "pendiente", 0.0
+            return "nulo", 0.0
 
         try:
             text = f"{subject or ''} {body or ''}"[:512]  # Limitar longitud
@@ -99,7 +99,7 @@ class BertClassifier:
 
             label_id = predicted.item()
             confidence_score = round(confidence.item(), 2)
-            category = self.id2label.get(label_id, "pendiente")
+            category = self.id2label.get(label_id, "nulo")
 
             logger.debug(
                 "BERT: %s -> %s (%.0f%%)",

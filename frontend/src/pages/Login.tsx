@@ -26,8 +26,8 @@ export default function Login() {
     try {
       await login(username, password)
       navigate('/dashboard')
-    } catch {
-      setLocalError('Credenciales inválidas')
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : 'No se pudo iniciar sesión')
     } finally {
       setSubmitting(false)
     }

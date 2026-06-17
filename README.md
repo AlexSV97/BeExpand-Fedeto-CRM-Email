@@ -274,6 +274,28 @@ npm install
 npm run dev
 ```
 
+### Despliegue en Render
+
+El repositorio incluye `render.yaml` para crear dos servicios web Docker:
+
+- `beexpand-fedeto-crm-email-api` — FastAPI + disco persistente en `/app/data`
+- `beconnect-frontend` — React servido por Nginx con proxy `/api/*` hacia el backend por red privada de Render
+
+Puntos importantes:
+
+- El frontend Docker build queda por defecto en `VITE_API_URL=/api/v1`
+- El proxy Nginx se resuelve con `API_UPSTREAM`, inyectado desde Render con `fromService.hostport`
+- `ADMIN_PASSWORD`, `OPENROUTER_API_KEY` y `HUGGINGFACE_TOKEN` quedan como variables manuales (`sync: false`)
+- Si el backend no está sano, el login del frontend fallará aunque las credenciales sean correctas
+
+Para crear el entorno:
+
+1. En Render, crear un Blueprint desde este repo
+2. Confirmar los servicios definidos en `render.yaml`
+3. Introducir los secrets solicitados
+4. Esperar a que el backend responda `GET /api/v1/health`
+5. Abrir el frontend y probar login
+
 ### Tests
 
 ```bash
