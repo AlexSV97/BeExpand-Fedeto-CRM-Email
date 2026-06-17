@@ -3,41 +3,35 @@ FROM python:3.12-slim AS builder
 
 WORKDIR /app
 
-# Dependencias del sistema mínimas
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends gcc && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Instalar dependencias Python (global, no --user, para evitar problemas de
-# permisos al ejecutar con usuario no-root en la etapa runtime)
+# Install Python dependencies (global, not --user)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # ── Stage 2: Runtime ──
-FROM python:3.12-slim
+FROM python:3.12-slim AS runtime
 
 WORKDIR /app
 
-# Crear usuario no-root
+# Create non-root user
 RUN groupadd -r beexpand && useradd -r -g beexpand -d /app -s /bin/false beexpand
 
-# Copiar site-packages del builder (instalación global → /usr/local/)
+# Copy installed packages from builder
 COPY --from=builder /usr/local /usr/local
 
-# Copiar código
-COPY src/ src/
-COPY alembic.ini .
-COPY alembic/ alembic/
+# Copy application code (filtered by .dockerignore)
+COPY . .
 
-# Entrypoint para esperar a PostgreSQL (si se usa)
+# Entrypoint: waits for PostgreSQL if configured, otherwise passes through
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
-# Puerto
 EXPOSE 8000
 
 USER beexpand
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
-# Por defecto: lanzar API (usa $PORT de Render, por defecto 8000 localmente)
-CMD uvicorn src.api.main:app --host 0.0.0.0 --port ${PORT:-8000}
+CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

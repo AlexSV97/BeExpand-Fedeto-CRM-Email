@@ -1,32 +1,31 @@
-# ── Stage 1: Builder ──
-FROM node:22-alpine AS builder
+# ── Build stage ──
+FROM node:22-alpine AS build
 
 WORKDIR /app
 
-# Dependencias (caché optimizado: package*.json primero)
-COPY frontend/package.json frontend/package-lock.json ./
+# Install dependencies (cached via package*.json)
+COPY package.json package-lock.json ./
 RUN npm ci
 
-# Código fuente (paths relativos al build context = raíz del proyecto)
-COPY frontend/tsconfig.json frontend/vite.config.ts frontend/index.html ./
-COPY frontend/src/ src/
+# Build-time env for Vite (inlined at build time)
+ARG VITE_API_URL
+ENV VITE_API_URL=${VITE_API_URL}
 
-# Build de producción
+# Copy source and build
+COPY . .
 RUN npm run build
 
-# ── Stage 2: Runtime (nginx) ──
+# ── Runtime stage (nginx) ──
 FROM nginx:alpine
 
-# Copiar configuración nginx (path relativo al build context = raíz del proyecto)
-COPY infrastructure/docker/nginx/frontend.conf /etc/nginx/conf.d/default.conf
+# Copy nginx config
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copiar build stage 1
-COPY --from=builder /app/dist /usr/share/nginx/html
+# Copy built assets from build stage
+COPY --from=build /app/dist /usr/share/nginx/html
 
-# Puerto (coincide con docker-compose: 5173:80)
 EXPOSE 80
 
-# Salud: verificar que nginx responde
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --quiet --tries=1 --spider http://127.0.0.1:80/ || exit 1
 
