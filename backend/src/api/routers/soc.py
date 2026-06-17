@@ -480,6 +480,7 @@ class SlaWarRoomResponse(BaseModel):
     breachTimers: list[BreachTimer]
     escalations: list[EscalationItem]
     activeSLAs: list[SlaItem]
+    operatingMode: str = "demo"
 
 
 class KnowledgeArticle(BaseModel):
@@ -909,7 +910,7 @@ async def get_sla_war_room(
 ):
     """Aggregate SLA breach timers, escalations, and active SLA definitions."""
     now = _now()
-    tickets = await _resolve_tickets(otrs, 25)
+    tickets, operating_mode = await _resolve_tickets_with_mode(otrs, 25)
 
     breach_timers: list[BreachTimer] = []
     escalations: list[EscalationItem] = []
@@ -961,6 +962,7 @@ async def get_sla_war_room(
         breachTimers=breach_timers,
         escalations=escalations[:10],
         activeSLAs=[SlaItem(**data) for data in active_sla_map.values()],
+        operatingMode=operating_mode,
     )
 
 

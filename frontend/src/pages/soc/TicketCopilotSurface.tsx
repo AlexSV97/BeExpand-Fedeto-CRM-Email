@@ -212,7 +212,13 @@ export default function TicketCopilotSurface() {
           break
       }
 
-      setActionFeedback({ type: 'success', message: `${action} executed successfully` })
+      setActionFeedback({
+        type: 'success',
+        message:
+          operatingMode === 'live'
+            ? `${action} executed successfully`
+            : `${action} simulated in ${operatingMode} mode`,
+      })
     } catch (err) {
       setActionFeedback({
         type: 'error',
@@ -282,7 +288,9 @@ export default function TicketCopilotSurface() {
   // ── Content ───────────────────────────────────────────────────────
 
   const ctx = data.ticketContext
-  const isDemo = source === 'mock'
+  const operatingMode = source === 'backend' ? 'live' : source === 'mock' ? 'demo' : 'degraded'
+  const isDemo = operatingMode === 'demo'
+  const isDegraded = operatingMode === 'degraded'
 
   return (
     <div className="space-y-4">
@@ -306,12 +314,12 @@ export default function TicketCopilotSurface() {
         )}
       </div>
 
-      {/* Error fallback banner when API failed */}
-      {source === 'error' && (
+      {/* Degraded fallback banner when backend failed */}
+      {isDegraded && (
         <div className="flex items-center justify-between px-4 py-2 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium">
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-3.5 w-3.5" />
-            <span>Failed to load data from server. Showing cached/demo data.</span>
+            <span>Backend unavailable. Showing degraded copilot snapshot.</span>
           </div>
           <button onClick={refresh} className="underline hover:no-underline cursor-pointer">Retry</button>
         </div>

@@ -548,13 +548,15 @@ export default function SlaWarRoomSurface() {
     return <SocEmptyState surfaceId={SURFACE_ID} />
   }
 
-  const isDemo = source === 'mock'
+  const operatingMode = data.operatingMode || (source === 'backend' ? 'live' : source === 'mock' ? 'demo' : 'degraded')
+  const isDemo = operatingMode === 'demo'
+  const isDegraded = operatingMode === 'degraded'
 
   // ── Content ──
   return (
     <div className="space-y-6">
-      {/* Error fallback banner when API failed */}
-      {source === 'error' && (
+      {/* Degraded fallback banner when backend failed */}
+      {isDegraded && (
         <motion.div
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
@@ -563,7 +565,7 @@ export default function SlaWarRoomSurface() {
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-3.5 w-3.5" />
             <span>
-              Failed to load data from server. Showing cached/demo data.
+              Backend unavailable. Showing degraded SLA snapshot.
             </span>
           </div>
           <button
@@ -627,13 +629,15 @@ export default function SlaWarRoomSurface() {
             {lastUpdated.toLocaleTimeString()}
           </span>
 
-          {/* Demo badge */}
-          {isDemo && (
-            <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-warning/10 border border-warning/20 text-warning text-[10px] font-medium">
-              <AlertTriangle className="h-3 w-3" />
-              Demo
-            </div>
-          )}
+          <div className={cn(
+            'flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium border',
+            operatingMode === 'live' && 'bg-success/10 border-success/20 text-success',
+            operatingMode === 'demo' && 'bg-warning/10 border-warning/20 text-warning',
+            operatingMode === 'degraded' && 'bg-destructive/10 border-destructive/20 text-destructive',
+          )}>
+            <AlertTriangle className="h-3 w-3" />
+            {operatingMode === 'live' ? 'Live' : operatingMode === 'demo' ? 'Demo' : 'Degraded'}
+          </div>
         </div>
       </motion.div>
 
