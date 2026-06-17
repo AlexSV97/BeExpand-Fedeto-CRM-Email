@@ -142,6 +142,21 @@ describe('normalizeTicketQueue', () => {
     expect(result.tickets).toEqual([])
     expect(result.total).toBe(0)
   })
+
+  it('extracts operatingMode from valid input', () => {
+    const result = normalizeTicketQueue({ ...validInput, operatingMode: 'live' })
+    expect(result.operatingMode).toBe('live')
+  })
+
+  it('defaults operatingMode to demo when missing', () => {
+    const result = normalizeTicketQueue(validInput)
+    expect(result.operatingMode).toBe('demo')
+  })
+
+  it('defaults operatingMode to demo in fallback', () => {
+    const result = normalizeTicketQueue(null as unknown as Record<string, unknown>)
+    expect(result.operatingMode).toBe('demo')
+  })
 })
 
 // =========================================================================

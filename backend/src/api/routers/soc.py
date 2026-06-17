@@ -20,7 +20,7 @@ from src.api.deps import get_current_user
 from src.audit.models import AuditActorKind, AuditEvent, AuditOutcome
 from src.db.models import OperationalRecord, User
 from src.db.session import get_db
-from src.domain.ticketing import ActorKind, ArticleDraft, Queue, SLA, Ticket, TicketPriority, TicketState
+from src.domain.ticketing import ActorKind, Article, ArticleDraft, Queue, SLA, Ticket, TicketPriority, TicketState
 from src.integrations.otrs_znuny import OtrsZnunyClient, OtrsZnunySettings
 from src.services.agent_governance import (
     AgentApprovalRequest,
@@ -295,14 +295,96 @@ def _synthetic_tickets(count: int = 25) -> list[Ticket]:
         "Security incident report from monitoring",
     ]
 
+    # Article content pools keyed by subject keyword
+    _article_pool: dict[str, list[dict]] = {
+        "classification": [
+            {"title": "Classification error analysis", "body": "The email was flagged as SPAM by the auto-classifier but the client insists it is a valid invoice. Reviewing header metadata and DKIM signature.", "author": ActorKind.IA},
+            {"title": "Manual reclassification performed", "body": "Reclassified the email from SPAM to BILLING. The invoice PDF is attached for reference. Flagging classifier rule for retraining.", "author": ActorKind.HUMAN},
+            {"title": "Root cause identified", "body": "The classifier model was trained on outdated invoice templates. New template pattern added to the training set for next cycle.", "author": ActorKind.IA},
+        ],
+        "password": [
+            {"title": "Verification steps completed", "body": "User identity verified via security questions. Temporary password generated and sent to registered alternate email.", "author": ActorKind.HUMAN},
+            {"title": "Portal access restored", "body": "Password has been reset successfully. User confirmed access to the portal. Ticket can be resolved.", "author": ActorKind.HUMAN},
+            {"title": "Audit log review", "body": "Reviewed access logs for the account. No unauthorized access detected. Password change was legitimate.", "author": ActorKind.IA},
+        ],
+        "onboarding": [
+            {"title": "Missing documents identified", "body": "Vendor has not submitted tax ID certification or proof of insurance. Contacted vendor relations for follow-up.", "author": ActorKind.HUMAN},
+            {"title": "Document request sent", "body": "Sent reminder to vendor with checklist of required documentation. Deadline set for 72 hours.", "author": ActorKind.IA},
+            {"title": "Onboarding status update", "body": "Two of three documents received. Still awaiting signed MSA. Escalated to account manager.", "author": ActorKind.HUMAN},
+        ],
+        "phishing": [
+            {"title": "Initial triage", "body": "Email reported by financial department contains suspicious link to 'fedeto-secure.com'. Domain registered 48 hours ago in Panama.", "author": ActorKind.IA},
+            {"title": "Indicators of compromise", "body": "Extracted IOCs: sender IP 185.220.101.x, malicious URL, spoofed display name. Blocked at gateway level.", "author": ActorKind.IA},
+            {"title": "User notified", "body": "Informed financial department that this is a confirmed phishing attempt. All users advised to be vigilant.", "author": ActorKind.HUMAN},
+        ],
+        "sla breach": [
+            {"title": "SLA timer alert", "body": "Ticket has exceeded 90% of SLA solution time (432 of 480 minutes). Auto-escalation triggered to N2.", "author": ActorKind.IA},
+            {"title": "Escalation initiated", "body": "Ticket escalated to N2 - Resolucion. Customer notified of expected delay. Priority bumped to HIGH.", "author": ActorKind.HUMAN},
+            {"title": "Post-mortem analysis", "body": "Root cause: delayed response from third-party vendor. SLA process exception filed.", "author": ActorKind.IA},
+        ],
+        "integration": [
+            {"title": "Connectivity test results", "body": "Ping to CRM endpoint timed out after 30 seconds. Certificate chain validated but TLS handshake fails intermittently.", "author": ActorKind.IA},
+            {"title": "Workaround applied", "body": "Implemented retry logic with exponential backoff. Integration queue resumed processing with manual supervision.", "author": ActorKind.HUMAN},
+            {"title": "Vendor ticket created", "body": "Opened support case with CRM vendor regarding API instability. Reference case CRM-88421.", "author": ActorKind.HUMAN},
+        ],
+        "lead qualification": [
+            {"title": "Lead scoring complete", "body": "New lead scored at 82/100 based on firmographic and intent signals. Assigning to senior sales rep.", "author": ActorKind.IA},
+            {"title": "Contact established", "body": "Spoke with prospect. Budget approved for Q3. Scheduling technical demo for next week.", "author": ActorKind.HUMAN},
+            {"title": "Qualification summary", "body": "Lead meets all BANT criteria. Budget: confirmed. Authority: IT Director. Need: documented. Timeline: 30 days.", "author": ActorKind.HUMAN},
+        ],
+        "escalation": [
+            {"title": "Incident severity assessment", "body": "Production issue affecting 200+ users. Critical path blocked. Declaring major incident per runbook.", "author": ActorKind.IA},
+            {"title": "Bridge call initiated", "body": "War room established with Engineering, Support, and Infrastructure teams. ETA for fix: 2 hours.", "author": ActorKind.HUMAN},
+            {"title": "Resolution deployed", "body": "Hotfix deployed to production. Monitoring confirms system stability. Post-incident review scheduled.", "author": ActorKind.HUMAN},
+        ],
+        "reconciliation": [
+            {"title": "Discrepancy detected", "body": "Invoice #INV-4421 shows $12,480 but CRM record shows $11,950. Difference of $530 needs investigation.", "author": ActorKind.IA},
+            {"title": "Billing audit results", "body": "Discrepancy traced to promo code not applied correctly. Credit memo issued for the difference.", "author": ActorKind.HUMAN},
+            {"title": "Resolution confirmed", "body": "Customer confirmed receipt of adjusted invoice. Both systems now reconciled.", "author": ActorKind.HUMAN},
+        ],
+        "security incident": [
+            {"title": "Alert verification", "body": "Monitoring system detected anomalous outbound traffic from workstation WS-442. Correlating with IDS alerts.", "author": ActorKind.IA},
+            {"title": "Containment actions", "body": "Isolated affected workstation from network. Revoked API keys. Blocked suspicious outbound IPs at firewall.", "author": ActorKind.HUMAN},
+            {"title": "Forensic analysis", "body": "Preliminary analysis indicates credential theft via phishing. No lateral movement detected. EDR sweep initiated.", "author": ActorKind.IA},
+        ],
+    }
+
+    def _articles_for_ticket(subject: str, ticket_id: str, ticket_created: datetime, ticket_updated: datetime) -> list[Article]:
+        """Generate 1-3 Article objects aligned to the ticket subject."""
+        subject_lower = subject.lower()
+        # Find the best matching pool key
+        pool_key = next((k for k in _article_pool if k in subject_lower), None)
+        pool = _article_pool.get(pool_key, _article_pool["classification"])
+        # Pick 1-3 articles deterministically based on ticket number
+        ticket_num = int(ticket_id.split("-")[-1])
+        num_articles = (ticket_num % 3) + 1  # 1-3 articles
+        articles: list[Article] = []
+        pool_len = len(pool)
+        for j in range(min(num_articles, pool_len)):
+            entry = pool[j]
+            # Stagger timestamps between created and updated
+            ts = ticket_created + (ticket_updated - ticket_created) * (j + 1) / (pool_len + 1)
+            articles.append(Article(
+                id=f"ART-{ticket_num}-{j + 1}",
+                ticket_id=ticket_id,
+                author_kind=entry["author"],
+                author_name=entry["author"].value.capitalize() if entry["author"] == ActorKind.IA else "Agent Support",
+                subject=entry["title"],
+                body_text=entry["body"],
+                created_at=ts,
+            ))
+        return articles
+
     tickets: list[Ticket] = []
     now = _now()
     for i in range(count):
         created = now - timedelta(hours=len(subjects) * (i + 1) % 72, minutes=i * 17 % 60)
         updated = created + timedelta(hours=i % 24)
+        ticket_id = f"TICKET-{1000 + i}"
+        subject = subjects[i % len(subjects)]
         tickets.append(Ticket(
-            id=f"TICKET-{1000 + i}",
-            subject=subjects[i % len(subjects)],
+            id=ticket_id,
+            subject=subject,
             queue=queues_data[i % len(queues_data)],
             state=statuses[i % len(statuses)],
             priority=priorities[i % len(priorities)],
@@ -314,6 +396,7 @@ def _synthetic_tickets(count: int = 25) -> list[Ticket]:
                 solution_time_minutes=480,
                 response_time_minutes=60,
             ),
+            articles=_articles_for_ticket(subject, ticket_id, created, updated),
             created_at=created,
             updated_at=updated,
         ))
@@ -421,6 +504,7 @@ class TicketQueueResponse(BaseModel):
     total: int
     page: int
     filters: TicketFilters
+    operatingMode: str = "demo"
 
 
 class CopilotMessage(BaseModel):
@@ -767,7 +851,7 @@ async def get_ticket_queue(
     db: AsyncSession = Depends(get_db),
 ):
     """Return a paginated ticket list."""
-    tickets = await _resolve_tickets(otrs, 25)
+    tickets, operating_mode = await _resolve_tickets_with_mode(otrs, 25)
 
     filtered = tickets
     if status:
@@ -811,6 +895,7 @@ async def get_ticket_queue(
             priority=CANONICAL_PRIORITY_OPTIONS,
             assignee=assignees,
         ),
+        operatingMode=operating_mode,
     )
 
 

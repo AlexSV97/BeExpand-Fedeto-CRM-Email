@@ -279,6 +279,24 @@ export default function SmartTicketQueueSurface() {
         </div>
       </div>
 
+      {/* Operating mode indicator */}
+      {view.operatingMode && (
+        <span className={cn(
+          'inline-flex items-center gap-1.5 text-[11px] font-medium',
+          view.operatingMode === 'live' && 'text-success',
+          view.operatingMode === 'demo' && 'text-warning',
+          view.operatingMode === 'degraded' && 'text-destructive',
+        )}>
+          <span className={cn(
+            'h-2 w-2 rounded-full',
+            view.operatingMode === 'live' && 'bg-success animate-pulse',
+            view.operatingMode === 'demo' && 'bg-warning',
+            view.operatingMode === 'degraded' && 'bg-destructive',
+          )} />
+          {view.operatingMode === 'live' ? 'Live' : view.operatingMode === 'demo' ? 'Demo' : 'Degraded'}
+        </span>
+      )}
+
       {/* Filter bar */}
       <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-4 space-y-3">
         {/* Search + clear */}

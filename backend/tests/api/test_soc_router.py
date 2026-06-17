@@ -66,8 +66,16 @@ class TestGetTicketQueue:
         assert "total" in data
         assert "page" in data
         assert "filters" in data
+        assert "operatingMode" in data
         assert isinstance(data["tickets"], list)
         assert len(data["tickets"]) > 0
+
+    async def test_returns_operating_mode(self, client: AsyncClient, auth_headers: dict[str, str]):
+        """operatingMode should be 'demo' when OTRS is not configured."""
+        response = await client.get("/api/v1/soc/tickets", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["operatingMode"] == "demo"
 
     async def test_supports_pagination(self, client: AsyncClient, auth_headers: dict[str, str]):
         response = await client.get(
@@ -125,6 +133,16 @@ class TestGetTicketCopilot:
         assert isinstance(data["conversation"], list)
         assert len(data["conversation"]) > 0
         assert data["ticketContext"]["ticketId"] == "TICKET-1000"
+
+    async def test_returns_article_count_greater_than_zero(self, client: AsyncClient, auth_headers: dict[str, str]):
+        """Synthetic tickets should have 1-3 articles each."""
+        response = await client.get(
+            "/api/v1/soc/tickets/TICKET-1000/copilot",
+            headers=auth_headers,
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["ticketContext"]["articleCount"] > 0
 
     async def test_accepts_message_param(self, client: AsyncClient, auth_headers: dict[str, str]):
         response = await client.get(

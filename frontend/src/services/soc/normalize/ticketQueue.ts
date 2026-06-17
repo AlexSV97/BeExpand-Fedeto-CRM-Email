@@ -9,6 +9,7 @@ interface TicketQueueView {
   total: number
   page: number
   filters: TicketFiltersView
+  operatingMode?: string
 }
 
 interface TicketItemView {
@@ -31,13 +32,14 @@ interface TicketFiltersView {
 
 function normalizeTicketQueue(raw: Record<string, unknown>): TicketQueueView {
   if (!raw || typeof raw !== 'object') {
-    return { tickets: [], total: 0, page: 1, filters: {} }
+    return { tickets: [], total: 0, page: 1, filters: {}, operatingMode: 'demo' }
   }
   return {
     tickets: (raw.tickets as TicketItemView[]) ?? [],
     total: (raw.total as number) ?? 0,
     page: (raw.page as number) ?? 1,
     filters: (raw.filters as TicketFiltersView) ?? {},
+    operatingMode: (raw.operatingMode as string) ?? 'demo',
   }
 }
 
