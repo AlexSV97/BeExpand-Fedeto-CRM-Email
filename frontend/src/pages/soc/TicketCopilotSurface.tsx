@@ -334,9 +334,30 @@ export default function TicketCopilotSurface() {
           <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded border', statusBadgeClass(ctx.status))}>
             {t(`ticket.status.${ctx.status.toLowerCase()}`)}
           </span>
-          <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded border', priorityBadgeClass(ctx.status))}>
-            {t('ticket.priority.high')}
+          <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded border', priorityBadgeClass(ctx.priority))}>
+            {t(`ticket.priority.${ctx.priority.toLowerCase()}`)}
           </span>
+        </div>
+      )}
+
+      {ctx && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          <div className="bg-card rounded-2xl border border-border/50 shadow-sm px-4 py-3">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Queue</p>
+            <p className="text-sm font-medium text-foreground mt-1">{ctx.queue || 'Unassigned'}</p>
+          </div>
+          <div className="bg-card rounded-2xl border border-border/50 shadow-sm px-4 py-3">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Assignee</p>
+            <p className="text-sm font-medium text-foreground mt-1">{ctx.assignee || 'Unassigned'}</p>
+          </div>
+          <div className="bg-card rounded-2xl border border-border/50 shadow-sm px-4 py-3">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">SLA</p>
+            <p className="text-sm font-medium text-foreground mt-1">{ctx.slaName || 'No SLA'}</p>
+          </div>
+          <div className="bg-card rounded-2xl border border-border/50 shadow-sm px-4 py-3">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Articles</p>
+            <p className="text-sm font-medium text-foreground mt-1">{ctx.articleCount}</p>
+          </div>
         </div>
       )}
 
@@ -381,17 +402,17 @@ export default function TicketCopilotSurface() {
             <div className="px-5 py-4 space-y-3">
               <div className="flex items-center gap-3 text-sm">
                 <div className="w-1.5 h-1.5 rounded-full bg-chart-1/50" />
-                <span className="text-muted-foreground">{applyNeutralCopy('Ticket assigned to Network Operations')}</span>
+                <span className="text-muted-foreground">{applyNeutralCopy(`Ticket assigned to ${ctx?.assignee || 'the response queue'}`)}</span>
                 <span className="ml-auto text-[10px] text-muted-foreground shrink-0">{t('time.hoursAgo', { count: '2' })}</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <div className="w-1.5 h-1.5 rounded-full bg-chart-2/50" />
-                <span className="text-muted-foreground">{applyNeutralCopy('BGP log analysis requested')}</span>
+                <span className="text-muted-foreground">{applyNeutralCopy(`Queue context: ${ctx?.queue || 'unassigned queue'}`)}</span>
                 <span className="ml-auto text-[10px] text-muted-foreground shrink-0">{t('time.hoursAgo', { count: '1' })}</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <div className="w-1.5 h-1.5 rounded-full bg-warning/50" />
-                <span className="text-muted-foreground">{applyNeutralCopy('SLA warning: 2h remaining before breach')}</span>
+                <span className="text-muted-foreground">{applyNeutralCopy(`SLA profile: ${ctx?.slaName || 'No SLA'} · ${ctx?.articleCount ?? 0} related articles`)}</span>
                 <span className="ml-auto text-[10px] text-muted-foreground shrink-0">{t('time.minAgo', { count: '30' })}</span>
               </div>
             </div>

@@ -430,6 +430,12 @@ class TicketContext(BaseModel):
     ticketId: str
     subject: str
     status: str
+    priority: str
+    queue: str | None = None
+    assignee: str | None = None
+    customerEmail: str | None = None
+    slaName: str | None = None
+    articleCount: int = 0
 
 
 class TicketCopilotResponse(BaseModel):
@@ -826,7 +832,7 @@ async def get_ticket_copilot(
         requested_action=action or "review",
     ))
 
-    search_result = knowledge_svc.search(KnowledgeSearchRequest(
+    search_result = await knowledge_svc.search_rag(KnowledgeSearchRequest(
         query=ticket.subject,
         limit=3,
     ))
@@ -874,6 +880,12 @@ async def get_ticket_copilot(
             ticketId=ticket_id,
             subject=ticket.subject,
             status=_ticket_status(ticket),
+            priority=_ticket_priority(ticket),
+            queue=ticket.queue.name if ticket.queue else None,
+            assignee=ticket.assigned_to,
+            customerEmail=ticket.customer_email,
+            slaName=ticket.sla.name if ticket.sla else None,
+            articleCount=len(ticket.articles),
         ),
     )
 

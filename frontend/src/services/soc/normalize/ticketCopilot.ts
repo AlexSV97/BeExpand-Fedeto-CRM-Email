@@ -26,18 +26,30 @@ interface TicketContextView {
   ticketId: string
   subject: string
   status: string
+  priority: string
+  queue?: string | null
+  assignee?: string | null
+  customerEmail?: string | null
+  slaName?: string | null
+  articleCount: number
 }
 
 // ── Normalizer ──
 
 function normalizeTicketCopilot(raw: Record<string, unknown>): TicketCopilotView {
   if (!raw || typeof raw !== 'object') {
-    return { conversation: [], suggestedActions: [], ticketContext: { ticketId: '', subject: '', status: '' } }
+    return {
+      conversation: [],
+      suggestedActions: [],
+      ticketContext: { ticketId: '', subject: '', status: '', priority: 'medium', articleCount: 0 },
+    }
   }
   return {
     conversation: (raw.conversation as CopilotMessageView[]) ?? [],
     suggestedActions: (raw.suggestedActions as SuggestionItemView[]) ?? [],
-    ticketContext: (raw.ticketContext as TicketContextView) ?? { ticketId: '', subject: '', status: '' },
+    ticketContext: (raw.ticketContext as TicketContextView) ?? {
+      ticketId: '', subject: '', status: '', priority: 'medium', articleCount: 0,
+    },
   }
 }
 
