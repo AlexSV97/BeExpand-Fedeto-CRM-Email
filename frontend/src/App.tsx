@@ -115,9 +115,10 @@ function AppRoutes() {
 function DarkModeDetector() {
   useEffect(() => {
     // Siempre dark mode — como el diseño original de v0
-    document.documentElement.classList.add("dark");
-  }, []);
-  return null;
+    document.documentElement.classList.add('dark')
+    document.title = isSocShellEnabled() ? 'Aiuken SOC' : 'BeConnect'
+  }, [])
+  return null
 }
 
 export default function App() {
