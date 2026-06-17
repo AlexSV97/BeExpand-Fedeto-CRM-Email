@@ -34,7 +34,7 @@ const SURFACE_ID = SURFACE_IDS.REPORTING
 
 const REPORT_TYPE_TABS = ['Daily', 'Weekly', 'Monthly', 'SLA', 'Agent'] as const
 
-// ─── Static metric cards data ────────────────────────────────────────────
+// ─── Metric card mapping ────────────────────────────────────────────────
 
 interface MetricCardData {
   label: string
@@ -43,36 +43,14 @@ interface MetricCardData {
   color: string
 }
 
-const METRICS_DATA: MetricCardData[] = [
-  { label: 'Total Tickets', value: '1,247', icon: BarChart3, color: 'from-blue-500 to-blue-600' },
-  { label: 'Open Tickets', value: '156', icon: FileText, color: 'from-amber-500 to-amber-600' },
-  { label: 'Pending Tickets', value: '23', icon: Clock, color: 'from-purple-500 to-purple-600' },
-  { label: 'SLA Breach', value: '5', icon: AlertTriangle, color: 'from-red-500 to-red-600' },
-  { label: 'Completion Rate', value: '98.2%', icon: CheckCircle, color: 'from-green-500 to-green-600' },
-  { label: 'Avg Resolution', value: '47m', icon: TrendingUp, color: 'from-cyan-500 to-cyan-600' },
-]
-
-// ─── Chart data ──────────────────────────────────────────────────────────
-
-const TICKET_VOLUME_DATA = [
-  { label: 'Mon', value: 42 },
-  { label: 'Tue', value: 56 },
-  { label: 'Wed', value: 38 },
-  { label: 'Thu', value: 61 },
-  { label: 'Fri', value: 47 },
-  { label: 'Sat', value: 22 },
-  { label: 'Sun', value: 18 },
-]
-
-const SLA_COMPLIANCE_DATA = [
-  { label: 'Mon', value: 95 },
-  { label: 'Tue', value: 88 },
-  { label: 'Wed', value: 92 },
-  { label: 'Thu', value: 85 },
-  { label: 'Fri', value: 90 },
-  { label: 'Sat', value: 87 },
-  { label: 'Sun', value: 93 },
-]
+const METRIC_ICON_MAP: Record<string, { icon: typeof BarChart3; color: string }> = {
+  'Total Tickets': { icon: BarChart3, color: 'from-blue-500 to-blue-600' },
+  'Open Tickets': { icon: FileText, color: 'from-amber-500 to-amber-600' },
+  'Pending Tickets': { icon: Clock, color: 'from-purple-500 to-purple-600' },
+  'SLA Breaches': { icon: AlertTriangle, color: 'from-red-500 to-red-600' },
+  'SLA Compliance Rate': { icon: CheckCircle, color: 'from-green-500 to-green-600' },
+  'Avg Resolution Time': { icon: TrendingUp, color: 'from-cyan-500 to-cyan-600' },
+}
 
 // ─── Report action cards ─────────────────────────────────────────────────
 
@@ -282,7 +260,33 @@ export default function ReportingSurface() {
     )
   }
 
-  const isDemo = source === 'mock'
+  const operatingMode = data.operatingMode || (source === 'backend' ? 'live' : source === 'mock' ? 'demo' : 'degraded')
+  const isDemo = operatingMode === 'demo'
+  const isDegraded = operatingMode === 'degraded'
+
+  const metricCards: MetricCardData[] = data.metrics.map((metric) => {
+    const config = METRIC_ICON_MAP[metric.label] || { icon: BarChart3, color: 'from-slate-500 to-slate-600' }
+    const formattedValue = metric.unit === '%'
+      ? `${metric.value.toFixed(1)}%`
+      : metric.unit
+        ? `${metric.value.toFixed(1)}${metric.unit}`
+        : metric.value.toFixed(0)
+
+    return {
+      label: metric.label,
+      value: formattedValue,
+      icon: config.icon,
+      color: config.color,
+    }
+  })
+
+  const ticketVolumeData = data.trends
+    .filter((item) => item.metric === 'ticket_volume')
+    .map((item) => ({ label: item.date.slice(5), value: item.value }))
+
+  const slaComplianceData = data.trends
+    .filter((item) => item.metric === 'sla_compliance')
+    .map((item) => ({ label: item.date.slice(5), value: item.value }))
 
   // ── Loading ──
   if (loading) {
@@ -306,15 +310,15 @@ export default function ReportingSurface() {
       animate="show"
       className="space-y-4"
     >
-      {/* Error fallback banner when API failed */}
-      {source === 'error' && (
+      {/* Degraded banner when backend failed and we fell back */}
+      {isDegraded && (
         <motion.div
           variants={itemVariants}
           className="flex items-center justify-between px-4 py-2 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium"
         >
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-3.5 w-3.5" />
-            <span>Failed to load data from server. Showing cached/demo data.</span>
+            <span>Backend unavailable. Showing degraded analytics snapshot.</span>
           </div>
           <button
             onClick={handleRefresh}
@@ -347,12 +351,15 @@ export default function ReportingSurface() {
           <span className="text-[10px] text-muted-foreground">
             Updated {lastUpdated}
           </span>
-          {isDemo && (
-            <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-warning/10 border border-warning/20 text-warning text-xs font-medium">
-              <AlertTriangle className="h-3.5 w-3.5" />
-              Demo
-            </div>
-          )}
+          <div className={cn(
+            'flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-medium border',
+            operatingMode === 'live' && 'bg-success/10 border-success/20 text-success',
+            operatingMode === 'demo' && 'bg-warning/10 border-warning/20 text-warning',
+            operatingMode === 'degraded' && 'bg-destructive/10 border-destructive/20 text-destructive',
+          )}>
+            <AlertTriangle className="h-3.5 w-3.5" />
+            {operatingMode === 'live' ? 'Live' : operatingMode === 'demo' ? 'Demo' : 'Degraded'}
+          </div>
         </div>
       </motion.div>
 
@@ -409,7 +416,7 @@ export default function ReportingSurface() {
         variants={itemVariants}
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4"
       >
-        {METRICS_DATA.map((metric) => (
+        {metricCards.map((metric) => (
           <MetricCard key={metric.label} {...metric} />
         ))}
       </motion.div>
@@ -420,12 +427,12 @@ export default function ReportingSurface() {
         className="grid grid-cols-1 lg:grid-cols-2 gap-4"
       >
         <BarChart
-          data={TICKET_VOLUME_DATA}
+          data={ticketVolumeData}
           label="Ticket Volume (7-day trend)"
           color="bg-gradient-to-t from-blue-500 to-blue-400"
         />
         <BarChart
-          data={SLA_COMPLIANCE_DATA}
+          data={slaComplianceData}
           label="SLA Compliance (7-day trend)"
           color="bg-gradient-to-t from-green-500 to-green-400"
         />

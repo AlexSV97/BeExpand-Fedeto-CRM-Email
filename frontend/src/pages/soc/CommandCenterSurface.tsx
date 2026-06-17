@@ -584,13 +584,21 @@ export default function CommandCenterSurface() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Live data indicator */}
-          {source === 'backend' && (
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-success">
-              <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
-              Live
-            </span>
-          )}
+          {/* Operating mode indicator */}
+          <span className={cn(
+            'inline-flex items-center gap-1.5 text-[11px] font-medium',
+            data.operatingMode === 'live' && 'text-success',
+            data.operatingMode === 'demo' && 'text-warning',
+            data.operatingMode === 'degraded' && 'text-destructive',
+          )}>
+            <span className={cn(
+              'h-2 w-2 rounded-full',
+              data.operatingMode === 'live' && 'bg-success animate-pulse',
+              data.operatingMode === 'demo' && 'bg-warning',
+              data.operatingMode === 'degraded' && 'bg-destructive',
+            )} />
+            {data.operatingMode === 'live' ? 'Live' : data.operatingMode === 'demo' ? 'Demo' : 'Degraded'}
+          </span>
 
           {/* Surface status badge */}
           <StatusBadge status={data.surfaceStatus || 'operational'} />
@@ -610,12 +618,12 @@ export default function CommandCenterSurface() {
           Source Banners
           ═══════════════════════════════════════════════════════════════ */}
 
-      {/* Error fallback banner when API failed */}
-      {source === 'error' && (
+      {/* Degraded fallback banner when backend failed */}
+      {data.operatingMode === 'degraded' && (
         <div className="flex items-center justify-between px-4 py-2 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium">
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-3.5 w-3.5" />
-            <span>Failed to load data from server. Showing cached/demo data.</span>
+            <span>Backend unavailable. Showing degraded command-center snapshot.</span>
           </div>
           <button
             onClick={refresh}
@@ -626,8 +634,8 @@ export default function CommandCenterSurface() {
         </div>
       )}
 
-      {/* Demo badge when source is mock (but no error) */}
-      {source === 'mock' && !error && (
+      {/* Demo banner when running with synthetic data */}
+      {data.operatingMode === 'demo' && !error && (
         <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-warning/10 border border-warning/20 text-warning text-xs font-medium">
           <AlertTriangle className="h-3.5 w-3.5" />
           {'Demo mode — data shown from local cache'}

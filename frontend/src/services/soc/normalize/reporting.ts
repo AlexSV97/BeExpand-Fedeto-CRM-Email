@@ -8,6 +8,7 @@ interface ReportingView {
   metrics: MetricItemView[]
   trends: TrendItemView[]
   reportTypes: string[]
+  operatingMode: string
 }
 
 interface MetricItemView {
@@ -26,12 +27,13 @@ interface TrendItemView {
 
 function normalizeReporting(raw: Record<string, unknown>): ReportingView {
   if (!raw || typeof raw !== 'object') {
-    return { metrics: [], trends: [], reportTypes: [] }
+    return { metrics: [], trends: [], reportTypes: [], operatingMode: 'demo' }
   }
   return {
     metrics: (raw.metrics as MetricItemView[]) ?? [],
     trends: (raw.trends as TrendItemView[]) ?? [],
     reportTypes: (raw.reportTypes as string[]) ?? [],
+    operatingMode: (raw.operatingMode as string) ?? 'demo',
   }
 }
 

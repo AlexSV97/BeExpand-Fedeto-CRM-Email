@@ -338,17 +338,25 @@ async def get_otrs_client(request: Request) -> OtrsZnunyClient | None:
     return None  # Will trigger synthetic fallback
 
 
+async def _resolve_tickets_with_mode(
+    otrs: OtrsZnunyClient | None,
+    count: int = 25,
+) -> tuple[list[Ticket], str]:
+    """Try OTRS first and return the operational mode used."""
+    if otrs is not None:
+        try:
+            return await otrs.list_tickets(limit=count), "live"
+        except Exception:
+            return _synthetic_tickets(count), "degraded"
+    return _synthetic_tickets(count), "demo"
+
+
 async def _resolve_tickets(
     otrs: OtrsZnunyClient | None,
     count: int = 25,
 ) -> list[Ticket]:
-    """Try OTRS first, fall back to synthetic tickets."""
-    if otrs is not None:
-        try:
-            return await otrs.list_tickets(limit=count)
-        except Exception:
-            pass  # Fall through to synthetic
-    return _synthetic_tickets(count)
+    tickets, _mode = await _resolve_tickets_with_mode(otrs, count)
+    return tickets
 
 
 async def _resolve_ticket(
@@ -389,6 +397,7 @@ class CommandCenterResponse(BaseModel):
     recentAlerts: list[AlertItem]
     queuePressure: float
     surfaceStatus: str
+    operatingMode: str = "demo"
 
 
 class TicketItem(BaseModel):
@@ -530,6 +539,7 @@ class ReportingResponse(BaseModel):
     reportTypes: list[str] = Field(
         default_factory=lambda: ["daily", "weekly", "monthly", "sla", "agent"]
     )
+    operatingMode: str = "demo"
 
 
 class AuditEventItem(BaseModel):
@@ -683,7 +693,7 @@ async def get_command_center(
 ):
     """Aggregate SOC command-center KPIs, alerts, and queue pressure."""
     now = _now()
-    tickets = await _resolve_tickets(otrs, 25)
+    tickets, operating_mode = await _resolve_tickets_with_mode(otrs, 25)
     report = report_svc.generate_report(OperationalReportRequest(
         window=ReportWindow.DAILY,
         as_of=now,
@@ -738,6 +748,7 @@ async def get_command_center(
         recentAlerts=alerts,
         queuePressure=round(queue_pressure, 1),
         surfaceStatus="operational",
+        operatingMode=operating_mode,
     )
 
 
@@ -1057,7 +1068,7 @@ async def get_reports(
 ):
     """Return reporting metrics and trends for SOC dashboards."""
     now = _now()
-    tickets = await _resolve_tickets(otrs, 25)
+    tickets, operating_mode = await _resolve_tickets_with_mode(otrs, 25)
 
     window_map = {
         "daily": ReportWindow.DAILY,
@@ -1083,17 +1094,29 @@ async def get_reports(
         MetricItem(label="Avg Resolution Time", value=round(metrics_data.average_elapsed_minutes, 1), unit="min"),
     ]
 
+    total_points = 7
+    tickets_per_point = max(1, len(tickets) // total_points) if tickets else 1
     trends: list[TrendItem] = []
-    for i in range(7):
-        day = now - timedelta(days=6 - i)
+    for i in range(total_points):
+        day = now - timedelta(days=total_points - 1 - i)
+        chunk = tickets[i * tickets_per_point:(i + 1) * tickets_per_point]
+        if not chunk:
+            chunk = tickets[-tickets_per_point:] if tickets else []
+
+        day_assessments = [lifecycle_svc.assess(ticket, as_of=now) for ticket in chunk]
+        breaches = sum(1 for assessment in day_assessments if assessment.risk_level.value == "critical")
+        compliance = 100.0
+        if day_assessments:
+            compliance = max(0.0, ((len(day_assessments) - breaches) / len(day_assessments)) * 100)
+
         trends.append(TrendItem(
             date=day.strftime("%Y-%m-%d"),
-            value=float(metrics_data.total_tickets - i * 2 + (i % 3)),
+            value=float(len(chunk)),
             metric="ticket_volume",
         ))
         trends.append(TrendItem(
             date=day.strftime("%Y-%m-%d"),
-            value=max(0.0, float(metrics_data.sla_compliance_rate * 100 - i * 1.5)),
+            value=round(compliance, 2),
             metric="sla_compliance",
         ))
 
@@ -1101,6 +1124,7 @@ async def get_reports(
         metrics=metrics_list,
         trends=trends,
         reportTypes=["daily", "weekly", "monthly", "sla", "agent"],
+        operatingMode=operating_mode,
     )
 
 
