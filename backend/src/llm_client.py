@@ -1,12 +1,13 @@
 """
-Cliente LLM unificado — solo OpenRouter (OpenAI-compatible).
+Cliente LLM unificado — OpenRouter con fallback a Ollama local.
 
-Eliminado: fallback a Ollama. En producción solo OpenRouter.
-Si no hay OPENROUTER_API_KEY configurada, las llamadas fallan lanzando
-excepción (el sistema debe tener OpenRouter para funcionar).
+- Si OPENROUTER_API_KEY está configurada → usa OpenRouter (cloud).
+- Si no → fallback automático a Ollama (http://localhost:11434).
+- El modelo se adapta según el backend activo.
 """
 
 import asyncio
+import json
 import logging
 import random
 from typing import Any
@@ -17,15 +18,19 @@ from src.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+_OLLAMA_BASE = "http://localhost:11434"
+_OLLAMA_FALLBACK_MODEL = "qwen2.5:7b"
+
 
 class LLMClient:
     """
-    Cliente para llamadas LLM vía OpenRouter API.
+    Cliente para llamadas LLM vía OpenRouter (preferido) u Ollama local (fallback).
 
     Uso:
         client = LLMClient(model="openrouter/owl-alpha")
         text = await client.generate("prompt")
-        text = await client.chat([{"role": "user", "content": "hola"}])
+
+    Si OPENROUTER_API_KEY no está configurada, usa Ollama automáticamente.
     """
 
     def __init__(
@@ -36,52 +41,27 @@ class LLMClient:
     ):
         settings = get_settings()
         self._settings = settings
+        self._use_ollama = not settings.openrouter_api_key
 
-        if model:
-            self.model = model
-        elif use_chat_model:
-            self.model = settings.openrouter_chat_model
+        if self._use_ollama:
+            # Modelo para Ollama — si se pidió un modelo específico, usarlo
+            if model:
+                self.model = model
+            elif use_chat_model:
+                # Para chat/classifier usamos el modelo principal de Ollama
+                self.model = _OLLAMA_FALLBACK_MODEL
+            else:
+                self.model = settings.openrouter_model or _OLLAMA_FALLBACK_MODEL
+            logger.info("LLMClient: usando Ollama (%s) — sin OPENROUTER_API_KEY", self.model)
         else:
-            self.model = settings.openrouter_model
+            if model:
+                self.model = model
+            elif use_chat_model:
+                self.model = settings.openrouter_chat_model
+            else:
+                self.model = settings.openrouter_model
 
         self.timeout = timeout or settings.openrouter_timeout or 120
-
-    async def generate_embedding(self, text: str) -> list[float]:
-        """Generate an embedding vector for the given text using OpenRouter.
-
-        Uses text-embedding-3-small (OpenAI-compatible via OpenRouter).
-        Falls back to a zero vector if the API call fails.
-        """
-        headers = {
-            "Authorization": f"Bearer {self._settings.openrouter_api_key}",
-            "Content-Type": "application/json",
-        }
-
-        payload = {
-            "model": "text-embedding-3-small",
-            "input": text,
-        }
-
-        try:
-            async with httpx.AsyncClient(timeout=30) as client:
-                resp = await client.post(
-                    f"{self._settings.openrouter_base_url}/embeddings",
-                    headers=headers,
-                    json=payload,
-                )
-                if resp.status_code == 200:
-                    data = resp.json()
-                    return data["data"][0]["embedding"]
-                else:
-                    logger.warning(
-                        "Embedding API returned %d: %s",
-                        resp.status_code,
-                        resp.text[:200],
-                    )
-                    return [0.0] * 768
-        except Exception:
-            logger.exception("Embedding generation failed, returning zero vector")
-            return [0.0] * 768  # zero vector = no semantic match
 
     # ── API Pública ──────────────────────────────────────────────────────────
 
@@ -119,6 +99,52 @@ class LLMClient:
     # ── Interno ──────────────────────────────────────────────────────────────
 
     async def _chat_completion(
+        self,
+        messages: list[dict[str, str]],
+        temperature: float,
+        max_tokens: int,
+    ) -> str:
+        """Envía a OpenRouter u Ollama según configuración."""
+        if self._use_ollama:
+            return await self._ollama_chat(messages, temperature, max_tokens)
+        return await self._openrouter_chat(messages, temperature, max_tokens)
+
+    async def _ollama_chat(
+        self,
+        messages: list[dict[str, str]],
+        temperature: float,
+        max_tokens: int,
+    ) -> str:
+        """Llama a Ollama (http://localhost:11434/api/chat) con timeout."""
+        url = f"{_OLLAMA_BASE}/api/chat"
+        payload: dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "stream": False,
+            "options": {
+                "temperature": temperature,
+                "num_predict": max_tokens,
+            },
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                resp = await client.post(url, json=payload)
+                resp.raise_for_status()
+                data = resp.json()
+                content = data.get("message", {}).get("content", "")
+                return content.strip() if content else ""
+        except httpx.ConnectError:
+            logger.error(
+                "Ollama no disponible en %s. ¿Está corriendo? "
+                "Ejecutá: ollama serve", _OLLAMA_BASE
+            )
+            raise
+        except Exception:
+            logger.exception("Ollama call failed (model: %s)", self.model)
+            raise
+
+    async def _openrouter_chat(
         self,
         messages: list[dict[str, str]],
         temperature: float,
@@ -193,3 +219,44 @@ class LLMClient:
         raise RuntimeError(
             f"OpenRouter rate limited after {max_retries} retries"
         )
+
+    async def generate_embedding(self, text: str) -> list[float]:
+        """Generate an embedding vector for the given text using OpenRouter.
+
+        Uses text-embedding-3-small (OpenAI-compatible via OpenRouter).
+        Falls back to a zero vector if the API call fails.
+        """
+        if self._use_ollama:
+            logger.warning("Embeddings no disponibles con Ollama — devolviendo vector cero")
+            return [0.0] * 768
+
+        headers = {
+            "Authorization": f"Bearer {self._settings.openrouter_api_key}",
+            "Content-Type": "application/json",
+        }
+
+        payload = {
+            "model": "text-embedding-3-small",
+            "input": text,
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.post(
+                    f"{self._settings.openrouter_base_url}/embeddings",
+                    headers=headers,
+                    json=payload,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    return data["data"][0]["embedding"]
+                else:
+                    logger.warning(
+                        "Embedding API returned %d: %s",
+                        resp.status_code,
+                        resp.text[:200],
+                    )
+                    return [0.0] * 768
+        except Exception:
+            logger.exception("Embedding generation failed, returning zero vector")
+            return [0.0] * 768  # zero vector = no semantic match

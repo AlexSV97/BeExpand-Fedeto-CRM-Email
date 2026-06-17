@@ -212,15 +212,23 @@ class ActionExecutor:
         """Guarda el email en BD."""
         settings = get_settings()
 
+        # Auto-generar message_id si no tiene (ej: correos sin Message-ID header)
+        # Esto evita violaciones de UniqueConstraint("message_id", "account_id")
+        # cuando múltiples emails llegan sin Message-ID.
+        message_id = ctx.raw.message_id
+        if not message_id:
+            message_id = f"auto-{uuid.uuid4()}"
+            logger.debug("Message-ID auto-generado: %s", message_id)
+
         # Verificar duplicado por message_id + account_id
-        if ctx.raw.message_id:
+        if message_id:
             existing = await self.db.execute(
                 select(Email).where(
-                    Email.message_id == ctx.raw.message_id,
+                    Email.message_id == message_id,
                 )
             )
             if existing.scalar_one_or_none():
-                logger.debug("Email duplicado (saltando): %s", ctx.raw.message_id)
+                logger.debug("Email duplicado (saltando): %s", message_id)
                 return existing.scalar_one()  # type: ignore
 
         now = datetime.now(timezone.utc)
@@ -228,7 +236,7 @@ class ActionExecutor:
         email = Email(
             id=str(uuid.uuid4()),
             account_id=await self._get_or_create_account_id(ctx),
-            message_id=ctx.raw.message_id,
+            message_id=message_id,
             subject=_strip_category_prefixes(ctx.raw.subject),
             body_plain=ctx.raw.body_plain,
             body_html=ctx.raw.body_html,

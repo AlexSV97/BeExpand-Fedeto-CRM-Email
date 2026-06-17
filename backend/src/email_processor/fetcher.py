@@ -119,8 +119,11 @@ def parse_raw_email(raw_bytes: bytes) -> dict:
     to_raw = decode_mime_header(msg["To"])
     _, to_email = parse_email_address(to_raw)
 
-    # Message-ID
-    message_id = msg.get("Message-ID", "").strip().strip("<>")
+    # Message-ID — some emails arrive without one (batch SMTP, local forwards, etc.)
+    # Return None so the DB layer can auto-generate one instead of inserting ""
+    # which would violate UniqueConstraint("message_id", "account_id") on duplicates.
+    raw_id = msg.get("Message-ID")
+    message_id = raw_id.strip().strip("<>") if raw_id else None
 
     # Fecha
     date_str = msg.get("Date")
