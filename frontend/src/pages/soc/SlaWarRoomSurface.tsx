@@ -549,7 +549,6 @@ export default function SlaWarRoomSurface() {
   }
 
   const operatingMode = data.operatingMode || (source === 'backend' ? 'live' : source === 'mock' ? 'demo' : 'degraded')
-  const isDemo = operatingMode === 'demo'
   const isDegraded = operatingMode === 'degraded'
 
   // ── Content ──

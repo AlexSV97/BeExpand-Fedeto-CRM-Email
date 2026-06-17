@@ -477,7 +477,7 @@ const SURFACE_ID = SURFACE_IDS.COMMAND_CENTER
 export default function CommandCenterSurface() {
   const { setSurfaceStatus } = useSocShell()
 
-  const { data, loading, error, source, refresh } = useSocResource(
+  const { data, loading, error, refresh } = useSocResource(
     SOC_ENDPOINTS[SURFACE_IDS.COMMAND_CENTER],
     normalizeCommandCenter,
     MOCK_COMMAND_CENTER,

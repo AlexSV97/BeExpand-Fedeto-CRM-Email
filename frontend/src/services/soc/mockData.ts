@@ -65,6 +65,7 @@ export const MOCK_COMMAND_CENTER: CommandCenterView = {
   ],
   queuePressure: 68,
   surfaceStatus: 'operational',
+  operatingMode: 'demo',
 }
 
 // ── SLA Risk items (supplementary -- rendered below the main grid) ────
@@ -143,6 +144,8 @@ export const MOCK_TICKET_COPILOT: TicketCopilotView = {
     ticketId: 'TKT-1001',
     subject: applyNeutralCopy('Circuit latency on MX-480 edge router — possible BGP flap'),
     status: 'in_progress',
+    priority: 'high',
+    articleCount: 3,
   },
 }
 
@@ -166,6 +169,7 @@ export const MOCK_SLA_WAR_ROOM: SlaWarRoomView = {
     { id: 'medium', name: 'Medium', targetSeconds: 28800, activeCount: 1, breachCount: 0 },
     { id: 'low', name: 'Low', targetSeconds: 86400, activeCount: 0, breachCount: 0 },
   ],
+  operatingMode: 'demo',
 }
 
 // ── Rich timer cards (supplementary -- shows countdown with progress) ──
@@ -340,6 +344,7 @@ export const MOCK_REPORTING: ReportingView = {
     { date: '2026-06-16', value: 18, metric: 'tickets' },
   ],
   reportTypes: ['slaCompliance', 'agentPerformance', 'ticketVolume', 'queueTrends'],
+  operatingMode: 'demo',
 }
 
 // ── Chart data for report types (supplementary) ──────────────────────

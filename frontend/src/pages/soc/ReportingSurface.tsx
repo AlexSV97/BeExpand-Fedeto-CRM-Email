@@ -261,7 +261,6 @@ export default function ReportingSurface() {
   }
 
   const operatingMode = data.operatingMode || (source === 'backend' ? 'live' : source === 'mock' ? 'demo' : 'degraded')
-  const isDemo = operatingMode === 'demo'
   const isDegraded = operatingMode === 'degraded'
 
   const metricCards: MetricCardData[] = data.metrics.map((metric) => {
