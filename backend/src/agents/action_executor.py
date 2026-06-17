@@ -249,6 +249,7 @@ class ActionExecutor:
         if not message_id:
             message_id = f"auto-{uuid.uuid4()}"
             logger.debug("Message-ID auto-generado: %s", message_id)
+            ctx.raw.message_id = message_id  # ← PROPAGATE back to context
 
         # Verificar duplicado por message_id + account_id
         if message_id:
@@ -769,6 +770,29 @@ class ActionExecutor:
                 detail="Email nulo — no se crea ticket",
             )
 
+        # ── PRE-CHECK: ¿ya existe ticket OTRS para este email? ──────────────
+        message_id = ctx.raw.message_id
+        if message_id:
+            try:
+                result = await self.db.execute(
+                    select(Email).where(Email.message_id == message_id)
+                )
+                email = result.scalar_one_or_none()
+                if email and email.otrs_ticket_id:
+                    logger.info(
+                        "Ticket %s ya existe para email %s",
+                        email.otrs_ticket_id, message_id,
+                    )
+                    return ActionResult(
+                        action="otrs_ticket_create",
+                        success=True,
+                        detail=f"Ticket {email.otrs_ticket_id} ya existe",
+                    )
+            except Exception:
+                logger.warning(
+                    "Error en pre-check de duplicado — continuando (fail-open)"
+                )
+
         try:
             input_data = self._build_ticket_input(ctx)
             service = TicketIngestionService()
@@ -779,6 +803,30 @@ class ActionExecutor:
                     ticket.id,
                     ticket.queue.name,
                 )
+
+                # ── POST-SAVE: persistir otrs_ticket_id en el Email ─────────
+                if message_id:
+                    try:
+                        r2 = await self.db.execute(
+                            select(Email).where(Email.message_id == message_id)
+                        )
+                        email2 = r2.scalar_one_or_none()
+                        if email2:
+                            email2.otrs_ticket_id = ticket.id
+                            email2.otrs_ticket_created_at = datetime.now(timezone.utc)
+                            await self.db.commit()
+                            logger.debug(
+                                "otrs_ticket_id=%s guardado para email %s",
+                                ticket.id, message_id,
+                            )
+                    except Exception:
+                        await self.db.rollback()
+                        logger.warning(
+                            "No se pudo persistir otrs_ticket_id para %s —"
+                            " ticket %s ya existe en OTRS (fail-soft)",
+                            message_id, ticket.id,
+                        )
+
                 return ActionResult(
                     action="otrs_ticket_create",
                     success=True,

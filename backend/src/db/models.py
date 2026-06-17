@@ -106,6 +106,12 @@ class Email(Base):
     status: Mapped[Optional[str]] = mapped_column(String(20), default="pendiente")
     summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     extra_data: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
+    otrs_ticket_id: Mapped[Optional[str]] = mapped_column(
+        String(100), nullable=True, default=None
+    )
+    otrs_ticket_created_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (

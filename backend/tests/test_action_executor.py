@@ -6,8 +6,9 @@ Covers:
 - T2.3: Graceful error handling (not configured, nulo, API failure)
 """
 
+import logging
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -526,4 +527,220 @@ class TestCreateTicketGracefulHandling:
             rec.message for rec in caplog.records if rec.levelno == logging.WARNING
         ]
         assert any("Error creando ticket OTRS" in msg for msg in warning_messages)
+
+
+# ---------------------------------------------------------------------------
+# IN-05 — Dedup: Pre-check + post-save + message_id propagation
+# ---------------------------------------------------------------------------
+
+
+class TestCreateTicketDedup:
+    """IN-05: Dedup scenarios for _create_ticket() and _save_email().
+
+    Covers:
+    - T1.3: message_id propagation in _save_email()
+    - T1.4: Pre-check skip when otrs_ticket_id already exists
+    - T1.5: Post-save otrs_ticket_id set after ticket creation
+    - Fail-open: DB error in pre-check does not block ticket creation
+    - Fail-soft: DB error in post-save does not affect ActionResult
+    """
+
+    @pytest.fixture(autouse=True)
+    def _patch_ticket_service(self, monkeypatch):
+        """Mock TicketIngestionService to avoid real HTTP calls.
+        Uses a call counter spy for verifying ingest_email calls."""
+
+        call_counter: list[int] = [0]
+
+        async def fake_ingest(self, input_data):
+            call_counter[0] += 1
+            return Ticket(
+                id="TCK-999",
+                subject=input_data.subject,
+                queue=input_data.queue or Queue(name="Support"),
+                state=input_data.state,
+                priority=input_data.priority,
+            )
+
+        async def fake_aclose(self_):
+            pass
+
+        monkeypatch.setattr(
+            "src.services.ticket_ingestion.TicketIngestionService.ingest_email",
+            fake_ingest,
+        )
+        monkeypatch.setattr(
+            "src.services.ticket_ingestion.TicketIngestionService.aclose",
+            fake_aclose,
+        )
+
+        return call_counter
+
+    # ── Scenario 1: Skip when ticket already exists (T1.4) ────────────────
+
+    async def test_skips_when_ticket_already_exists(
+        self, executor, sample_context, _patch_ticket_service
+    ):
+        """Pre-check finds existing otrs_ticket_id → skip with early return."""
+        call_counter = _patch_ticket_service
+
+        email_mock = MagicMock()
+        email_mock.message_id = "msg-123"
+        email_mock.otrs_ticket_id = "TCK-1"
+        email_mock.otrs_ticket_created_at = datetime.now(timezone.utc)
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = email_mock
+        executor.db.execute = AsyncMock(return_value=mock_result)
+
+        result = await executor._create_ticket(sample_context)
+
+        assert result.action == "otrs_ticket_create"
+        assert result.success is True
+        assert "ya existe" in result.detail
+        assert call_counter[0] == 0  # ingest_email was NOT called
+
+    # ── Scenario 2: Create when no otrs_ticket_id (T1.4 + T1.5) ───────────
+
+    async def test_creates_ticket_when_no_otrs_ticket_id(
+        self, executor, sample_context, _patch_ticket_service
+    ):
+        """No otrs_ticket_id → pre-check continues, post-save sets the ID."""
+        call_counter = _patch_ticket_service
+
+        email_mock = MagicMock()
+        email_mock.message_id = "msg-123"
+        email_mock.otrs_ticket_id = None
+        email_mock.otrs_ticket_created_at = None
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = email_mock
+        executor.db.execute = AsyncMock(return_value=mock_result)
+        executor.db.commit = AsyncMock()
+
+        result = await executor._create_ticket(sample_context)
+
+        assert result.action == "otrs_ticket_create"
+        assert result.success is True
+        assert "TCK-999" in result.detail
+        assert call_counter[0] == 1  # ingest_email WAS called once
+        # Post-save should have set otrs_ticket_id on the email mock
+        assert email_mock.otrs_ticket_id == "TCK-999"
+        assert email_mock.otrs_ticket_created_at is not None
+        # commit was called (once for post-save)
+        executor.db.commit.assert_awaited_once()
+
+    # ── Scenario 3: Missing message_id (T1.4) ─────────────────────────────
+
+    async def test_missing_message_id_skips_pre_check(
+        self, executor, sample_context, _patch_ticket_service
+    ):
+        """message_id=None → pre-check AND post-save are skipped."""
+        call_counter = _patch_ticket_service
+
+        ctx = sample_context
+        ctx.raw.message_id = None
+
+        # db.execute should never be called — raise if it is
+        executor.db.execute = AsyncMock(
+            side_effect=RuntimeError("No db.execute should happen")
+        )
+
+        result = await executor._create_ticket(ctx)
+
+        assert result.success is True
+        assert call_counter[0] == 1  # Ticket created normally
+
+    # ── Scenario 4: DB error in pre-check — fail-open (T1.4) ──────────────
+
+    async def test_db_error_in_pre_check_fails_open(
+        self, executor, sample_context, _patch_ticket_service, caplog
+    ):
+        """Pre-check raises → warning logged, ticket creation continues."""
+        call_counter = _patch_ticket_service
+
+        executor.db.execute = AsyncMock(
+            side_effect=RuntimeError("DB connection lost")
+        )
+
+        with caplog.at_level(logging.WARNING):
+            result = await executor._create_ticket(sample_context)
+
+        assert result.success is True
+        assert call_counter[0] == 1  # Ticket created despite pre-check error
+        # Verify fail-open warning
+        warning_messages = [
+            rec.message for rec in caplog.records if rec.levelno == logging.WARNING
+        ]
+        assert any("fail-open" in msg for msg in warning_messages)
+
+    # ── Scenario 5: DB error in post-save — fail-soft (T1.5) ──────────────
+
+    async def test_db_error_in_post_save_fails_soft(
+        self, executor, sample_context, _patch_ticket_service, caplog
+    ):
+        """Post-save commit fails → warning logged, ActionResult still success."""
+        call_counter = _patch_ticket_service
+
+        email_mock = MagicMock()
+        email_mock.message_id = "msg-123"
+        email_mock.otrs_ticket_id = None
+        email_mock.otrs_ticket_created_at = None
+
+        # Pre-check succeeds (returns email without ticket)
+        first_result = MagicMock()
+        first_result.scalar_one_or_none.return_value = email_mock
+
+        # Post-save also needs a db.execute — return email again
+        executor.db.execute = AsyncMock(return_value=first_result)
+
+        # But commit raises on post-save
+        executor.db.commit = AsyncMock(side_effect=RuntimeError("Commit failed"))
+
+        with caplog.at_level(logging.WARNING):
+            result = await executor._create_ticket(sample_context)
+
+        assert result.success is True
+        assert "TCK-999" in result.detail
+        assert call_counter[0] == 1  # Ticket was created
+        # Verify fail-soft warning
+        warning_messages = [
+            rec.message for rec in caplog.records if rec.levelno == logging.WARNING
+        ]
+        assert any("No se pudo persistir" in msg for msg in warning_messages)
+        # rollback was called
+        executor.db.rollback.assert_awaited_once()
+
+    # ── Scenario 6: Auto-generated message_id propagates (T1.3) ───────────
+
+    async def test_message_id_propagates_to_context(
+        self, executor, sample_context, monkeypatch
+    ):
+        """_save_email() sets ctx.raw.message_id when auto-generated."""
+        ctx = sample_context
+
+        # Mock contact
+        contact = MagicMock()
+        contact.id = "contact-id"
+        contact.name = "Test"
+        contact.email = "test@example.com"
+
+        # Mock _get_or_create_account_id
+        async def fake_get_account(_ctx):
+            return "account-id"
+
+        monkeypatch.setattr(executor, "_get_or_create_account_id", fake_get_account)
+
+        # Mock db.execute for duplicate check to return None (no duplicate)
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        executor.db.execute = AsyncMock(return_value=mock_result)
+
+        # Set message_id to None — should be auto-generated
+        ctx.raw.message_id = None
+
+        await executor._save_email(ctx, contact)
+
+        assert ctx.raw.message_id is not None
+        assert ctx.raw.message_id.startswith("auto-")
 
