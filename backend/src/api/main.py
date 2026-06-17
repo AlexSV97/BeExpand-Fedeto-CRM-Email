@@ -36,6 +36,7 @@ from src.api.routers import (
     soc,
     tickets,
 )
+from src.api.middleware.error_handler import soc_error_handler
 from src.config import get_settings
 from src.db.models import ReprocessTask, User
 from src.db.session import async_session_factory, init_db
@@ -171,6 +172,9 @@ app.include_router(queues.router, prefix="/api/v1")
 app.include_router(sla.router, prefix="/api/v1")
 app.include_router(tickets.router, prefix="/api/v1")
 app.include_router(soc.router, prefix="/api/v1")
+
+# ── Safe error handler ──────────────────────────────────────────────────────
+app.exception_handler(Exception)(soc_error_handler)
 
 # CORS
 import os

@@ -45,12 +45,8 @@ from src.services.ticket_lifecycle import (
     TicketLifecycleService,
 )
 from src.api.middleware.rate_limit import RateLimiter
-from src.api.middleware.error_handler import soc_error_handler
 
 router = APIRouter(tags=["soc"])
-
-# Register safe error handler for all SOC endpoints
-router.exception_handler(Exception)(soc_error_handler)
 
 
 # ---------------------------------------------------------------------------
