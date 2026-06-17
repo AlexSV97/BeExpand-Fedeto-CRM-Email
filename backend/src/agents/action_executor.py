@@ -26,7 +26,9 @@ from src.config import get_settings
 from src.attachment_storage import save_attachment
 from src.db.models import ClassificationHistory, Contact, Email, Invoice
 from src.email_processor.forwarder import forward_email
-from src.orchestrator.context import ActionResult, AttachmentContent, Category, EmailContext
+from src.domain.ticketing import TicketIngestionInput, TicketPriority, TicketState, Queue
+from src.integrations.otrs_znuny.settings import OtrsZnunySettings
+from src.orchestrator.context import ActionResult, AttachmentContent, Category, Department, EmailContext, Urgency
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +55,30 @@ def _strip_category_prefixes(subject: str | None) -> str | None:
 
 class ActionExecutor:
     """Ejecuta las acciones post-clasificación del pipeline."""
+
+    # ── Mapeo de categoría → cola OTRS ──────────────────────────────────
+    QUEUE_MAP: dict[str, str] = {
+        Category.CLIENTE.value: "Support",
+        Category.LEAD.value: "Ventas",
+        Category.PROVEEDOR.value: "Proveedores",
+    }
+
+    # ── Mapeo de departamento de routing → cola OTRS (fallback Tier 2) ──
+    DEPARTMENT_QUEUE_MAP: dict[str, str] = {
+        Department.SOPORTE.value: "Support",
+        Department.COMERCIAL.value: "Ventas",
+        Department.CONTABILIDAD.value: "Contabilidad",
+        Department.PROVEEDORES.value: "Proveedores",
+        Department.DIRECCION.value: "Direccion",
+        Department.OTRO.value: "Support",
+    }
+
+    # ── Mapeo de urgencia → prioridad OTRS ──────────────────────────────
+    URGENCY_PRIORITY_MAP: dict[str, TicketPriority] = {
+        Urgency.ALTA.value: TicketPriority.HIGH,
+        Urgency.MEDIA.value: TicketPriority.NORMAL,
+        Urgency.BAJA.value: TicketPriority.LOW,
+    }
 
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -103,6 +129,10 @@ class ActionExecutor:
         # 5. Procesar facturas (si el email tiene adjuntos PDF)
         invoice_action = await self._process_invoices(ctx)
         actions.append(invoice_action)
+
+        # 6. Crear ticket en OTRS (si está configurado)
+        ticket_action = await self._create_ticket(ctx)
+        actions.append(ticket_action)
 
         ctx.actions = actions
         return actions
@@ -650,6 +680,119 @@ class ActionExecutor:
             success=len(errors) == 0,
             detail=f"No se extrajeron facturas ({len(errors)} errores)" if errors else "PDF procesado sin datos de factura",
         )
+
+    def _resolve_queue(self, ctx: EmailContext) -> Queue:
+        """Resuelve la cola OTRS aplicando el fallback de 3 niveles.
+
+        Tier 1 — Category match: lookup directo en QUEUE_MAP.
+        Tier 2 — Department match: primer departamento de routing que coincida.
+        Tier 3 — Default queue: OtrsZnunySettings.default_queue ("Support").
+        """
+        # Tier 1: categoría conocida
+        if ctx.final_category:
+            mapped = self.QUEUE_MAP.get(ctx.final_category)
+            if mapped:
+                return Queue(name=mapped)
+
+        # Tier 2: departamentos de routing
+        if ctx.routing and ctx.routing.departments:
+            for dept in ctx.routing.departments:
+                mapped = self.DEPARTMENT_QUEUE_MAP.get(dept)
+                if mapped:
+                    return Queue(name=mapped)
+
+        # Tier 3: cola por defecto
+        return Queue(name=OtrsZnunySettings().default_queue)
+
+    def _build_ticket_input(self, ctx: EmailContext) -> TicketIngestionInput:
+        """Construye un TicketIngestionInput a partir del EmailContext.
+
+        Aplica los mapeos de cola, prioridad, estado y metadata
+        según el diseño en §3.1 de IN-01.
+        """
+        # Resolver urgencia y prioridad
+        urgency = ctx.extracted.urgency if ctx.extracted else "media"
+        priority = self.URGENCY_PRIORITY_MAP.get(urgency, TicketPriority.NORMAL)
+
+        # Metadata de clasificación
+        metadata: dict = {
+            "category": ctx.final_category,
+            "confidence": ctx.final_confidence,
+            "resolution_method": ctx.resolution_method,
+            "urgency": urgency,
+            "action_required": ctx.extracted.action_required if ctx.extracted else None,
+        }
+
+        return TicketIngestionInput(
+            subject=ctx.raw.subject or "",
+            body_text=ctx.raw.body_plain or "",
+            body_html=ctx.raw.body_html,
+            sender_name=ctx.raw.sender_name,
+            sender_email=ctx.raw.sender_email,
+            recipients=ctx.raw.recipients or [],
+            message_id=ctx.raw.message_id,
+            received_at=ctx.raw.received_at,
+            queue=self._resolve_queue(ctx),
+            priority=priority,
+            state=TicketState.NEW,
+            comment_text=ctx.extracted.summary if ctx.extracted else None,
+            comment_visible_to_customer=False,
+            metadata=metadata,
+        )
+
+    async def _create_ticket(self, ctx: EmailContext) -> ActionResult:
+        """Crea un ticket en OTRS/Znuny a partir del email clasificado.
+
+        Guardas:
+        - Si OTRS no está configurado → skip con ActionResult(success=True)
+        - Si la categoría es nulo/None → skip con ActionResult(success=True)
+
+        Error handling: NUNCA re-lanza excepción. Siempre retorna ActionResult.
+        """
+        from src.services.ticket_ingestion import TicketIngestionService
+
+        # Guard: OTRS no configurado
+        if not OtrsZnunySettings().is_configured:
+            logger.info("OTRS no configurado — omitiendo creación de ticket")
+            return ActionResult(
+                action="otrs_ticket_create",
+                success=True,
+                detail="OTRS no configurado — omitido",
+            )
+
+        # Guard: email nulo
+        if ctx.final_category is None or ctx.final_category == Category.NULO.value:
+            logger.info("Email nulo — no se crea ticket")
+            return ActionResult(
+                action="otrs_ticket_create",
+                success=True,
+                detail="Email nulo — no se crea ticket",
+            )
+
+        try:
+            input_data = self._build_ticket_input(ctx)
+            service = TicketIngestionService()
+            try:
+                ticket = await service.ingest_email(input_data)
+                logger.info(
+                    "Ticket creado: %s en cola %s",
+                    ticket.id,
+                    ticket.queue.name,
+                )
+                return ActionResult(
+                    action="otrs_ticket_create",
+                    success=True,
+                    detail=f"Ticket {ticket.id} creado en cola {ticket.queue.name}",
+                )
+            finally:
+                await service.aclose()
+        except Exception as e:
+            logger.warning("Error creando ticket OTRS: %s", e)
+            return ActionResult(
+                action="otrs_ticket_create",
+                success=False,
+                detail=str(e),
+            )
 
     def _determine_relevance(self, ctx: EmailContext) -> str:
         """Determina la relevancia del email basado en categoría y urgencia."""
