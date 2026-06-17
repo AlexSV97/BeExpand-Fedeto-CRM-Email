@@ -36,8 +36,8 @@ import {
 const SURFACE_ID = SURFACE_IDS.SMART_TICKET_QUEUE
 const PAGE_SIZE = 15
 
-const STATUS_OPTIONS = ['open', 'in_progress', 'pending', 'resolved', 'closed'] as const
-const PRIORITY_OPTIONS = ['critical', 'high', 'medium', 'low'] as const
+const DEFAULT_STATUS_OPTIONS = ['open', 'in_progress', 'pending', 'resolved', 'closed'] as const
+const DEFAULT_PRIORITY_OPTIONS = ['critical', 'high', 'medium', 'low'] as const
 
 // ─── Module-level selected ticket (shared with TicketCopilot) ────────────
 
@@ -153,6 +153,13 @@ export default function SmartTicketQueueSurface() {
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  const statusOptions = view.filters.status && view.filters.status.length > 0
+    ? view.filters.status
+    : [...DEFAULT_STATUS_OPTIONS]
+  const priorityOptions = view.filters.priority && view.filters.priority.length > 0
+    ? view.filters.priority
+    : [...DEFAULT_PRIORITY_OPTIONS]
 
   // ── Derived: filtered tickets ─────────────────────────────────────
 
@@ -314,7 +321,7 @@ export default function SmartTicketQueueSurface() {
           <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mr-1">
             {t('ticket.statusLabel')}:
           </span>
-          {STATUS_OPTIONS.map((s) => (
+          {statusOptions.map((s) => (
             <FilterChip
               key={s}
               label={statusLabel(s)}
@@ -329,7 +336,7 @@ export default function SmartTicketQueueSurface() {
           <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mr-1">
             {t('ticket.priorityLabel')}:
           </span>
-          {PRIORITY_OPTIONS.map((p) => (
+          {priorityOptions.map((p) => (
             <FilterChip
               key={p}
               label={priorityLabel(p)}

@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -198,8 +198,79 @@ def get_reporting_service(request: Request) -> ReportingService:
 # ---------------------------------------------------------------------------
 
 
+CANONICAL_STATUS_OPTIONS = ["open", "in_progress", "pending", "resolved", "closed"]
+CANONICAL_PRIORITY_OPTIONS = ["low", "medium", "high", "critical"]
+
+_STATUS_CANONICAL_MAP = {
+    "new": "open",
+    "open": "open",
+    "in_progress": "in_progress",
+    "pending": "pending",
+    "resolved": "resolved",
+    "closed": "closed",
+    "merged": "closed",
+}
+
+_PRIORITY_CANONICAL_MAP = {
+    "low": "low",
+    "normal": "medium",
+    "medium": "medium",
+    "high": "high",
+    "urgent": "critical",
+    "critical": "critical",
+}
+
+_PRIORITY_DOMAIN_MAP = {
+    "low": TicketPriority.LOW,
+    "medium": TicketPriority.MEDIUM,
+    "high": TicketPriority.HIGH,
+    "critical": TicketPriority.CRITICAL,
+}
+
+_STATE_DOMAIN_MAP = {
+    "open": TicketState.OPEN,
+    "in_progress": TicketState.IN_PROGRESS,
+    "pending": TicketState.PENDING,
+    "resolved": TicketState.RESOLVED,
+    "closed": TicketState.CLOSED,
+}
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _canonical_status(value: str | None) -> str:
+    raw = (value or "open").strip().lower()
+    return _STATUS_CANONICAL_MAP.get(raw, "open")
+
+
+def _canonical_priority(value: str | None) -> str:
+    raw = (value or "medium").strip().lower()
+    return _PRIORITY_CANONICAL_MAP.get(raw, "medium")
+
+
+def _ticket_status(ticket: Ticket) -> str:
+    return _canonical_status(ticket.state.value if ticket.state else None)
+
+
+def _ticket_priority(ticket: Ticket) -> str:
+    return _canonical_priority(ticket.priority.value if ticket.priority else None)
+
+
+def _domain_priority(value: str | None) -> TicketPriority:
+    return _PRIORITY_DOMAIN_MAP[_canonical_priority(value)]
+
+
+def _domain_state(value: str | None) -> TicketState:
+    return _STATE_DOMAIN_MAP[_canonical_status(value)]
+
+
+def _queue_from_slug(slug: str | None) -> Queue | None:
+    if not slug:
+        return None
+    label = slug.replace("-", " ").strip().title()
+    return Queue(name=label, slug=slug)
 
 
 def _synthetic_tickets(count: int = 25) -> list[Ticket]:
@@ -291,7 +362,7 @@ async def _resolve_ticket(
         except Exception:
             pass  # Fall through to synthetic
     tickets = _synthetic_tickets(25)
-    return next((t for t in tickets if t.id == ticket_id), tickets[0])
+    return next((t for t in tickets if t.id == ticket_id), None)
 
 
 # ---------------------------------------------------------------------------
@@ -682,9 +753,11 @@ async def get_ticket_queue(
 
     filtered = tickets
     if status:
-        filtered = [t for t in filtered if t.state.value == status.lower()]
+        canonical_status = _canonical_status(status)
+        filtered = [t for t in filtered if _ticket_status(t) == canonical_status]
     if priority:
-        filtered = [t for t in filtered if t.priority.value == priority.lower()]
+        canonical_priority = _canonical_priority(priority)
+        filtered = [t for t in filtered if _ticket_priority(t) == canonical_priority]
     if search:
         search_lower = search.lower()
         filtered = [
@@ -705,8 +778,8 @@ async def get_ticket_queue(
             TicketItem(
                 id=t.id,
                 subject=t.subject,
-                status=t.state.value,
-                priority=t.priority.value,
+                status=_ticket_status(t),
+                priority=_ticket_priority(t),
                 assignee=t.assigned_to,
                 createdAt=t.created_at.isoformat(),
                 updatedAt=t.updated_at.isoformat(),
@@ -716,8 +789,8 @@ async def get_ticket_queue(
         total=total,
         page=page,
         filters=TicketFilters(
-            status=["new", "open", "in_progress", "pending", "resolved", "closed", "merged"],
-            priority=["low", "medium", "high", "critical"],
+            status=CANONICAL_STATUS_OPTIONS,
+            priority=CANONICAL_PRIORITY_OPTIONS,
             assignee=assignees,
         ),
     )
@@ -735,6 +808,11 @@ async def get_ticket_copilot(
 ):
     """Return copilot data for a specific ticket."""
     ticket = await _resolve_ticket(otrs, ticket_id)
+    if ticket is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found",
+        )
 
     rec = agent_svc.recommend(AgentRecommendationRequest(
         subject=ticket.subject,
@@ -795,7 +873,7 @@ async def get_ticket_copilot(
         ticketContext=TicketContext(
             ticketId=ticket_id,
             subject=ticket.subject,
-            status=ticket.state.value,
+            status=_ticket_status(ticket),
         ),
     )
 
@@ -960,13 +1038,14 @@ async def get_reports(
     dateFrom: str | None = Query(None),
     dateTo: str | None = Query(None),
     current_user: User = Depends(get_current_user),
+    otrs: OtrsZnunyClient | None = Depends(get_otrs_client),
     report_svc: ReportingService = Depends(get_reporting_service),
     queue_svc: QueueStrategyService = Depends(get_queue_strategy),
     lifecycle_svc: TicketLifecycleService = Depends(get_ticket_lifecycle),
 ):
     """Return reporting metrics and trends for SOC dashboards."""
     now = _now()
-    tickets = _synthetic_tickets(25)
+    tickets = await _resolve_tickets(otrs, 25)
 
     window_map = {
         "daily": ReportWindow.DAILY,
@@ -1127,20 +1206,27 @@ async def post_reclassify_ticket(
     db: AsyncSession = Depends(get_db),
 ):
     """Reclassify a ticket — validate priority/queue change via QueueStrategyService."""
-    tickets = _synthetic_tickets(25)
-    ticket = next((t for t in tickets if t.id == ticket_id), tickets[0])
+    ticket = await _resolve_ticket(otrs, ticket_id)
+    if ticket is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found",
+        )
+
+    previous_priority = _ticket_priority(ticket)
+    previous_queue = ticket.queue.slug or "n1-triage"
 
     # Validate via queue strategy
     decision = queue_svc.recommend(QueueDecisionRequest(
         subject=ticket.subject,
         body_text=body.reason or ticket.subject,
-        urgency=body.priority or ticket.priority.value,
+        urgency=body.priority or previous_priority,
         current_tier=QueueTier.N1,
         current_locked=False,
     ))
 
-    new_priority = body.priority or ticket.priority.value
-    new_queue = body.queue_slug or decision.routing.queue.slug or ticket.queue.slug or "n1-triage"
+    new_priority = _canonical_priority(body.priority or previous_priority)
+    new_queue = body.queue_slug or decision.routing.queue.slug or previous_queue
 
     # Log the action and persist to database
     await agent_svc.persist_and_log_event(
@@ -1153,8 +1239,8 @@ async def post_reclassify_ticket(
             "reason": body.reason,
             "new_priority": new_priority,
             "new_queue": new_queue,
-            "previous_priority": ticket.priority.value,
-            "previous_queue": ticket.queue.slug,
+            "previous_priority": previous_priority,
+            "previous_queue": previous_queue,
         },
     )
 
@@ -1163,7 +1249,8 @@ async def post_reclassify_ticket(
         try:
             await otrs.update_ticket(
                 ticket_id,
-                priority=new_priority,
+                priority=_domain_priority(new_priority),
+                queue=_queue_from_slug(new_queue),
             )
         except Exception:
             pass  # Best-effort
@@ -1187,14 +1274,20 @@ async def post_escalate_ticket(
     db: AsyncSession = Depends(get_db),
 ):
     """Escalate a ticket — get recommendation and create approval record."""
-    tickets = _synthetic_tickets(25)
-    ticket = next((t for t in tickets if t.id == ticket_id), tickets[0])
+    ticket = await _resolve_ticket(otrs, ticket_id)
+    if ticket is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found",
+        )
+
+    current_priority = _ticket_priority(ticket)
 
     # Get escalation recommendation via queue strategy
     decision = queue_svc.recommend(QueueDecisionRequest(
         subject=ticket.subject,
         body_text=body.reason,
-        urgency=ticket.priority.value,
+        urgency=current_priority,
         current_tier=QueueTier.N1,
         current_locked=False,
     ))
@@ -1249,8 +1342,9 @@ async def post_escalate_ticket(
         try:
             await otrs.update_ticket(
                 ticket_id,
-                state=TicketState.OPEN,
-                priority=TicketPriority.CRITICAL,
+                state=_domain_state("in_progress"),
+                priority=_domain_priority("critical"),
+                queue=_queue_from_slug(target_queue),
             )
         except Exception:
             pass  # Best-effort
@@ -1273,6 +1367,13 @@ async def post_add_note(
     db: AsyncSession = Depends(get_db),
 ):
     """Add an internal note to a ticket and record the audit event."""
+    ticket = await _resolve_ticket(otrs, ticket_id)
+    if ticket is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found",
+        )
+
     note_id = str(uuid4())
 
     # Create audit event via AgentGovernanceService and persist to database
