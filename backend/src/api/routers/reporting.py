@@ -7,6 +7,7 @@ from src.api.deps import get_current_user
 from src.api.schemas import OperationalHistoryResponse, OperationalRecordView
 from src.db.models import OperationalRecord, User
 from src.db.session import get_db
+from src.services.observability import ObservabilityService, ObservabilitySnapshot
 from src.services.reporting import (
     AnalystFeedbackRequest,
     FeedbackLoopResponse,
@@ -19,6 +20,15 @@ from src.services.reporting import (
 )
 
 router = APIRouter(tags=["reporting"])
+
+
+@router.get("/reporting/observability", response_model=ObservabilitySnapshot)
+async def get_observability(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """System observability snapshot: integrations, mode, activity, failures (RP-04)."""
+    return await ObservabilityService(db).snapshot()
 
 
 def get_reporting_service(request: Request) -> ReportingService:
