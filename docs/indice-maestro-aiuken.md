@@ -5,7 +5,7 @@ Este documento conecta la documentación principal del programa Aiuken SOC sobre
 ## Documentos principales
 
 ### 1) Propuesta ejecutiva
-**Archivo:** `docs/propuesta-aiuken-beconnect.md` (contenido Aiuken SOC)
+**Archivo:** `docs/propuesta-aiuken-beconnect.md` (contenido Aiuken SOC; nombre heredado por compatibilidad)
 
 Contiene la narrativa comercial y estratégica:
 - resumen ejecutivo
@@ -18,7 +18,7 @@ Contiene la narrativa comercial y estratégica:
 - beneficios, riesgos y métricas
 
 ### 2) Backlog técnico implementable
-**Archivo:** `docs/backlog-aiuken-beconnect.md` (contenido Aiuken SOC)
+**Archivo:** `docs/backlog-aiuken-beconnect.md` (contenido Aiuken SOC; nombre heredado por compatibilidad)
 
 Contiene el plan de ejecución técnica:
 - epics
