@@ -1,7 +1,7 @@
 /**
  * socCopy — SOC term neutralization and copy resolver.
  *
- * Provides a term map to translate old BeConnect/BeExpand/race terminology into
+ * Provides a term map to translate legacy/race terminology into
  * SOC-aligned equivalents, a forbidden-terms check, and a simple key-based
  * copy resolver (future: load from a locale map).
  */
