@@ -705,6 +705,49 @@ class ActionExecutor:
         # Tier 3: cola por defecto
         return Queue(name=OtrsZnunySettings().default_queue)
 
+    async def _validate_queue(self, queue: Queue) -> Queue:
+        """Valida la cola resuelta contra la tabla ``queues`` (CE-01, REQ-4).
+
+        Si el nombre existe como fila activa en BD, devuelve la cola enriquecida
+        con su id/slug/tier/owner. Si no existe (o la BD no es accesible),
+        cae a ``OtrsZnunySettings.default_queue`` (fail-open).
+        """
+        from src.db.models import QueueModel
+
+        try:
+            row = (
+                await self.db.execute(
+                    select(QueueModel).where(
+                        QueueModel.name == queue.name,
+                        QueueModel.is_active.is_(True),
+                    )
+                )
+            ).scalar_one_or_none()
+
+            if row is not None:
+                return Queue(
+                    id=str(row.id),
+                    name=row.name,
+                    slug=row.slug,
+                    tier=row.tier,
+                    owner=row.owner,
+                    parent_id=None,
+                    is_active=row.is_active,
+                    metadata=row.queue_metadata or {},
+                )
+
+            default_name = OtrsZnunySettings().default_queue
+            if queue.name == default_name:
+                return queue
+            logger.warning(
+                "Cola '%s' no existe en la tabla queues; usando default '%s'",
+                queue.name,
+                default_name,
+            )
+            return Queue(name=default_name)
+        except Exception:  # noqa: BLE001 — fail-open: nunca bloquear la creación del ticket
+            return queue
+
     def _build_ticket_input(self, ctx: EmailContext) -> TicketIngestionInput:
         """Construye un TicketIngestionInput a partir del EmailContext.
 
@@ -795,6 +838,8 @@ class ActionExecutor:
 
         try:
             input_data = self._build_ticket_input(ctx)
+            # CE-01 (REQ-4): validar la cola resuelta contra la tabla queues
+            input_data.queue = await self._validate_queue(input_data.queue)
             service = TicketIngestionService()
             try:
                 ticket = await service.ingest_email(input_data)

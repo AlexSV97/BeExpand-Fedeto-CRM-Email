@@ -272,6 +272,42 @@ class ReprocessTask(Base):
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
+class QueueModel(Base):
+    """Cola OTRS persistida con jerarquía padre-hijo (CE-01).
+
+    Fuente de verdad única para la topología de colas: reemplaza las dos
+    topologías hardcoded (QueueStrategyService._topology y
+    ActionExecutor.QUEUE_MAP). Se sincroniza desde OTRS con seed de fallback.
+
+    El atributo Python `queue_metadata` mapea a la columna SQL `metadata`
+    (no se puede usar `metadata` como atributo: lo reserva la Base declarativa).
+    """
+    __tablename__ = "queues"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    slug: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    tier: Mapped[Optional[str]] = mapped_column(String(20))  # n1 | n2 | n3 | special | None
+    owner: Mapped[Optional[str]] = mapped_column(String(100))
+    parent_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("queues.id", ondelete="SET NULL"), nullable=True
+    )
+    otrs_external_id: Mapped[Optional[str]] = mapped_column(String(100))
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    queue_metadata: Mapped[Optional[dict]] = mapped_column("metadata", JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relación self-referencial: padre ↔ hijos
+    parent: Mapped[Optional["QueueModel"]] = relationship(
+        "QueueModel", remote_side="QueueModel.id", back_populates="children"
+    )
+    children: Mapped[list["QueueModel"]] = relationship(
+        "QueueModel", back_populates="parent"
+    )
+
+
 class OperationalRecord(Base):
     """Registro duradero para aprobaciones, feedback, reportes y auditoría operativa."""
     __tablename__ = "operational_records"

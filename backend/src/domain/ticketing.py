@@ -52,6 +52,9 @@ class Queue(BaseModel):
     name: str
     slug: str | None = None
     description: str | None = None
+    parent_id: str | None = None  # CE-01: slug of parent queue in the hierarchy
+    tier: str | None = None  # CE-01: "n1" | "n2" | "n3" | "special" | None
+    owner: str | None = None  # CE-01: default owner / responsible group
     is_active: bool = True
     external_refs: list[ExternalRef] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)

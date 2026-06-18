@@ -88,8 +88,31 @@ def _fold(text: str) -> str:
 
 
 class QueueStrategyService:
-    def __init__(self) -> None:
-        self._topology = QueueTopology(
+    def __init__(self, topology: QueueTopology | None = None) -> None:
+        if topology is not None:
+            self._topology = topology
+            return
+        self._topology = self._default_topology()
+
+    @classmethod
+    async def create(cls, session) -> "QueueStrategyService":
+        """Factory async: carga la topología desde la BD (CE-01, REQ-3).
+
+        Garantiza el seed y construye la topología desde la tabla ``queues``.
+        Si la BD no tiene nodos de topología, cae al árbol hardcoded.
+        """
+        from src.services.queue_sync import QueueSyncService
+
+        sync = QueueSyncService(session)
+        await sync.ensure_seeded()
+        topology = await sync.get_topology()
+        if not topology.roots:
+            return cls()
+        return cls(topology=topology)
+
+    @staticmethod
+    def _default_topology() -> "QueueTopology":
+        return QueueTopology(
             roots=[
                 QueueTopologyNode(
                     name="N1 - Triage",
@@ -299,5 +322,22 @@ class QueueStrategyService:
         return any(term in text for term in terms)
 
 
-async def get_queue_strategy_service() -> QueueStrategyService:
-    yield QueueStrategyService()
+async def get_queue_strategy_service():
+    """Dependencia FastAPI: estrategia con topología cargada desde BD (CE-01).
+
+    Fail-open: si la carga desde BD falla, cae al árbol hardcoded.
+    """
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from src.db.session import get_db
+
+    db_gen = get_db()
+    session: AsyncSession = await db_gen.__anext__()
+    try:
+        try:
+            service = await QueueStrategyService.create(session)
+        except Exception:  # noqa: BLE001 — fail-open a topología hardcoded
+            service = QueueStrategyService()
+        yield service
+    finally:
+        await db_gen.aclose()
