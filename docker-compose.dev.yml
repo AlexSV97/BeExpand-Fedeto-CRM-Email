@@ -4,6 +4,16 @@ services:
     volumes:
       - ./backend:/app
       - beexpand-data:/app/data
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
 
   frontend:
     build:
@@ -16,8 +26,36 @@ services:
     environment:
       - VITE_API_URL=http://localhost:8000/api/v1
     depends_on:
+      - redis
       - backend
     command: npm run dev -- --host 0.0.0.0
 
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: celery -A src.celery_app worker --loglevel=info --pool=solo
+    volumes:
+      - ./backend:/app
+      - beexpand-data:/app/data
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: celery -A src.celery_app beat --loglevel=info
+    volumes:
+      - ./backend:/app
+      - beexpand-data:/app/data
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+
 volumes:
   beexpand-data:
+  redis-data:
