@@ -18,6 +18,7 @@ import { t } from '../../content/socCopy'
 import { cn } from '../../lib/utils'
 import { motion } from 'framer-motion'
 import { SocLoadingState } from './index'
+import { getSocShellMode } from './shellMode'
 
 // ── Fondo animado ambiental (reutilizado de Layout.tsx) ──
 
@@ -47,6 +48,7 @@ export default function SocShell() {
   useHistorySync()
 
   const { activeSurfaceId, navigate, featureEnabled, dataSource } = useSocShell()
+  const shellMode = getSocShellMode(dataSource[activeSurfaceId] ?? 'mock')
 
   // Safety guard — if the flag somehow flips off while mounted, render nothing
   if (!featureEnabled) return null
@@ -81,11 +83,15 @@ export default function SocShell() {
               <span className="font-semibold text-lg tracking-tight font-display text-foreground">
                 {t('Aiuken SOC')}
               </span>
-              {dataSource[activeSurfaceId] !== 'backend' && (
-                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20 leading-none">
-                  Demo Data
-                </span>
-              )}
+              <span
+                className={cn(
+                  'flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border leading-none',
+                  shellMode.badgeClassName,
+                )}
+              >
+                <span className={cn('w-1.5 h-1.5 rounded-full', shellMode.dotClassName)} />
+                {shellMode.label}
+              </span>
             </motion.div>
           </div>
 
