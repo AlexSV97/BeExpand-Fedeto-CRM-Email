@@ -1,5 +1,5 @@
 """
-1. Mark all forwarded (BeExpand CRM) as SEEN
+1. Mark all forwarded copies as SEEN
 2. Re-mark originals as UNSEEN  
 3. Run sync and capture all error details
 """
@@ -7,7 +7,7 @@ import imaplib, os, sys, httpx, sqlite3
 from dotenv import load_dotenv
 load_dotenv("backend/.env")
 
-USER = os.getenv("IMAP_EMAIL", "beexpandcrmpoc@gmail.com")
+USER = os.getenv("IMAP_EMAIL", "<IMAP_EMAIL_DEMO>")
 PASS = os.getenv("IMAP_PASSWORD")
 
 conn = imaplib.IMAP4_SSL("imap.gmail.com")
@@ -19,7 +19,7 @@ status, msgs = conn.search(None, "UNSEEN")
 for uid in (msgs[0].split() if msgs[0] else []):
     data = conn.fetch(uid, "(FLAGS BODY.PEEK[HEADER.FIELDS (FROM)])")
     raw = data[1][0][1].decode(errors="replace")
-    if "BeExpand CRM" in raw:
+    if "Aiuken SOC" in raw:
         conn.store(uid, "+FLAGS", "\\Seen")
 
 # Re-mark original test emails UNSEEN
@@ -30,7 +30,7 @@ for uid in (msgs[0].split() if msgs[0] else []):
     data = conn.fetch(uid, "(FLAGS BODY.PEEK[HEADER.FIELDS (SUBJECT FROM)])")
     raw = data[1][0][1].decode(errors="replace")
     flags = data[1][0][0]
-    if "BeExpand CRM" in raw:
+    if "Aiuken SOC" in raw:
         continue
     if any(k in raw for k in subject_kw):
         if b"\\Seen" in flags:
@@ -56,7 +56,7 @@ db.close()
 
 # Sync with error capture
 BASE = "http://localhost:8001/api/v1"
-r = httpx.post(f"{BASE}/auth/login", json={"username": "admin", "password": "admin123"})
+r = httpx.post(f"{BASE}/auth/login", json={"username": "admin", "password": os.getenv("ADMIN_PASSWORD", "<ADMIN_PASSWORD_DEMO>")})
 headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 print("\nSyncing...")

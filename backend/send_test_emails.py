@@ -5,12 +5,13 @@ Cada email simula un escenario real de negocio.
 import smtplib
 import email.message
 import email.utils
+import os
 from datetime import datetime, timezone
 
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
-FROM_EMAIL = "beexpandcrmpoc@gmail.com"
-FROM_PASS = "wdjqgpkkurdoxiqg"
+FROM_EMAIL = os.getenv("IMAP_EMAIL", "<IMAP_EMAIL_DEMO>")
+FROM_PASS = os.getenv("IMAP_PASSWORD", "<IMAP_PASSWORD_DEMO>")
 
 emails = [
     {

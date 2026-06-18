@@ -2,12 +2,14 @@
 Check detailed errors from last sync by examining the actual action results
 """
 import httpx
+import os
 
 BASE = "http://localhost:8001/api/v1"
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "<ADMIN_PASSWORD_DEMO>")
 
 r = httpx.post(f"{BASE}/auth/login", json={
     "username": "admin",
-    "password": "admin123",
+    "password": ADMIN_PASSWORD,
 })
 token = r.json()["access_token"]
 headers = {"Authorization": f"Bearer {token}"}
