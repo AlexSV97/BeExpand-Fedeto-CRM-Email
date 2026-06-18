@@ -199,7 +199,7 @@ def get_reporting_service(request: Request) -> ReportingService:
 
 
 CANONICAL_STATUS_OPTIONS = ["open", "in_progress", "pending", "resolved", "closed"]
-CANONICAL_PRIORITY_OPTIONS = ["low", "medium", "high", "critical"]
+CANONICAL_PRIORITY_OPTIONS = ["low", "medium", "high", "urgent", "critical"]
 
 _STATUS_CANONICAL_MAP = {
     "new": "open",
@@ -216,7 +216,7 @@ _PRIORITY_CANONICAL_MAP = {
     "normal": "medium",
     "medium": "medium",
     "high": "high",
-    "urgent": "critical",
+    "urgent": "urgent",
     "critical": "critical",
 }
 
@@ -224,6 +224,7 @@ _PRIORITY_DOMAIN_MAP = {
     "low": TicketPriority.LOW,
     "medium": TicketPriority.MEDIUM,
     "high": TicketPriority.HIGH,
+    "urgent": TicketPriority.URGENT,
     "critical": TicketPriority.CRITICAL,
 }
 
@@ -281,7 +282,7 @@ def _synthetic_tickets(count: int = 25) -> list[Ticket]:
         Queue(name="N3 - Ingenieria", slug="n3-ingenieria", metadata={"tier": "n3"}),
     ]
     statuses = [TicketState.NEW, TicketState.OPEN, TicketState.PENDING, TicketState.CLOSED]
-    priorities = [TicketPriority.LOW, TicketPriority.NORMAL, TicketPriority.MEDIUM, TicketPriority.HIGH, TicketPriority.CRITICAL]
+    priorities = [TicketPriority.LOW, TicketPriority.NORMAL, TicketPriority.MEDIUM, TicketPriority.HIGH, TicketPriority.URGENT, TicketPriority.CRITICAL]
     subjects = [
         "Email classification failed for client invoice",
         "Password reset request for portal access",
@@ -495,7 +496,7 @@ class TicketItem(BaseModel):
 
 class TicketFilters(BaseModel):
     status: list[str] = Field(default_factory=lambda: ["new", "open", "in_progress", "pending", "resolved", "closed", "merged"])
-    priority: list[str] = Field(default_factory=lambda: ["low", "medium", "high", "critical"])
+    priority: list[str] = Field(default_factory=lambda: ["low", "medium", "high", "urgent", "critical"])
     assignee: list[str] = Field(default_factory=list)
 
 
@@ -681,8 +682,8 @@ class ReclassifyRequest(BaseModel):
     @field_validator('priority')
     @classmethod
     def validate_priority(cls, v):
-        if v is not None and v not in ('low', 'medium', 'high', 'critical'):
-            raise ValueError('priority must be one of: low, medium, high, critical')
+        if v is not None and v not in ('low', 'medium', 'high', 'urgent', 'critical'):
+            raise ValueError('priority must be one of: low, medium, high, urgent, critical')
         return v
 
     @field_validator('queue_slug')
@@ -1081,7 +1082,7 @@ async def get_knowledge_vault(
     ]
 
     categories = sorted(set(
-        item.document.document_type for item in vault._documents
+        doc.document_type for doc in vault._documents
     )) or ["case", "runbook", "faq"]
 
     search_suggestions = sorted(set(
