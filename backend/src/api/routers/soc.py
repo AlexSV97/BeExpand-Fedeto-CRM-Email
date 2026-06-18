@@ -37,6 +37,7 @@ from src.services.queue_strategy import (
     QueueStrategyService,
     QueueTier,
 )
+from src.services.escalation import EscalationRequest, EscalationService
 from src.services.reporting import (
     OperationalReportRequest,
     ReportWindow,
@@ -1409,32 +1410,23 @@ async def post_escalate_ticket(
             detail="Ticket not found",
         )
 
-    current_priority = _ticket_priority(ticket)
-
-    # Get escalation recommendation via queue strategy
-    decision = queue_svc.recommend(QueueDecisionRequest(
-        subject=ticket.subject,
-        body_text=body.reason,
-        urgency=current_priority,
-        current_tier=QueueTier.N1,
-        current_locked=False,
+    # CE-03: hierarchy-aware N-level escalation over the persisted topology.
+    # Current tier comes from the ticket's real queue; honor an explicit target.
+    plan = EscalationService(queue_svc).escalate(EscalationRequest(
+        current_queue_slug=ticket.queue.slug,
+        target_tier=QueueTier(body.target_tier) if body.target_tier else None,
+        reason=body.reason,
     ))
 
-    escalation_level = {
-        "n1": 1,
-        "n2": 2,
-        "n3": 3,
-        "special": 4,
-    }.get(decision.routing.tier.value, 2)
-
-    target_queue = decision.routing.queue.slug or "n2-resolucion"
+    escalation_level = plan.level
+    target_queue = plan.to_queue.slug or "n2-resolucion"
 
     # Create an approval record via AgentGovernanceService
     rec_response = agent_svc.recommend(AgentRecommendationRequest(
         subject=ticket.subject,
         body_text=body.reason,
         customer=ticket.customer_email,
-        current_tier=decision.routing.tier,
+        current_tier=plan.to_tier,
         current_state=ticket.state,
         sla_minutes=ticket.sla.solution_time_minutes if ticket.sla else 480,
         ticket_created_at=ticket.created_at,
@@ -1459,7 +1451,7 @@ async def post_escalate_ticket(
         resource_id=ticket_id,
         details={
             "reason": body.reason,
-            "target_tier": body.target_tier or decision.routing.tier.value,
+            "target_tier": body.target_tier or plan.to_tier.value,
             "escalation_level": escalation_level,
             "target_queue": target_queue,
         },

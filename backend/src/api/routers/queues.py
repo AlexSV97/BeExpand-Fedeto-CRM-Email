@@ -16,6 +16,11 @@ from src.services.queue_suggestion import (
     QueueSuggestionRequest,
     QueueSuggestionService,
 )
+from src.services.escalation import (
+    EscalationPlan,
+    EscalationRequest,
+    EscalationService,
+)
 
 router = APIRouter(tags=["queues"])
 
@@ -46,3 +51,13 @@ async def suggest_queue(
     """Sugerencia de cola asistida por IA (CE-02) con fallback a reglas."""
     suggester = QueueSuggestionService(strategy=service)
     return await suggester.suggest(body)
+
+
+@router.post("/queues/escalate", response_model=EscalationPlan)
+async def escalate_queue(
+    body: EscalationRequest,
+    current_user: User = Depends(get_current_user),
+    service: QueueStrategyService = Depends(get_queue_strategy_service),
+):
+    """Escalado N-niveles sobre la topología persistida (CE-03)."""
+    return EscalationService(service).escalate(body)
