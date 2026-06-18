@@ -514,6 +514,12 @@ class TicketItem(BaseModel):
     assignee: str | None = None
     createdAt: str
     updatedAt: str
+    # CP-01 (Smart inbox): contexto operativo en la propia fila
+    owner: str | None = None
+    queue: str | None = None
+    slaRisk: str | None = None          # low | watch | high | critical (SLA-04)
+    slaRemainingMinutes: float | None = None
+    suggestedQueue: str | None = None   # cola sugerida por reglas (CE-02)
 
 
 class TicketFilters(BaseModel):
@@ -920,6 +926,50 @@ async def get_command_center(
     )
 
 
+def _enrich_ticket_item(
+    t: Ticket,
+    queue_svc: QueueStrategyService,
+    lifecycle_svc: TicketLifecycleService,
+) -> TicketItem:
+    """Build a smart-inbox row enriched with SLA risk and suggested queue (CP-01)."""
+    sla_risk: str | None = None
+    remaining: float | None = None
+    try:
+        if t.sla is not None:
+            assessment = lifecycle_svc.assess(t)
+            sla_risk = assessment.risk_level.value
+            remaining = assessment.remaining_minutes
+    except Exception:  # noqa: BLE001 — enrichment must not break the list
+        pass
+
+    suggested_queue: str | None = None
+    try:
+        decision = queue_svc.recommend(QueueDecisionRequest(
+            subject=t.subject,
+            body_text=t.subject,
+            urgency=_ticket_priority(t),
+            current_tier=QueueTier.N1,
+        ))
+        suggested_queue = decision.routing.queue.slug
+    except Exception:  # noqa: BLE001
+        pass
+
+    return TicketItem(
+        id=t.id,
+        subject=t.subject,
+        status=_ticket_status(t),
+        priority=_ticket_priority(t),
+        assignee=t.assigned_to,
+        createdAt=t.created_at.isoformat(),
+        updatedAt=t.updated_at.isoformat(),
+        owner=t.owner,
+        queue=t.queue.slug if t.queue else None,
+        slaRisk=sla_risk,
+        slaRemainingMinutes=remaining,
+        suggestedQueue=suggested_queue,
+    )
+
+
 @router.get("/soc/tickets", response_model=TicketQueueResponse)
 async def get_ticket_queue(
     page: int = Query(1, ge=1),
@@ -960,15 +1010,7 @@ async def get_ticket_queue(
 
     return TicketQueueResponse(
         tickets=[
-            TicketItem(
-                id=t.id,
-                subject=t.subject,
-                status=_ticket_status(t),
-                priority=_ticket_priority(t),
-                assignee=t.assigned_to,
-                createdAt=t.created_at.isoformat(),
-                updatedAt=t.updated_at.isoformat(),
-            )
+            _enrich_ticket_item(t, queue_svc, lifecycle_svc)
             for t in page_items
         ],
         total=total,
