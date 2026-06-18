@@ -81,7 +81,7 @@
 
 ### 2.1 `accounts` — Configuración de Buzones IMAP
 
-Cada buzón que el sistema monitoriza. Be Expand confirmó Ionos e Imax.
+Cada buzón que el sistema monitoriza. Aiuken confirmó Ionos e Imax.
 
 | Columna | Tipo | Descripción |
 |---------|------|-------------|

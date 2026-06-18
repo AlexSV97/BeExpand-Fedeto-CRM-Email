@@ -1,6 +1,6 @@
 # Stack Tecnológico y Arquitectura del Sistema
 
-> Documento definitivo — Actualizado tras reunión con Be Expand (11/05/2026)
+> Documento definitivo — Actualizado tras reunión con Aiuken (11/05/2026)
 > Reemplaza las especulaciones iniciales con decisiones confirmadas.
 
 ---
@@ -12,7 +12,7 @@
 | **CRM** | VTiger | Integración vía REST API. Autenticación con token. |
 | **Email** | Ionos e Imax | Conexión IMAP estándar en ambos. Sin dependencia de Graph API. |
 | **Clasificación** | Contextual (Cliente/Lead/Proveedor) | Enfoque híbrido: Keywords primero, NLP en el futuro. |
-| **Stack** | Validado por Be Expand | Sin restricciones técnicas que cambien la propuesta. |
+| **Stack** | Validado por Aiuken | Sin restricciones técnicas que cambien la propuesta. |
 
 ---
 
@@ -262,7 +262,7 @@ class HybridClassifier(ClassifierStrategy):
 
 ### ADR-001: Clasificación Híbrida
 
-**Contexto:** Be Expand clasifica correos manualmente leyendo el contexto. No hay datos etiquetados para entrenar un modelo.
+**Contexto:** Aiuken clasifica correos manualmente leyendo el contexto. No hay datos etiquetados para entrenar un modelo.
 
 **Decisión:** Implementar RuleEngine por keywords como capa primaria. Cuando se acumulen suficientes correos clasificados (>500), añadir MLClassifier con spaCy como capa secundaria.
 

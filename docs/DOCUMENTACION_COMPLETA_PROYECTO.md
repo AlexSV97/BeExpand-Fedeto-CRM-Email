@@ -27,7 +27,7 @@
 
 ## 1. Descripción General
 
-Sistema diseñado para **Be Expand** que permite centralizar, estructurar y procesar automáticamente la información proveniente del correo electrónico empresarial. Clasifica contactos (clientes, leads, proveedores, etc.), determina el estado de las interacciones y se integra con el CRM (VTiger) para proporcionar una visión operativa clara de la actividad comercial.
+Sistema diseñado para **Aiuken** que permite centralizar, estructurar y procesar automáticamente la información proveniente del correo electrónico empresarial. Clasifica contactos (clientes, leads, proveedores, etc.), determina el estado de las interacciones y se integra con el CRM (VTiger) para proporcionar una visión operativa clara de la actividad comercial.
 
 ---
 
@@ -466,7 +466,7 @@ Aiuken SOC/
 - README inicial con descripción del proyecto
 
 ### Sesión 2 — 12/05/2026
-- **Reunión con Be Expand completada**
+- **Reunión con Aiuken completada**
 - Stack definitivo validado: Python/FastAPI/React/PostgreSQL/VTiger
 - Arquitectura, modelo de datos y wireframes diseñados
 - M1 completado: 5 issues cerradas

@@ -1,4 +1,4 @@
-# Toma de Requisitos — Be Expand
+# Toma de Requisitos — Aiuken
 
 ## Requisitos Funcionales
 

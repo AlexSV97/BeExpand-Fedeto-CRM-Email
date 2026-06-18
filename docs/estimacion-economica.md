@@ -131,7 +131,7 @@ Valoración del producto terminado llave en mano.
 
 ## 4. Escenario 2: Proyecto Completo con Integración en Empresa
 
-Incluye el desarrollo completo + implantación en el entorno real de Be Expand.
+Incluye el desarrollo completo + implantación en el entorno real de Aiuken.
 
 | Fase | Concepto | Horas | Subtotal |
 |------|----------|:-----:|:--------:|
