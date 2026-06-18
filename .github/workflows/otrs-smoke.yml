@@ -1,0 +1,74 @@
+name: OTRS Live Smoke
+
+# Manual-only: validates the live OTRS/Znuny bridge against a real instance using
+# repository secrets. Never runs automatically (no push/PR triggers).
+#
+# Required repo secrets:
+#   OTRS_ZNUNY_BASE_URL, OTRS_ZNUNY_API_TOKEN
+# Optional repo secret:
+#   OTRS_ZNUNY_DEFAULT_QUEUE
+on:
+  workflow_dispatch:
+    inputs:
+      ticket_id:
+        description: "Known ticket id to exercise get_ticket (optional, read-only)"
+        required: false
+        default: ""
+      allow_write:
+        description: "Post a real internal [SMOKE TEST] note (WRITE — outward-facing)"
+        type: boolean
+        required: false
+        default: false
+      write_ticket_id:
+        description: "Ticket id to write the internal note to (required if allow_write)"
+        required: false
+        default: ""
+
+jobs:
+  otrs-smoke:
+    name: OTRS live smoke (read-only unless write enabled)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      OTRS_ZNUNY_BASE_URL: ${{ secrets.OTRS_ZNUNY_BASE_URL }}
+      OTRS_ZNUNY_API_TOKEN: ${{ secrets.OTRS_ZNUNY_API_TOKEN }}
+      OTRS_ZNUNY_DEFAULT_QUEUE: ${{ secrets.OTRS_ZNUNY_DEFAULT_QUEUE }}
+      OTRS_SMOKE_TICKET_ID: ${{ inputs.ticket_id }}
+      OTRS_SMOKE_WRITE_TICKET_ID: ${{ inputs.write_ticket_id }}
+      OTRS_SMOKE_ALLOW_WRITE: ${{ inputs.allow_write }}
+      SECRET_KEY: ci-test-secret-key
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fail fast if OTRS secrets are missing
+        run: |
+          if [ -z "$OTRS_ZNUNY_BASE_URL" ] || [ -z "$OTRS_ZNUNY_API_TOKEN" ]; then
+            echo "::error::OTRS secrets not set. Add OTRS_ZNUNY_BASE_URL and OTRS_ZNUNY_API_TOKEN in repo Settings → Secrets → Actions."
+            exit 1
+          fi
+
+      - name: Guard write inputs
+        if: ${{ inputs.allow_write }}
+        run: |
+          if [ -z "$OTRS_SMOKE_WRITE_TICKET_ID" ]; then
+            echo "::error::allow_write is enabled but write_ticket_id is empty."
+            exit 1
+          fi
+          echo "::warning::Write smoke ENABLED — will post a real internal note to ticket $OTRS_SMOKE_WRITE_TICKET_ID"
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run OTRS live smoke
+        run: pytest tests/smoke -m smoke -v -rs
