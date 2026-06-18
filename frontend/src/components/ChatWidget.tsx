@@ -47,10 +47,10 @@ interface Message {
 
 const WELCOME_MESSAGE: Message = {
   role: 'assistant',
-  content: '¡Hola! Soy el asistente de BeConnect. Puedo ayudarte a entender el dashboard, las clasificaciones de correos, o consultar las estadísticas actuales del sistema. ¿En qué puedo ayudarte?',
+  content: '¡Hola! Soy el asistente de Aiuken SOC. Puedo ayudarte a entender el dashboard, las clasificaciones de correos, o consultar las estadísticas actuales del sistema. ¿En qué puedo ayudarte?',
 }
 
-const LS_CONVERSATION_KEY = 'beconnect_chat_conv'
+const LS_CONVERSATION_KEY = 'aiuken_soc_chat_conv'
 
 // ── Componente principal ──
 

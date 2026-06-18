@@ -80,7 +80,7 @@ function Navigation() {
               <span className="text-background font-bold text-sm font-display">{isSocShellEnabled() ? 'AS' : 'Bc'}</span>
             </div>
             <span className="font-semibold text-lg tracking-tight font-display text-foreground">
-              {isSocShellEnabled() ? t('Aiuken SOC') : 'BeConnect'}
+              {isSocShellEnabled() ? t('Aiuken SOC') : 'BeExpand CRM'}
             </span>
           </motion.div>
         </NavLink>

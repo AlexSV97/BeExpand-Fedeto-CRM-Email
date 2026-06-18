@@ -1,5 +1,5 @@
 /**
- * Dashboard principal — BeConnect
+ * Dashboard principal — Aiuken SOC
  *
  * Diseño premium neutro tipo Apple.
  * KPIs animados, gráficos interactivos, predicciones IA,
@@ -76,7 +76,7 @@ const latestEmails = [
   { id: 2, subject: "Factura #FAC-2024-0892", from: "facturacion@proveedorco.com", category: "Proveedor", confidence: 98, time: "hace 5 min" },
   { id: 3, subject: "Re: Renovación de Contrato", from: "miguel.ross@acmeinc.com", category: "Cliente", confidence: 96, time: "hace 12 min" },
   { id: 4, subject: "Solicitud de Reunión: Demo del Producto", from: "j.martinez@nuevoprospecto.co", category: "Lead", confidence: 89, time: "hace 18 min" },
-  { id: 5, subject: "Notas de la Reunión Semanal", from: "rrhh@beconnect.ai", category: "Interno", confidence: 99, time: "hace 25 min" },
+  { id: 5, subject: "Notas de la Reunión Semanal", from: "rrhh@aiuken.ai", category: "Interno", confidence: 99, time: "hace 25 min" },
 ];
 
 // ============================================================================

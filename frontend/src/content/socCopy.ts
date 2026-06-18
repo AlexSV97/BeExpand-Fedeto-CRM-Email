@@ -1,7 +1,7 @@
 /**
  * socCopy — SOC term neutralization and copy resolver.
  *
- * Provides a term map to translate old BeConnect/race terminology into
+ * Provides a term map to translate old BeConnect/BeExpand/race terminology into
  * SOC-aligned equivalents, a forbidden-terms check, and a simple key-based
  * copy resolver (future: load from a locale map).
  */
@@ -10,6 +10,7 @@
 
 const SOC_TERM_MAP: Record<string, string> = {
   'BeConnect': 'Aiuken SOC',
+  'BeExpand': 'Aiuken SOC',
   'race': 'priority tier',
   'Race': 'Priority tier',
   'Pit': 'Operations',
