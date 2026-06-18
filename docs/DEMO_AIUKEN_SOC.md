@@ -28,7 +28,13 @@ simulado y hay un smoke parametrizable para validar el OTRS real."
 
 ---
 
-## Arco de la demo (≈12–15 min)
+## Arco de la demo (≈15–20 min)
+
+> Ensayo cronometrado: `python backend/scripts/demo_rehearsal.py` (corre las 10
+> escenas en vivo y mide cada una). En el último ensayo: 10/10 OK; toda la API
+> lista en ~13s; las únicas llamadas lentas son las de **IA real** (borrador ~6s,
+> RAG ~5s) — habla mientras cargan.
+
 
 | # | Escena | Superficie / acción | Épica |
 |---|--------|---------------------|-------|
@@ -85,7 +91,11 @@ simulado y hay un smoke parametrizable para validar el OTRS real."
 - Muestra timers de incumplimiento y colas activas.
 - Lanza un **scan de alertas tempranas** → se notifica *antes* del vencimiento.
 - **Mensaje:** "De SLA reactivo a SLA predictivo."
-- API: `GET /api/v1/soc/sla`, `POST /api/v1/soc/sla/alerts/scan`.
+- API: `GET /api/v1/soc/sla`, `POST /api/v1/soc/sla/alerts/scan`, `GET /api/v1/soc/sla/alerts`.
+- ⚠️ **El scan es idempotente**: si ya se ejecutó (p.ej. en el pre-flight), un
+  segundo scan genera 0 nuevas. Para que se vea con datos, **muestra la lista de
+  alertas** (`GET /soc/sla/alerts`) o haz el scan **una sola vez** sobre estado
+  fresco antes de la demo.
 
 ## Escena 8 — Escalado N-niveles y externo (2 min)
 - Escala un ticket N1→N2/N3 (recomendación + registro con motivo/actor/timestamp).
