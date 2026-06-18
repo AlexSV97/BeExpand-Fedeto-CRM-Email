@@ -199,6 +199,45 @@ async def seed_queues() -> None:
         logger.warning("seed_queues: no se pudo sembrar la topología de colas (%s)", exc)
 
 
+async def seed_knowledge_vault() -> None:
+    """Carga el vault de conocimiento desde snapshot y lo enriquece con tickets cerrados.
+
+    Si OTRS/Znuny está configurado, toma los tickets disponibles y los ingiere
+    en el vault antes de persistir el snapshot actualizado.
+    """
+    from src.api.routers.soc import _resolve_tickets_with_mode, _seed_knowledge_documents
+    from src.integrations.otrs_znuny.client import OtrsZnunyClient
+    from src.integrations.otrs_znuny.settings import OtrsZnunySettings
+    from src.llm_client import LLMClient
+    from src.services.knowledge_vault import KnowledgeVaultService
+    from src.services.knowledge_vault_store import load_knowledge_vault_snapshot, save_knowledge_vault_snapshot
+
+    llm_client = LLMClient(use_chat_model=True)
+    seed_docs = _seed_knowledge_documents()
+
+    async with async_session_factory() as session:
+        snapshot = await load_knowledge_vault_snapshot(session)
+        if snapshot:
+            vault = KnowledgeVaultService.from_snapshot(snapshot, llm_client=llm_client)
+        else:
+            vault = KnowledgeVaultService(documents=seed_docs, llm_client=llm_client)
+
+        existing_ids = {doc.id for doc in vault.documents}
+        for doc in seed_docs:
+            if doc.id not in existing_ids:
+                vault.add_document_with_embedding(doc)
+
+        otrs = OtrsZnunyClient() if OtrsZnunySettings().is_configured else None
+        try:
+            tickets, _mode = await _resolve_tickets_with_mode(otrs, 50)
+            await vault.ingest_closed_tickets(tickets, embed=True)
+        finally:
+            if otrs is not None:
+                await otrs.close()
+
+        await save_knowledge_vault_snapshot(session, vault)
+
+
 async def _recover_orphan_tasks() -> None:
     """Resetea tareas de reprocess que quedaron 'processing' tras un reinicio."""
     try:
@@ -252,6 +291,7 @@ async def lifespan(app: FastAPI):
     await _recover_orphan_tasks()
     await seed_admin()
     await seed_queues()
+    await seed_knowledge_vault()
     await _check_production_settings()
 
     task = asyncio.create_task(_auto_sync_loop())

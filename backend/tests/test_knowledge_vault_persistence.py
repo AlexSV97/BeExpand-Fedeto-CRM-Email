@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from src.domain.ticketing import Article, ActorKind, Queue, Ticket, TicketState
 from src.services.knowledge_vault import KnowledgeDocument, KnowledgeVaultService
 from src.services.knowledge_vault_store import load_knowledge_vault_snapshot, save_knowledge_vault_snapshot
 from src.services.vector_store import VectorStore
@@ -86,3 +87,29 @@ async def test_embed_all_documents_triggers_snapshot_writer():
     assert count == 1
     assert calls
     assert calls[0]["documents"][0]["id"] == "doc-3"
+
+
+@pytest.mark.asyncio
+async def test_ingest_closed_tickets_only_indexes_closed_items():
+    vault = KnowledgeVaultService(llm_client=FakeEmbeddingLLM())
+    tickets = [
+        Ticket(
+            id="T-1",
+            subject="Open issue",
+            queue=Queue(name="Support", slug="support"),
+            state=TicketState.OPEN,
+            articles=[Article(id="A-1", ticket_id="T-1", author_kind=ActorKind.HUMAN, author_name="User", body_text="open")],
+        ),
+        Ticket(
+            id="T-2",
+            subject="Resolved issue",
+            queue=Queue(name="Support", slug="support"),
+            state=TicketState.RESOLVED,
+            articles=[Article(id="A-2", ticket_id="T-2", author_kind=ActorKind.HUMAN, author_name="User", body_text="resolved")],
+        ),
+    ]
+
+    count = await vault.ingest_closed_tickets(tickets, embed=False)
+
+    assert count == 1
+    assert [doc.source_id for doc in vault.documents] == ["T-2"]
