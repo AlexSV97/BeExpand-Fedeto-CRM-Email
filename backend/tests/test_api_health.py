@@ -17,7 +17,7 @@ class TestHealthEndpoint:
 
         assert "status" in data
         assert "services" in data
-        assert data["app"] == "BeExpand CRM Email"
+        assert data["app"] == "Aiuken SOC"
         assert data["version"] == "0.1.0"
 
         services = data["services"]

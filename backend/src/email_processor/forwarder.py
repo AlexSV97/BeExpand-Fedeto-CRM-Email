@@ -62,7 +62,7 @@ def _build_forward_email(
 
     # Cuerpo del email reenviado
     forward_body = f"""╔══════════════════════════════════════════╗
-║   BEEXPAND CRM — EMAIL CLASIFICADO     ║
+║   AIUKEN SOC — EMAIL CLASIFICADO       ║
 ╠══════════════════════════════════════════╣
 ║ Categoría: {category_label:<29} ║
 ║ Confianza: {category or 'N/A':<31} ║
@@ -87,7 +87,7 @@ Asunto: {subject or '(sin asunto)'}
     # Construir el mensaje RFC822
     msg = email.message.EmailMessage()
     msg["Subject"] = new_subject
-    msg["From"] = f"BeExpand CRM <{sender_email}>"
+    msg["From"] = f"Aiuken SOC <{sender_email}>"
     msg["To"] = ", ".join(
         DEPARTMENT_EMAILS.get(d, f"beexpandcrmpoc+{d}@gmail.com")
         for d in departments

@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 # ── System prompt ─────────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """Eres un asistente de onboarding para el panel de gestión BeExpand CRM Email, desarrollado para Be Expand. Tu función es ayudar a los usuarios a entender y usar la herramienta.
+SYSTEM_PROMPT = """Eres un asistente de onboarding para Aiuken SOC, desarrollado para Aiuken. Tu función es ayudar a los usuarios a entender y usar la herramienta.
 
 CONTEXTO ACTUAL DEL SISTEMA:
 {context}

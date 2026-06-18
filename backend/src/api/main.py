@@ -267,8 +267,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="BeExpand CRM Email API",
-    description="API de clasificación y gestión de correos con integración VTiger",
+    title="Aiuken SOC API",
+    description="API de clasificación y gestión de correos para Aiuken SOC",
     version="0.1.0",
     lifespan=lifespan,
 )
@@ -320,7 +320,7 @@ app.add_middleware(
 async def root():
     """Endpoint de bienvenida (health check)."""
     return {
-        "app": "BeExpand CRM Email",
+        "app": "Aiuken SOC",
         "version": "0.1.0",
         "status": "running",
     }
@@ -386,6 +386,6 @@ async def health():
     return {
         "status": overall,
         "services": services,
-        "app": "BeExpand CRM Email",
+        "app": "Aiuken SOC",
         "version": "0.1.0",
     }
