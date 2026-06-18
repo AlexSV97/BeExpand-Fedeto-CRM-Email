@@ -1,10 +1,10 @@
 # Propuesta ejecutiva
-## BeConnect AI Layer sobre OTRS/Znuny para Aiuken
+## Aiuken SOC como capa de inteligencia sobre OTRS/Znuny
 
 ### 1. Resumen ejecutivo
-Aiuken ya dispone de una operativa SOC madura basada en OTRS/Znuny, con colas, roles, SLA, auditoría y flujos consolidados. La oportunidad no es sustituir ese núcleo, sino evolucionarlo hacia una **plataforma SOC inteligente** mediante una capa BeConnect AI que aporte copiloto de analista, explotación semántica del histórico, predicción de SLA, agentes especializados y gobierno trazable.
+Aiuken ya dispone de una operativa SOC madura basada en OTRS/Znuny, con colas, roles, SLA, auditoría y flujos consolidados. La oportunidad no es sustituir ese núcleo, sino evolucionarlo hacia una **plataforma SOC inteligente** mediante una capa Aiuken SOC que aporte copiloto de analista, explotación semántica del histórico, predicción de SLA, agentes especializados y gobierno trazable.
 
-La propuesta mantiene **OTRS/Znuny como system of record** y sitúa a BeConnect como capa de inteligencia, experiencia y automatización gobernada.
+La propuesta mantiene **OTRS/Znuny como system of record** y sitúa a Aiuken SOC como capa de inteligencia, experiencia y automatización gobernada.
 
 ### 2. Objetivo
 Reducir fricción operativa y mejorar la capacidad de respuesta del SOC mediante:
@@ -31,18 +31,18 @@ Canales / Ingesta
       ↓
 OTRS / Znuny (tickets, colas, SLA, auditoría)
       ↓  API / eventos / lecturas controladas
-BeConnect Core (IA + orquestación + RAG + SLA)
+Aiuken SOC Core (IA + orquestación + RAG + SLA)
       ↓
-BeConnect UI (copiloto, war room, reporting)
+Aiuken SOC UI (copiloto, war room, reporting, command center)
 ```
 
 #### Componentes
 - **OTRS/Znuny**: gestión operativa de tickets, colas, estados, roles y SLA.
-- **Conector BeConnect**: lectura/escritura controlada vía API.
+- **Conector Aiuken SOC**: lectura/escritura controlada vía API.
 - **Modelo canónico**: Ticket, Article, Queue, SLA, ExternalRef.
 - **Capa de IA**: triaje, resumen, RAG, predicción SLA, recomendación de acciones.
 - **Capa de gobierno**: RBAC, aprobación humana, auditoría, límites por cliente.
-- **UI BeConnect**: Smart Queue, Ticket Copilot, SLA War Room, reporting.
+- **UI Aiuken SOC**: Smart Queue, Ticket Copilot, SLA War Room, reporting.
 
 ### 5. Casos de uso prioritarios
 #### 5.1 Ticket Copilot
@@ -94,7 +94,7 @@ Motor semántico sobre:
 ### 7. Roadmap 30/60/90 días
 | Horizonte | Enfoque | Resultado |
 |---|---|---|
-| 0–30 días | Integración | BeConnect lee tickets, normaliza datos y audita acciones |
+| 0–30 días | Integración | Aiuken SOC lee tickets, normaliza datos y audita acciones |
 | 31–60 días | Operación mejorada | Tickets mejor creados, colas sugeridas, SLA básico visible |
 | 61–90 días | Copiloto | Smart Queue, resúmenes, casos similares, borradores con aprobación |
 

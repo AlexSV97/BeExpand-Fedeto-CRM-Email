@@ -1,8 +1,8 @@
 # Backlog técnico implementable
-## BeConnect AI Layer sobre OTRS/Znuny para Aiuken
+## Aiuken SOC como capa de inteligencia sobre OTRS/Znuny
 
 ### Objetivo
-Convertir la propuesta en un plan de ejecución técnico, priorizado y entregable por fases, manteniendo OTRS/Znuny como sistema de registro y BeConnect como capa de inteligencia gobernada.
+Convertir la propuesta en un plan de ejecución técnico, priorizado y entregable por fases, manteniendo OTRS/Znuny como sistema de registro y Aiuken SOC como capa de inteligencia gobernada.
 
 ---
 
@@ -23,7 +23,7 @@ Preparar el núcleo de integración, normalización y gobierno.
 ### Historias
 | ID | Historia | Prioridad | Dependencias | Criterio de aceptación |
 |---|---|---:|---|---|
-| BT-01 | Crear conector REST OTRS/Znuny | P0 | — | BeConnect puede autenticar, leer tickets e historial y registrar comentarios/estado vía API |
+| BT-01 | Crear conector REST OTRS/Znuny | P0 | — | Aiuken SOC puede autenticar, leer tickets e historial y registrar comentarios/estado vía API |
 | BT-02 | Definir modelo canónico interno | P0 | — | Existe esquema común para `Ticket`, `Article`, `Queue`, `SLA`, `ExternalRef` |
 | BT-03 | Implementar normalizador OTRS → modelo interno | P0 | BT-01, BT-02 | El payload de OTRS/Znuny se convierte sin pérdida crítica |
 | BT-04 | Añadir audit log técnico | P0 | BT-02 | Toda acción queda registrada con actor, timestamp, fuente y resultado |
@@ -31,7 +31,7 @@ Preparar el núcleo de integración, normalización y gobierno.
 | BT-06 | Healthcheck y observabilidad básica | P1 | BT-01 | Hay métricas de conectividad, latencia y errores por integración |
 
 ### Salida esperada
-BeConnect puede **leer tickets** de OTRS/Znuny, normalizarlos y auditar toda interacción.
+Aiuken SOC puede **leer tickets** de OTRS/Znuny, normalizarlos y auditar toda interacción.
 
 ---
 
@@ -127,7 +127,7 @@ Convertir el histórico del SOC en conocimiento reutilizable.
 | KV-06 | Citar fuentes en respuestas | P1 | KV-04 | Toda respuesta IA referencia el origen del conocimiento |
 
 ### Salida esperada
-BeConnect puede responder usando histórico y runbooks con fuentes trazables.
+Aiuken SOC puede responder usando histórico y runbooks con fuentes trazables.
 
 ---
 

@@ -1,10 +1,10 @@
 # Presentación ejecutiva
-## BeConnect AI Layer sobre OTRS/Znuny para Aiuken
+## Aiuken SOC como capa de inteligencia sobre OTRS/Znuny
 
 ---
 
 ## Slide 1 — Título
-**BeConnect AI Layer para Aiuken**
+**Aiuken SOC como capa de inteligencia para Aiuken**
 
 Evolución inteligente del SOC sobre OTRS/Znuny
 
@@ -20,7 +20,7 @@ Evolución inteligente del SOC sobre OTRS/Znuny
 ---
 
 ## Slide 3 — La propuesta
-BeConnect se integra como una **capa AI gobernada** sobre OTRS/Znuny para aportar:
+Aiuken SOC se integra como una **capa AI gobernada** sobre OTRS/Znuny para aportar:
 - copiloto de analista,
 - búsqueda semántica del histórico,
 - predicción de SLA,
@@ -39,9 +39,9 @@ Canales / Ingesta
       ↓
 OTRS / Znuny (system of record)
       ↓  API / eventos / lecturas controladas
-BeConnect Core (IA + orquestación + RAG + SLA)
+Aiuken SOC Core (IA + orquestación + RAG + SLA)
       ↓
-BeConnect UI (copiloto, war room, reporting)
+Aiuken SOC UI (copiloto, war room, reporting)
 ```
 
 Principios:
@@ -79,7 +79,7 @@ Principios:
 ## Slide 6 — Knowledge Vault / RAG
 ![Flujo 5: Knowledge Vault / RAG](../images/ChatGPT%20Image%2016%20jun%202026,%2015_48_15%20(5).png)
 
-BeConnect aprende del histórico del SOC:
+Aiuken SOC aprende del histórico del SOC:
 - tickets cerrados
 - ticket_history
 - notas internas
