@@ -27,6 +27,7 @@ type SocShellStore = SocShellState & SocShellActions
 // ── Initial state ──
 
 const allSurfaceIds = surfaceRegistry.getAll().map((s) => s.id)
+const surfaceIdSet = new Set<SurfaceId>(allSurfaceIds)
 
 const initialSurfaceStatusMap = Object.fromEntries(
   allSurfaceIds.map((id) => [id, 'loading' as SurfaceStatus]),
@@ -99,6 +100,18 @@ const useSocShellStore = create<SocShellStore>()((set, get) => ({
 
 function useHistorySync(): void {
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    const surfaceParam = searchParams.get('soc')
+    if (surfaceParam && surfaceIdSet.has(surfaceParam as SurfaceId)) {
+      const surfaceId = surfaceParam as SurfaceId
+      const current = useSocShellStore.getState().activeSurfaceId
+      if (surfaceId !== current) {
+        useSocShellStore.setState({ activeSurfaceId: surfaceId })
+      }
+
+      window.history.replaceState({ surfaceId }, '', '?soc=' + surfaceId)
+    }
+
     const handlePopState = (event: PopStateEvent) => {
       const surfaceId = event.state?.surfaceId as SurfaceId | undefined
       if (!surfaceId) return

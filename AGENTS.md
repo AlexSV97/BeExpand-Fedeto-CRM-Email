@@ -87,8 +87,8 @@ admin / admin123
 - sdd-* (para cambios estructurados)
 
 ## SOC Shell Frontend
-- Feature flag: `localStorage.setItem('soc_shell_enabled', 'true')` activa el SOC shell
-- Navegación mediante Zustand + History API (sin React Router)
+- Feature flag: `VITE_SOC_SHELL_DEFAULT=false` o `localStorage.setItem('soc_shell_enabled', 'false')` desactiva el SOC shell; por defecto arranca Aiuken SOC
+- Navegación mediante Zustand + History API en surfaces SOC; el modo legacy sigue usando React Router
 - 9 surfaces en `src/pages/soc/`, registradas en `src/services/soc/surfaceRegistry.tsx`
 - API client SOC en `src/services/soc/client.ts` (socFetch con auth JWT, timeout, retry)
 - Todas las surfaces tienen loading/empty/error states + mock data fallback

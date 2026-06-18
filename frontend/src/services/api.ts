@@ -2,28 +2,16 @@
  * API client — comunicación con el backend FastAPI.
  *
  * En desarrollo usa el proxy de Vite (/api/v1 → localhost:8001).
- * En producción intenta usar VITE_API_URL; si falta y estamos en el frontend público
- * de Render, cae al backend público conocido para evitar depender de un proxy roto.
+ * En producción usa VITE_API_URL si está definido; si no, recurre al proxy
+ * same-origin /api/v1 que expone el frontend.
  */
 
-const RENDER_FRONTEND_HOST = 'beconnect-frontend.onrender.com'
-const RENDER_BACKEND_BASE = 'https://beexpand-fedeto-crm-email.onrender.com/api/v1'
-
-function resolveApiBase(): string {
-  const envBase = import.meta.env.VITE_API_URL?.trim()
-  if (envBase) return envBase
-
-  if (typeof window !== 'undefined' && window.location.hostname === RENDER_FRONTEND_HOST) {
-    return RENDER_BACKEND_BASE
-  }
-
-  return '/api/v1'
-}
+import { resolveApiBase } from './apiBase'
 
 const API_BASE = resolveApiBase()
 const API_CONFIG_HINT = import.meta.env.DEV
   ? 'Verificá que el backend esté corriendo en http://localhost:8001 o definí VITE_API_URL=http://localhost:8001/api/v1.'
-  : `Configurá VITE_API_URL con la URL pública del backend o usá ${RENDER_BACKEND_BASE}.`
+  : 'Configurá VITE_API_URL con la URL pública del backend o asegurate de que el proxy same-origin /api/v1 esté disponible.'
 
 let _token: string | null = null
 

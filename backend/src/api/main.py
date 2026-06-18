@@ -181,17 +181,20 @@ async def _sla_alert_loop():
 
 
 async def seed_queues() -> None:
-    """Garantiza la topología de colas por defecto en el arranque (CE-01).
+    """Sincroniza colas desde OTRS y garantiza la topología por defecto.
 
     ``init_db`` crea la tabla ``queues`` (create_all) pero el seed de la
-    migración Alembic no se ejecuta en el deploy; esto la puebla de forma
-    idempotente con las 11 colas por defecto (topología + negocio).
+    migración Alembic no se ejecuta en el deploy; esto intenta primero la
+    sincronización viva con OTRS y luego deja la topología/colas de negocio
+    mínimas de forma idempotente.
     """
     from src.services.queue_sync import QueueSyncService
 
     try:
         async with async_session_factory() as session:
-            await QueueSyncService(session).seed_defaults()
+            sync_svc = QueueSyncService(session)
+            await sync_svc.sync_from_otrs()
+            await sync_svc.seed_defaults()
     except Exception as exc:  # noqa: BLE001 — no bloquear el arranque
         logger.warning("seed_queues: no se pudo sembrar la topología de colas (%s)", exc)
 
@@ -308,7 +311,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins_list,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
 

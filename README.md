@@ -123,11 +123,11 @@ En tiempo real, el equipo ve en el Command Center los KPIs, alertas, presión de
 
 ## Aiuken SOC Shell — Centro de Comando
 
-El frontend incluye un **SOC Shell** completo con 9 superficies especializadas, accesible mediante feature flag:
+El frontend incluye un **SOC Shell** completo con 9 superficies especializadas, **activo por defecto**. Si querés volver al CRM legacy, podés desactivarlo con `VITE_SOC_SHELL_DEFAULT=false` o desde `localStorage`:
 
-### Cómo activarlo
+### Cómo desactivarlo
 ```js
-localStorage.setItem('soc_shell_enabled', 'true')
+localStorage.setItem('soc_shell_enabled', 'false')
 // Recargar la página
 ```
 
@@ -172,7 +172,7 @@ src/
 
 **Principios de diseño:**
 - **Sin React Router**: la navegación entre surfaces usa Zustand + History API
-- **Feature flag**: `localStorage.setItem('soc_shell_enabled', 'true')` activa el SOC shell; con flag OFF la app funciona exactamente como antes
+- **Feature flag**: `VITE_SOC_SHELL_DEFAULT=false` o `localStorage.setItem('soc_shell_enabled', 'false')` desactiva el SOC shell; por defecto la app arranca en modo Aiuken SOC
 - **Mock data fallback**: todas las surfaces muestran datos de ejemplo cuando el backend no está disponible
 - **Copia neutral**: `socCopy.ts` traduce términos legacy automáticamente
 
