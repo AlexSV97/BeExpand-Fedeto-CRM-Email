@@ -69,6 +69,42 @@ class TestEnsureSeeded:
         assert len(rows) == 6
 
 
+class TestSeedDefaults:
+    async def test_seeds_eleven_rows(self, session):
+        sync = QueueSyncService(session)
+        await sync.seed_defaults()
+
+        rows = (await session.execute(QueueModel.__table__.select())).fetchall()
+        assert len(rows) == 11
+        support = await sync.get_by_name("Support")
+        ventas = await sync.get_by_name("Ventas")
+        assert support is not None and ventas is not None
+
+    async def test_seed_defaults_sets_special_parents(self, session):
+        sync = QueueSyncService(session)
+        await sync.seed_defaults()
+
+        fabricante = await sync.get_by_name("Special - Fabricante")
+        n3 = await sync.get_by_name("N3 - Ingeniería")
+        assert fabricante.parent_id == n3.id
+
+    async def test_seed_defaults_is_idempotent(self, session):
+        sync = QueueSyncService(session)
+        await sync.seed_defaults()
+        await sync.seed_defaults()
+
+        rows = (await session.execute(QueueModel.__table__.select())).fetchall()
+        assert len(rows) == 11
+
+    async def test_seed_defaults_completes_partial_seed(self, session):
+        sync = QueueSyncService(session)
+        await sync.ensure_seeded()  # 6 topology rows
+        await sync.seed_defaults()  # should add the 5 business queues
+
+        rows = (await session.execute(QueueModel.__table__.select())).fetchall()
+        assert len(rows) == 11
+
+
 # ---------------------------------------------------------------------------
 # get_topology (Scenario 1)
 # ---------------------------------------------------------------------------

@@ -167,6 +167,39 @@ class QueueSyncService:
 
         await self.db.commit()
 
+    async def seed_defaults(self) -> None:
+        """Garantiza las 11 colas por defecto (6 topología + 5 de negocio).
+
+        Idempotente por nombre: solo inserta las que falten. Pensado para el
+        arranque de la app (lifespan), donde ``create_all`` crea la tabla pero
+        las migraciones de seed no se ejecutan. A diferencia de
+        ``ensure_seeded`` (6 filas, fallback de sync), aquí también se siembran
+        las colas de negocio necesarias para la validación de ``ActionExecutor``.
+        """
+        existing_names = set(
+            (await self.db.execute(select(QueueModel.name))).scalars().all()
+        )
+        created = False
+        for row in (*_TIER_SEED, *_BUSINESS_SEED):
+            if row["name"] not in existing_names:
+                self.db.add(
+                    QueueModel(
+                        name=row["name"],
+                        slug=row["slug"],
+                        tier=row["tier"],
+                        owner=row["owner"],
+                        is_active=True,
+                    )
+                )
+                created = True
+
+        if not created:
+            return
+
+        await self.db.flush()
+        await self._resolve_parents()
+        await self.db.commit()
+
     # ── Lectura ─────────────────────────────────────────────────────────
     async def get_by_name(self, name: str) -> QueueModel | None:
         return await self._get_model_by_name(name, active_only=True)

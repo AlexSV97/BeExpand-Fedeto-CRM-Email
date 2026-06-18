@@ -121,6 +121,22 @@ async def seed_admin():
         await session.commit()
 
 
+async def seed_queues() -> None:
+    """Garantiza la topología de colas por defecto en el arranque (CE-01).
+
+    ``init_db`` crea la tabla ``queues`` (create_all) pero el seed de la
+    migración Alembic no se ejecuta en el deploy; esto la puebla de forma
+    idempotente con las 11 colas por defecto (topología + negocio).
+    """
+    from src.services.queue_sync import QueueSyncService
+
+    try:
+        async with async_session_factory() as session:
+            await QueueSyncService(session).seed_defaults()
+    except Exception as exc:  # noqa: BLE001 — no bloquear el arranque
+        logger.warning("seed_queues: no se pudo sembrar la topología de colas (%s)", exc)
+
+
 async def _recover_orphan_tasks() -> None:
     """Resetea tareas de reprocess que quedaron 'processing' tras un reinicio."""
     try:
@@ -173,6 +189,7 @@ async def lifespan(app: FastAPI):
     await init_db()
     await _recover_orphan_tasks()
     await seed_admin()
+    await seed_queues()
     await _check_production_settings()
 
     task = asyncio.create_task(_auto_sync_loop())
