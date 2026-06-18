@@ -39,8 +39,8 @@ Sirve como visión general del producto Aiuken SOC, su stack de despliegue y la 
 
 ## Orden de lectura recomendado
 1. `README.md`
-2. `docs/propuesta-aiuken-beconnect.md`
-3. `docs/backlog-aiuken-beconnect.md`
+2. `docs/propuesta-aiuken-beconnect.md` (histórico)
+3. `docs/backlog-aiuken-beconnect.md` (histórico)
 
 ---
 

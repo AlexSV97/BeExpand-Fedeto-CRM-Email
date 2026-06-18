@@ -389,8 +389,8 @@ Aiuken SOC UI (copiloto, war room, reporting, command center)
 - Reporting y mejora continua
 
 ### Documentación asociada
-- [Propuesta ejecutiva](docs/propuesta-aiuken-beconnect.md)
-- [Backlog técnico implementable](docs/backlog-aiuken-beconnect.md)
+- [Propuesta ejecutiva (histórica)](docs/propuesta-aiuken-beconnect.md)
+- [Backlog técnico implementable (histórico)](docs/backlog-aiuken-beconnect.md)
 - [Índice maestro](docs/indice-maestro-aiuken.md)
 
 ### Diagramas de apoyo
