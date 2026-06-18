@@ -1,4 +1,4 @@
-# Documentación Completa del Proyecto — BeExpand CRM Email
+# Documentación Completa del Proyecto — Aiuken SOC
 
 > **Proyecto**: BeExpand-Fedeto-CRM-Email
 > **Cliente**: Be Expand

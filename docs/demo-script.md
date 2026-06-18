@@ -1,4 +1,4 @@
-# Demo PoC — BeExpand CRM Email
+# Demo PoC — Aiuken SOC
 
 > **Fecha**: Viernes 22 de mayo de 2026
 > **Duración estimada**: 20-25 minutos

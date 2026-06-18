@@ -1,6 +1,6 @@
-# Wireframes del Dashboard
+# Wireframes del Dashboard — Aiuken SOC
 
-> Diseño de interfaz de usuario — Sistema BeExpand CRM Email
+> Diseño de interfaz de usuario — Sistema Aiuken SOC
 > Última actualización: 12/05/2026
 
 ---

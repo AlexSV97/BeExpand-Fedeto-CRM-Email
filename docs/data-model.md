@@ -1,4 +1,4 @@
-# Modelo de Datos — BeExpand CRM Email
+# Modelo de Datos — Aiuken SOC
 
 > Diseñado para PostgreSQL 16 con soporte JSONB y Full-Text Search (tsvector).
 > Última actualización: 12/05/2026

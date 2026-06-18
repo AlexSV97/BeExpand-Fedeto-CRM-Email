@@ -1,4 +1,4 @@
-# Guión de Demo — PoC BeExpand CRM Email
+# Guión de Demo — Aiuken SOC
 
 > **Duración estimada**: 15-20 minutos
 > **Prep**: Backend + Frontend arrancados, navegador en http://localhost:5173

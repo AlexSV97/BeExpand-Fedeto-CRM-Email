@@ -1,4 +1,4 @@
-# Estimación Económica — BeExpand CRM Email
+# Estimación Económica — Aiuken SOC
 
 > Documento generado el 12/05/2026
 > Proyecto: BeExpand-Fedeto-CRM-Email
