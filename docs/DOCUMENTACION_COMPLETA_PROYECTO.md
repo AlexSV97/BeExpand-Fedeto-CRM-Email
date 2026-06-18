@@ -515,7 +515,7 @@ Aiuken SOC/
 ### Deuda Técnica / Mejoras Futuras
 
 - [ ] Re-entrenar BERT con más datos reales (a medida que crezca classification_history)
-- [ ] Migrar de SQLite a PostgreSQL para producción
+- [x] Migrar de SQLite a PostgreSQL para producción (Render Postgres)
 - [ ] Integración VTiger para sincronizar contactos y oportunidades
 - [ ] Tests unitarios formales para el pipeline híbrido (13 escenarios)
 - [ ] Dashboard: filtros por fecha, exportar reportes

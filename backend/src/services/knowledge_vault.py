@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import json
 import re
 from collections import Counter
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -106,15 +107,44 @@ class KnowledgeVaultService:
         documents: list[KnowledgeDocument] | None = None,
         vector_store: VectorStore | None = None,
         llm_client: LLMClient | None = None,
+        snapshot_writer: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
     ):
         self._documents = documents or []
         self._vector_store = vector_store or VectorStore()
         self._llm_client = llm_client
+        self._snapshot_writer = snapshot_writer
         self._embeddings_done = False
 
     @property
     def documents(self) -> list[KnowledgeDocument]:
         return list(self._documents)
+
+    def to_snapshot(self) -> dict[str, Any]:
+        return {
+            "documents": [doc.model_dump(mode="json") for doc in self._documents],
+            "vector_store": self._vector_store.to_json(),
+            "embeddings_done": self._embeddings_done,
+        }
+
+    @classmethod
+    def from_snapshot(
+        cls,
+        snapshot: dict[str, Any],
+        *,
+        llm_client: LLMClient | None = None,
+        snapshot_writer: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
+    ) -> KnowledgeVaultService:
+        documents = [KnowledgeDocument.model_validate(item) for item in snapshot.get("documents", [])]
+        vector_store_data = snapshot.get("vector_store")
+        vector_store = VectorStore.from_json(vector_store_data) if isinstance(vector_store_data, str) else VectorStore()
+        svc = cls(
+            documents=documents,
+            vector_store=vector_store,
+            llm_client=llm_client,
+            snapshot_writer=snapshot_writer,
+        )
+        svc._embeddings_done = bool(snapshot.get("embeddings_done", False))
+        return svc
 
     def add_document(self, document: KnowledgeDocument) -> None:
         self._documents.append(document)
@@ -124,6 +154,10 @@ class KnowledgeVaultService:
         self._documents.append(document)
         # Embedding will be generated on next embed_all_documents() call
         self._embeddings_done = False
+
+    async def _persist_snapshot(self) -> None:
+        if self._snapshot_writer is not None:
+            await self._snapshot_writer(self.to_snapshot())
 
     # ── KV-01: ingesta de tickets cerrados ───────────────────────────────
     def has_document(self, source_id: str, source_type: str = "ticket") -> bool:
@@ -175,6 +209,8 @@ class KnowledgeVaultService:
                 await self.embed_all_documents()
             except Exception:  # noqa: BLE001 — embeddings best-effort
                 pass
+        elif count:
+            await self._persist_snapshot()
         return count
 
     async def embed_all_documents(self) -> int:
@@ -193,6 +229,7 @@ class KnowledgeVaultService:
             count += 1
 
         self._embeddings_done = True
+        await self._persist_snapshot()
         return count
 
     async def search_rag(

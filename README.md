@@ -279,7 +279,7 @@ npm run dev
 El repositorio incluye `render.yaml` para crear el stack en Render:
 
 - `aiuken-redis` — Key Value/Redis para Celery y jobs asíncronos
-- `aiuken-soc-email-api` — FastAPI + disco persistente en `/app/data`
+- `aiuken-soc-email-api` — FastAPI + PostgreSQL gestionado por Render
 - `aiuken-frontend` — React servido por Nginx con proxy `/api/*` hacia el backend por red privada de Render
 - `aiuken-celery-worker` — worker Celery para sincronización periódica
 - `aiuken-celery-beat` — scheduler Celery Beat

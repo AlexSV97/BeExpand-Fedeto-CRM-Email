@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.api.deps import get_current_user
 from src.audit.models import AuditActorKind, AuditEvent, AuditOutcome
 from src.db.models import OperationalRecord, User
-from src.db.session import get_db
+from src.db.session import async_session_factory, get_db
 from src.domain.ticketing import ActorKind, Article, ArticleDraft, Queue, SLA, Ticket, TicketPriority, TicketState
 from src.integrations.otrs_znuny import OtrsZnunyClient, OtrsZnunySettings
 from src.services.agent_governance import (
@@ -32,6 +32,7 @@ from src.services.knowledge_vault import (
     KnowledgeSearchRequest,
     KnowledgeVaultService,
 )
+from src.services.knowledge_vault_store import load_knowledge_vault_snapshot, save_knowledge_vault_snapshot
 from src.services.queue_strategy import (
     QueueDecisionRequest,
     QueueStrategyService,
@@ -104,6 +105,10 @@ async def get_knowledge_vault(request: Request) -> KnowledgeVaultService:
     from src.llm_client import LLMClient
     from src.services.vector_store import VectorStore
 
+    async def _snapshot_writer(snapshot: dict[str, Any]) -> None:
+        async with async_session_factory() as writer_session:
+            await save_knowledge_vault_snapshot(writer_session, KnowledgeVaultService.from_snapshot(snapshot, llm_client=llm_client))
+
     # Add seed documents if vault is empty
     documents = _seed_knowledge_documents()
     llm_client = LLMClient(use_chat_model=True)
@@ -113,10 +118,17 @@ async def get_knowledge_vault(request: Request) -> KnowledgeVaultService:
         documents=documents,
         vector_store=vector_store,
         llm_client=llm_client,
+        snapshot_writer=_snapshot_writer,
     )
 
-    # Pre-embed all documents for RAG search
-    await svc.embed_all_documents()
+    async with async_session_factory() as session:
+        snapshot = await load_knowledge_vault_snapshot(session)
+        if snapshot:
+            svc = KnowledgeVaultService.from_snapshot(snapshot, llm_client=llm_client, snapshot_writer=_snapshot_writer)
+        else:
+            # Pre-embed all documents for RAG search and persist snapshot
+            await svc.embed_all_documents()
+            await save_knowledge_vault_snapshot(session, svc)
 
     request.app.state.knowledge_vault_service = svc
     return svc

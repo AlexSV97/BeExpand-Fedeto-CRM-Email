@@ -1,3 +1,9 @@
+databases:
+  - name: aiuken-postgres
+    databaseName: aiuken
+    user: aiuken
+    plan: free
+
 services:
   - type: keyvalue
     name: aiuken-redis
@@ -12,7 +18,9 @@ services:
     healthCheckPath: /api/v1/health
     envVars:
       - key: DATABASE_URL
-        value: sqlite+aiosqlite:////app/data/aiuken.db
+        fromDatabase:
+          name: aiuken-postgres
+          property: connectionString
       - key: SECRET_KEY
         generateValue: true
       - key: ADMIN_USERNAME
@@ -30,10 +38,6 @@ services:
           property: connectionString
       - key: CORS_ORIGINS
         value: https://aiuken-frontend.onrender.com
-    disk:
-      name: aiuken-data
-      mountPath: /app/data
-      sizeGB: 5
 
   - type: web
     name: aiuken-frontend

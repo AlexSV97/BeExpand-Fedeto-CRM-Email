@@ -12,6 +12,59 @@ valid JWT token.
 import pytest
 from httpx import AsyncClient
 
+from src.api.main import app
+from src.api.routers.soc import get_otrs_client
+from src.domain.ticketing import Queue, Ticket, TicketPriority, TicketState
+
+
+def _live_ticket(ticket_id: str = "TICKET-1000") -> Ticket:
+    return Ticket(
+        id=ticket_id,
+        subject="Live OTRS ticket",
+        queue=Queue(name="Support", slug="support"),
+        state=TicketState.OPEN,
+        priority=TicketPriority.HIGH,
+        customer_email="live@example.com",
+        articles=[],
+    )
+
+
+class _LiveOtrsClient:
+    def __init__(self) -> None:
+        self.list_tickets_calls = 0
+        self.get_ticket_calls: list[str] = []
+        self.update_ticket_calls: list[tuple[str, dict]] = []
+        self.add_article_calls: list[tuple[str, str]] = []
+
+    async def list_tickets(self, *, limit: int = 50, offset: int = 0, queue: str | None = None):
+        self.list_tickets_calls += 1
+        return [_live_ticket("TCK-LIVE-1")]
+
+    async def get_ticket(self, ticket_id: str):
+        self.get_ticket_calls.append(ticket_id)
+        return _live_ticket(ticket_id)
+
+    async def update_ticket(self, ticket_id: str, **kwargs):
+        self.update_ticket_calls.append((ticket_id, kwargs))
+        return _live_ticket(ticket_id)
+
+    async def add_article(self, ticket_id: str, article):
+        self.add_article_calls.append((ticket_id, getattr(article, "body_text", "")))
+        from src.domain.ticketing import Article, ActorKind
+
+        return Article(
+            id="ART-LIVE-1",
+            ticket_id=ticket_id,
+            author_kind=ActorKind.HUMAN,
+            author_name=getattr(article, "author_name", "admin"),
+            body_text=getattr(article, "body_text", ""),
+        )
+
+
+class _BrokenOtrsClient:
+    async def list_tickets(self, *, limit: int = 50, offset: int = 0, queue: str | None = None):
+        raise RuntimeError("OTRS down")
+
 
 # ===========================================================================
 # GET /soc/command-center
@@ -76,6 +129,29 @@ class TestGetTicketQueue:
         assert response.status_code == 200
         data = response.json()
         assert data["operatingMode"] == "demo"
+
+    async def test_returns_live_mode_when_otrs_is_configured(self, client: AsyncClient, auth_headers: dict[str, str]):
+        app.dependency_overrides[get_otrs_client] = lambda: _LiveOtrsClient()
+        try:
+            response = await client.get("/api/v1/soc/tickets", headers=auth_headers)
+        finally:
+            app.dependency_overrides.pop(get_otrs_client, None)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["operatingMode"] == "live"
+        assert any(ticket["id"] == "TCK-LIVE-1" for ticket in data["tickets"])
+
+    async def test_returns_degraded_mode_when_otrs_errors(self, client: AsyncClient, auth_headers: dict[str, str]):
+        app.dependency_overrides[get_otrs_client] = lambda: _BrokenOtrsClient()
+        try:
+            response = await client.get("/api/v1/soc/tickets", headers=auth_headers)
+        finally:
+            app.dependency_overrides.pop(get_otrs_client, None)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["operatingMode"] == "degraded"
 
     async def test_supports_pagination(self, client: AsyncClient, auth_headers: dict[str, str]):
         response = await client.get(
@@ -159,6 +235,23 @@ class TestGetTicketCopilot:
     async def test_requires_auth(self, client: AsyncClient):
         response = await client.get("/api/v1/soc/tickets/TICKET-1000/copilot")
         assert response.status_code == 401
+
+    async def test_uses_otrs_ticket_when_configured(self, client: AsyncClient, auth_headers: dict[str, str]):
+        fake_otrs = _LiveOtrsClient()
+        app.dependency_overrides[get_otrs_client] = lambda: fake_otrs
+        try:
+            response = await client.get(
+                "/api/v1/soc/tickets/TICKET-LIVE-1/copilot",
+                headers=auth_headers,
+                params={"message": "Please review"},
+            )
+        finally:
+            app.dependency_overrides.pop(get_otrs_client, None)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["ticketContext"]["ticketId"] == "TICKET-LIVE-1"
+        assert fake_otrs.get_ticket_calls == ["TICKET-LIVE-1"]
 
 
 # ===========================================================================
@@ -383,6 +476,24 @@ class TestPostReclassifyTicket:
         )
         assert response.status_code == 401
 
+    async def test_updates_otrs_when_configured(self, client: AsyncClient, auth_headers: dict[str, str]):
+        fake_otrs = _LiveOtrsClient()
+        app.dependency_overrides[get_otrs_client] = lambda: fake_otrs
+        try:
+            response = await client.post(
+                "/api/v1/soc/tickets/TICKET-LIVE-1/reclassify",
+                headers=auth_headers,
+                json={"priority": "urgent", "reason": "Needs higher priority"},
+            )
+        finally:
+            app.dependency_overrides.pop(get_otrs_client, None)
+
+        assert response.status_code == 200
+        assert fake_otrs.update_ticket_calls
+        ticket_id, kwargs = fake_otrs.update_ticket_calls[0]
+        assert ticket_id == "TICKET-LIVE-1"
+        assert "priority" in kwargs
+
 
 # ===========================================================================
 # POST /soc/tickets/{ticket_id}/escalate
@@ -449,6 +560,21 @@ class TestPostEscalateTicket:
         )
         assert response.status_code == 401
 
+    async def test_updates_otrs_when_configured(self, client: AsyncClient, auth_headers: dict[str, str]):
+        fake_otrs = _LiveOtrsClient()
+        app.dependency_overrides[get_otrs_client] = lambda: fake_otrs
+        try:
+            response = await client.post(
+                "/api/v1/soc/tickets/TICKET-LIVE-1/escalate",
+                headers=auth_headers,
+                json={"reason": "Escalate to N2", "target_tier": "n2"},
+            )
+        finally:
+            app.dependency_overrides.pop(get_otrs_client, None)
+
+        assert response.status_code == 200
+        assert fake_otrs.update_ticket_calls
+
 
 # ===========================================================================
 # POST /soc/tickets/{ticket_id}/notes
@@ -513,3 +639,18 @@ class TestPostAddNote:
             json={"content": "Test", "visibility": "internal"},
         )
         assert response.status_code == 401
+
+    async def test_adds_otrs_article_when_configured(self, client: AsyncClient, auth_headers: dict[str, str]):
+        fake_otrs = _LiveOtrsClient()
+        app.dependency_overrides[get_otrs_client] = lambda: fake_otrs
+        try:
+            response = await client.post(
+                "/api/v1/soc/tickets/TICKET-LIVE-1/notes",
+                headers=auth_headers,
+                json={"content": "This is an internal note", "visibility": "internal"},
+            )
+        finally:
+            app.dependency_overrides.pop(get_otrs_client, None)
+
+        assert response.status_code == 200
+        assert fake_otrs.add_article_calls
