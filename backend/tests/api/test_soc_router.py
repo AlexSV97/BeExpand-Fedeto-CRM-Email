@@ -253,6 +253,44 @@ class TestGetTicketCopilot:
         assert data["ticketContext"]["ticketId"] == "TICKET-LIVE-1"
         assert fake_otrs.get_ticket_calls == ["TICKET-LIVE-1"]
 
+    async def test_copilot_reports_live_mode(self, client: AsyncClient, auth_headers: dict[str, str]):
+        app.dependency_overrides[get_otrs_client] = lambda: _LiveOtrsClient()
+        try:
+            response = await client.get(
+                "/api/v1/soc/tickets/TICKET-LIVE-1/copilot", headers=auth_headers,
+            )
+        finally:
+            app.dependency_overrides.pop(get_otrs_client, None)
+        assert response.status_code == 200
+        assert response.json()["operatingMode"] == "live"
+
+    async def test_copilot_reports_demo_mode(self, client: AsyncClient, auth_headers: dict[str, str]):
+        # No OTRS configured → demo seed mode.
+        response = await client.get(
+            "/api/v1/soc/tickets/TICKET-1000/copilot", headers=auth_headers,
+        )
+        assert response.status_code == 200
+        assert response.json()["operatingMode"] == "demo"
+
+    async def test_copilot_reports_degraded_mode(self, client: AsyncClient, auth_headers: dict[str, str]):
+        # OTRS configured but failing get_ticket → degraded (synthetic fallback).
+        class _BrokenGet:
+            async def list_tickets(self, **kwargs):
+                return []
+
+            async def get_ticket(self, ticket_id):
+                raise RuntimeError("OTRS down")
+
+        app.dependency_overrides[get_otrs_client] = lambda: _BrokenGet()
+        try:
+            response = await client.get(
+                "/api/v1/soc/tickets/TICKET-1000/copilot", headers=auth_headers,
+            )
+        finally:
+            app.dependency_overrides.pop(get_otrs_client, None)
+        assert response.status_code == 200
+        assert response.json()["operatingMode"] == "degraded"
+
 
 # ===========================================================================
 # GET /soc/sla

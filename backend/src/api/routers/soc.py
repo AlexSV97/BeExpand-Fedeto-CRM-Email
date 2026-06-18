@@ -7,6 +7,7 @@ Endpoints mirror the 9 SOC surfaces from the frontend surface registry.
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
@@ -71,6 +72,8 @@ from src.notifiers.telegram import TelegramNotifier
 from src.services.ticket_drafts import DraftResult, TicketDraftService
 from src.api.middleware.rate_limit import RateLimiter
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(tags=["soc"])
 
 
@@ -106,8 +109,15 @@ async def get_knowledge_vault(request: Request) -> KnowledgeVaultService:
     from src.services.vector_store import VectorStore
 
     async def _snapshot_writer(snapshot: dict[str, Any]) -> None:
-        async with async_session_factory() as writer_session:
-            await save_knowledge_vault_snapshot(writer_session, KnowledgeVaultService.from_snapshot(snapshot, llm_client=llm_client))
+        # Best-effort: snapshot persistence must never break a request.
+        try:
+            async with async_session_factory() as writer_session:
+                await save_knowledge_vault_snapshot(
+                    writer_session,
+                    KnowledgeVaultService.from_snapshot(snapshot, llm_client=llm_client),
+                )
+        except Exception:  # noqa: BLE001 — persistence is an optimization
+            logger.warning("knowledge vault snapshot write failed (best-effort)", exc_info=True)
 
     # Add seed documents if vault is empty
     documents = _seed_knowledge_documents()
@@ -121,14 +131,25 @@ async def get_knowledge_vault(request: Request) -> KnowledgeVaultService:
         snapshot_writer=_snapshot_writer,
     )
 
-    async with async_session_factory() as session:
-        snapshot = await load_knowledge_vault_snapshot(session)
-        if snapshot:
-            svc = KnowledgeVaultService.from_snapshot(snapshot, llm_client=llm_client, snapshot_writer=_snapshot_writer)
-        else:
-            # Pre-embed all documents for RAG search and persist snapshot
+    # Load/persist snapshot best-effort: the vault must work from seed even if the
+    # snapshot store (settings table) is unavailable. This keeps the SOC surfaces
+    # resilient in production and hermetic in tests.
+    try:
+        async with async_session_factory() as session:
+            snapshot = await load_knowledge_vault_snapshot(session)
+            if snapshot:
+                svc = KnowledgeVaultService.from_snapshot(
+                    snapshot, llm_client=llm_client, snapshot_writer=_snapshot_writer
+                )
+            else:
+                await svc.embed_all_documents()
+                await save_knowledge_vault_snapshot(session, svc)
+    except Exception:  # noqa: BLE001 — fall back to in-memory seed vault
+        logger.warning("knowledge vault snapshot load failed; using seed (best-effort)", exc_info=True)
+        try:
             await svc.embed_all_documents()
-            await save_knowledge_vault_snapshot(session, svc)
+        except Exception:  # noqa: BLE001 — embeddings also best-effort
+            pass
 
     request.app.state.knowledge_vault_service = svc
     return svc
@@ -478,18 +499,29 @@ async def _resolve_tickets(
     return tickets
 
 
+async def _resolve_ticket_with_mode(
+    otrs: OtrsZnunyClient | None,
+    ticket_id: str,
+) -> tuple[Ticket | None, str]:
+    """Resolve a ticket and report the operating mode (live | degraded | demo)."""
+    if otrs is not None:
+        try:
+            return await otrs.get_ticket(ticket_id), "live"
+        except Exception:
+            # OTRS configured but failing → degraded, fall back to synthetic.
+            tickets = _synthetic_tickets(25)
+            return next((t for t in tickets if t.id == ticket_id), None), "degraded"
+    tickets = _synthetic_tickets(25)
+    return next((t for t in tickets if t.id == ticket_id), None), "demo"
+
+
 async def _resolve_ticket(
     otrs: OtrsZnunyClient | None,
     ticket_id: str,
 ) -> Ticket | None:
     """Try OTRS first, fall back to synthetic tickets."""
-    if otrs is not None:
-        try:
-            return await otrs.get_ticket(ticket_id)
-        except Exception:
-            pass  # Fall through to synthetic
-    tickets = _synthetic_tickets(25)
-    return next((t for t in tickets if t.id == ticket_id), None)
+    ticket, _mode = await _resolve_ticket_with_mode(otrs, ticket_id)
+    return ticket
 
 
 # ---------------------------------------------------------------------------
@@ -577,6 +609,7 @@ class TicketCopilotResponse(BaseModel):
     conversation: list[CopilotMessage]
     suggestedActions: list[SuggestionItem]
     ticketContext: TicketContext
+    operatingMode: str = "demo"  # live | degraded | demo
 
 
 class BreachTimer(BaseModel):
@@ -1048,7 +1081,7 @@ async def get_ticket_copilot(
     knowledge_svc: KnowledgeVaultService = Depends(get_knowledge_vault),
 ):
     """Return copilot data for a specific ticket."""
-    ticket = await _resolve_ticket(otrs, ticket_id)
+    ticket, operating_mode = await _resolve_ticket_with_mode(otrs, ticket_id)
     if ticket is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -1122,6 +1155,7 @@ async def get_ticket_copilot(
             slaName=ticket.sla.name if ticket.sla else None,
             articleCount=len(ticket.articles),
         ),
+        operatingMode=operating_mode,
     )
 
 

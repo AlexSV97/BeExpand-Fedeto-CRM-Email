@@ -301,6 +301,59 @@ Para crear el entorno:
 4. Esperar a que el backend responda `GET /api/v1/health`
 5. Abrir el frontend y probar login
 
+### Modos de operación: Demo · Live · Degraded
+
+Aiuken SOC funciona **sin OTRS** (modo demo, con tickets sintéticos sembrados) y
+se conecta a **OTRS/Znuny real** en cuanto se configuran las credenciales. Cada
+superficie de lectura del SOC informa de su `operatingMode`:
+
+| Modo | Cuándo | Origen de los tickets |
+|------|--------|------------------------|
+| `demo` | OTRS no configurado | Tickets sintéticos de demostración (seed) |
+| `live` | OTRS configurado y respondiendo | OTRS/Znuny real (`list_tickets` / `get_ticket`) |
+| `degraded` | OTRS configurado pero falla | Fallback a sintéticos; se marca degradado |
+
+El campo `operatingMode` se devuelve en `GET /soc/command-center`,
+`GET /soc/tickets`, `GET /soc/tickets/{id}/copilot` y `GET /soc/sla`, y el SOC
+Shell lo muestra como badge **Live / Demo / Degraded**.
+
+#### Variables de entorno OTRS/Znuny
+
+El cliente se activa cuando `base_url` **y** `api_token` están presentes
+(prefijo `OTRS_ZNUNY_`):
+
+```bash
+OTRS_ZNUNY_BASE_URL=https://otrs.tu-dominio.com/otrs/nph-genericinterface.pl/Webservice/BeConnect
+OTRS_ZNUNY_API_TOKEN=<token>
+OTRS_ZNUNY_DEFAULT_QUEUE=Support   # opcional (por defecto "Support")
+```
+
+#### Qué pasa a ser "real" en modo live
+
+- **Bandeja** (`/soc/tickets`) y **detalle/Copilot** (`/soc/tickets/{id}/copilot`)
+  leen tickets reales (`list_tickets` / `get_ticket`).
+- **Notas** (`POST /soc/tickets/{id}/notes`) crean un **artículo real** en el
+  ticket (`add_article`).
+- **Reclasificar** y **escalar** propagan a OTRS (`update_ticket`: prioridad,
+  estado y cola) — best-effort, sin romper el flujo si OTRS falla.
+- El **Knowledge Vault** ingiere los tickets **cerrados/resueltos** como casos y
+  persiste el snapshot en BD (sobrevive reinicios); si el store no está
+  disponible, el vault sigue operativo desde el seed (best-effort).
+
+#### De demo a live (runbook)
+
+1. Definir `OTRS_ZNUNY_BASE_URL` y `OTRS_ZNUNY_API_TOKEN` en el entorno del backend.
+2. Reiniciar el backend y comprobar `GET /api/v1/health` → `services.otrs.status: ok`.
+3. Abrir el SOC: el badge debe pasar a **Live**; `GET /soc/tickets` debe devolver
+   `operatingMode: "live"` con tickets reales.
+4. Verificación E2E del puente OTRS (cliente simulado, sin OTRS real):
+   `pytest tests/api/test_soc_router.py -k "otrs or live or mode"`.
+
+> Estado actual: la integración OTRS está **implementada y cubierta por tests E2E
+> con un cliente OTRS simulado** (modos live/demo/degraded, `add_article`,
+> `update_ticket`, `get_ticket`). El paso a productivo real requiere una instancia
+> OTRS/Znuny de Aiuken con credenciales válidas.
+
 ### Tests
 
 ```bash
