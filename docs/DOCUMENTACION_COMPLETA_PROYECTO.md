@@ -474,7 +474,7 @@ Aiuken SOC/
 
 ### Sesión 3 — 13/05/2026
 - **Tailwind CSS 4** instalado y refactorizado el frontend (~250 líneas de `style={{}}` eliminadas)
-- **Conexión IMAP con Gmail** funcional (cuenta: beexpandcrmpoc@gmail.com)
+- **Conexión IMAP con Gmail** funcional (cuenta de pruebas IMAP)
 - 3 correos reales sincronizados, 0 errores
 - **Ollama** instalado (pendiente descargar modelo)
 - Issues de M4 cerradas (Dashboard, Contactos, Pipeline, Auth)
@@ -526,8 +526,8 @@ Aiuken SOC/
 ```bash
 # Arrancar backend
 cd backend
-$env:IMAP_EMAIL="beexpandcrmpoc@gmail.com"
-$env:IMAP_PASSWORD="wdjqgpkkurdoxiqg"
+$env:IMAP_EMAIL="<IMAP_EMAIL_DE_PRUEBA>"
+$env:IMAP_PASSWORD="<IMAP_PASSWORD_DE_PRUEBA>"
 uvicorn src.api.main:app --host 0.0.0.0 --port 8001 --reload
 
 # Arrancar frontend
