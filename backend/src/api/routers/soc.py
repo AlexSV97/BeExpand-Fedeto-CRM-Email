@@ -61,6 +61,12 @@ from src.services.reporting import (
 from src.services.ticket_lifecycle import (
     TicketLifecycleService,
 )
+from src.services.sla_alerts import (
+    SlaAlertListResponse,
+    SlaAlertScanResponse,
+    SlaAlertService,
+)
+from src.notifiers.telegram import TelegramNotifier
 from src.api.middleware.rate_limit import RateLimiter
 
 router = APIRouter(tags=["soc"])
@@ -1126,6 +1132,49 @@ async def get_sla_war_room(
         activeSLAs=[SlaItem(**data) for data in active_sla_map.values()],
         operatingMode=operating_mode,
     )
+
+
+@router.post("/soc/sla/alerts/scan", response_model=SlaAlertScanResponse)
+async def post_sla_alerts_scan(
+    current_user: User = Depends(get_current_user),
+    _rate_limit: None = Depends(RateLimiter(30)),
+    otrs: OtrsZnunyClient | None = Depends(get_otrs_client),
+    lifecycle_svc: TicketLifecycleService = Depends(get_ticket_lifecycle),
+    db: AsyncSession = Depends(get_db),
+):
+    """Scan current tickets and raise early SLA alerts before breach (SLA-05)."""
+    tickets, _mode = await _resolve_tickets_with_mode(otrs, 25)
+    svc = SlaAlertService(db, lifecycle_svc, notifier=TelegramNotifier())
+    generated = await svc.scan(tickets)
+    return SlaAlertScanResponse(
+        scanned=len(tickets),
+        generated=len(generated),
+        alerts=generated,
+    )
+
+
+@router.get("/soc/sla/alerts", response_model=SlaAlertListResponse)
+async def get_sla_alerts(
+    limit: int = Query(100, ge=1, le=500),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List active (unacknowledged) SLA early-warning alerts (SLA-05)."""
+    alerts = await SlaAlertService(db).list_active(limit=limit)
+    return SlaAlertListResponse(total=len(alerts), alerts=alerts)
+
+
+@router.post("/soc/sla/alerts/{alert_id}/ack")
+async def post_ack_sla_alert(
+    alert_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Acknowledge an SLA alert so it no longer appears as active (SLA-05)."""
+    ok = await SlaAlertService(db).acknowledge(alert_id, current_user.username)
+    if not ok:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
+    return {"alert_id": alert_id, "status": "acknowledged"}
 
 
 @router.get("/soc/knowledge", response_model=KnowledgeVaultResponse)
