@@ -43,7 +43,7 @@ services:
     name: aiuken-frontend
     runtime: docker
     dockerContext: ./frontend
-    dockerfilePath: ./frontend/Dockerfile
+    dockerfilePath: ./frontend/Dockerfile.render
     envVars:
       - key: API_UPSTREAM
         fromService:

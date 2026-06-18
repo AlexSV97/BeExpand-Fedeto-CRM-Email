@@ -7,9 +7,11 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# Build-time env for Vite (allow env var or default to /api/v1)
-ARG VITE_API_URL
-ENV VITE_API_URL=${VITE_API_URL:-/api/v1}
+# Build-time env for Vite — FOR RENDER PRODUCTION
+# API_UPSTREAM will be provided at runtime, but we need VITE_API_URL at build time
+# Using /api/v1 proxy which nginx will forward to the API backend
+ARG VITE_API_URL=/api/v1
+ENV VITE_API_URL=${VITE_API_URL}
 
 # Copy source and build
 COPY . .
