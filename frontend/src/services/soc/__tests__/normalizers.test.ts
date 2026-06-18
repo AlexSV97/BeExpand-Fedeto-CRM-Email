@@ -188,7 +188,7 @@ describe('normalizeTicketCopilot', () => {
     const result = normalizeTicketCopilot(null as unknown as Record<string, unknown>)
     expect(result.conversation).toEqual([])
     expect(result.suggestedActions).toEqual([])
-    expect(result.ticketContext).toEqual({ ticketId: '', subject: '', status: '' })
+    expect(result.ticketContext).toEqual({ ticketId: '', subject: '', status: '', priority: 'medium', articleCount: 0 })
   })
 
   it('returns fallback for non-object input', () => {
@@ -199,7 +199,7 @@ describe('normalizeTicketCopilot', () => {
 
   it('handles missing ticketContext gracefully', () => {
     const result = normalizeTicketCopilot({ conversation: [], suggestedActions: [] })
-    expect(result.ticketContext).toEqual({ ticketId: '', subject: '', status: '' })
+    expect(result.ticketContext).toEqual({ ticketId: '', subject: '', status: '', priority: 'medium', articleCount: 0 })
   })
 
   it('preserves suggestions when provided', () => {

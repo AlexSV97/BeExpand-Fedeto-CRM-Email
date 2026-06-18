@@ -119,6 +119,11 @@ describe('socShellStore — navigate', () => {
 
 describe('socShellStore — deep-link hydration', () => {
   it('restores the active surface from ?soc=', () => {
+    // pushState is mocked in beforeEach (no-op), which would leave
+    // window.location.search empty. Restore the real impl so the URL actually
+    // updates and hydrate can read the ?soc= param; replaceState stays mocked
+    // for the assertion below.
+    vi.mocked(window.history.pushState).mockRestore()
     window.history.pushState({}, '', '?soc=' + SURFACE_IDS.SLA_WAR_ROOM)
 
     hydrateSocSurfaceFromUrl()
