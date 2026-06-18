@@ -43,6 +43,10 @@ from src.services.escalation_recording import (
     EscalationHistoryResponse,
     EscalationRecordService,
 )
+from src.services.ticket_ownership import (
+    OwnershipResponse,
+    TicketOwnershipService,
+)
 from src.services.reporting import (
     OperationalReportRequest,
     ReportWindow,
@@ -740,6 +744,38 @@ class EscalateResponse(BaseModel):
     escalation_level: int
     target_queue: str
     status: str = "escalated"
+
+
+class AssignRequest(BaseModel):
+    owner: str
+    reason: str = ""
+
+    @field_validator('owner')
+    @classmethod
+    def validate_owner(cls, v):
+        if not v or not v.strip():
+            raise ValueError('owner must not be empty')
+        if len(v) > 100:
+            raise ValueError('owner must not exceed 100 characters')
+        return v.strip()
+
+    @field_validator('reason')
+    @classmethod
+    def validate_reason(cls, v):
+        if len(v) > 500:
+            raise ValueError('reason must not exceed 500 characters')
+        return v
+
+
+class LockRequest(BaseModel):
+    reason: str = ""
+
+    @field_validator('reason')
+    @classmethod
+    def validate_reason(cls, v):
+        if len(v) > 500:
+            raise ValueError('reason must not exceed 500 characters')
+        return v
 
 
 class AddNoteRequest(BaseModel):
@@ -1507,6 +1543,72 @@ async def get_ticket_escalations(
         total=len(items),
         items=items,
     )
+
+
+async def _ownership_response(svc: TicketOwnershipService, ticket_id: str) -> OwnershipResponse:
+    state = await svc.current_state(ticket_id)
+    history = [TicketOwnershipService.to_item(r) for r in await svc.list_history(ticket_id)]
+    return OwnershipResponse(ticket_id=ticket_id, state=state, history=history)
+
+
+@router.post("/soc/tickets/{ticket_id}/assign", response_model=OwnershipResponse)
+async def post_assign_ticket(
+    ticket_id: str,
+    body: AssignRequest,
+    current_user: User = Depends(get_current_user),
+    _rate_limit: None = Depends(RateLimiter(30)),
+    otrs: OtrsZnunyClient | None = Depends(get_otrs_client),
+    db: AsyncSession = Depends(get_db),
+):
+    """Assign an owner to a ticket (CE-05), tracked + best-effort OTRS propagation."""
+    svc = TicketOwnershipService(db)
+    await svc.assign(ticket_id, owner=body.owner, actor_name=current_user.username, reason=body.reason)
+
+    if otrs is not None:
+        try:
+            await otrs.update_ticket(ticket_id, owner=body.owner)
+        except Exception:
+            pass  # Best-effort
+
+    return await _ownership_response(svc, ticket_id)
+
+
+@router.post("/soc/tickets/{ticket_id}/lock", response_model=OwnershipResponse)
+async def post_lock_ticket(
+    ticket_id: str,
+    body: LockRequest | None = None,
+    current_user: User = Depends(get_current_user),
+    _rate_limit: None = Depends(RateLimiter(30)),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lock a ticket to the current user (CE-05, advisory)."""
+    svc = TicketOwnershipService(db)
+    await svc.lock(ticket_id, actor_name=current_user.username, reason=body.reason if body else None)
+    return await _ownership_response(svc, ticket_id)
+
+
+@router.post("/soc/tickets/{ticket_id}/unlock", response_model=OwnershipResponse)
+async def post_unlock_ticket(
+    ticket_id: str,
+    body: LockRequest | None = None,
+    current_user: User = Depends(get_current_user),
+    _rate_limit: None = Depends(RateLimiter(30)),
+    db: AsyncSession = Depends(get_db),
+):
+    """Unlock a ticket (CE-05, advisory)."""
+    svc = TicketOwnershipService(db)
+    await svc.unlock(ticket_id, actor_name=current_user.username, reason=body.reason if body else None)
+    return await _ownership_response(svc, ticket_id)
+
+
+@router.get("/soc/tickets/{ticket_id}/ownership", response_model=OwnershipResponse)
+async def get_ticket_ownership(
+    ticket_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return the current owner/lock state and history for a ticket (CE-05)."""
+    return await _ownership_response(TicketOwnershipService(db), ticket_id)
 
 
 @router.post("/soc/tickets/{ticket_id}/notes", response_model=AddNoteResponse)

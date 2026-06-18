@@ -136,6 +136,9 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        # Ignora variables de entorno ajenas a la app (p.ej. RENDER_API_KEY,
+        # usada solo para verificar deploys) en lugar de fallar al arrancar.
+        extra = "ignore"
 
 
 @lru_cache
