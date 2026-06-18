@@ -130,6 +130,13 @@ class Settings(BaseSettings):
     """Intervalo en segundos entre sincronizaciones automáticas de IMAP.
     60 = cada minuto. 0 = desactivado."""
 
+    # ── SLA-05: scan automático de alertas tempranas ──
+    sla_alert_scan_interval_seconds: int = 0
+    """Intervalo en segundos del scan automático de alertas SLA (SLA-05).
+    0 = desactivado (por defecto; el scan sigue disponible on-demand vía
+    POST /soc/sla/alerts/scan). Actívalo solo con tickets reales (OTRS) para
+    evitar ruido con los tickets de demostración."""
+
     # ── Entorno ──
     debug: bool = False
 

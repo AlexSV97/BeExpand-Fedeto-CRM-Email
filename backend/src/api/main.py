@@ -121,6 +121,65 @@ async def seed_admin():
         await session.commit()
 
 
+async def _run_sla_scan_once(session_factory=None, ticket_source=None) -> int:
+    """Ejecuta un único scan de alertas SLA (SLA-05). Devuelve nº de alertas nuevas.
+
+    Deps inyectables para test: ``session_factory`` (por defecto el de la app) y
+    ``ticket_source`` (callable async → list[Ticket]; por defecto resuelve de OTRS
+    o tickets de demostración, igual que el War Room).
+    """
+    from src.services.sla_alerts import SlaAlertService
+    from src.services.ticket_lifecycle import TicketLifecycleService
+    from src.notifiers.telegram import TelegramNotifier
+
+    session_factory = session_factory or async_session_factory
+
+    if ticket_source is not None:
+        tickets = await ticket_source()
+    else:
+        from src.api.routers.soc import _resolve_tickets_with_mode
+        from src.integrations.otrs_znuny.settings import OtrsZnunySettings
+        from src.integrations.otrs_znuny.client import OtrsZnunyClient
+
+        otrs = OtrsZnunyClient() if OtrsZnunySettings().is_configured else None
+        try:
+            tickets, _mode = await _resolve_tickets_with_mode(otrs, 25)
+        finally:
+            if otrs is not None:
+                await otrs.close()
+
+    async with session_factory() as session:
+        svc = SlaAlertService(session, TicketLifecycleService(), notifier=TelegramNotifier())
+        generated = await svc.scan(tickets)
+        return len(generated)
+
+
+async def _sla_alert_loop():
+    """Bucle de fondo que ejecuta el scan de alertas SLA cada N segundos (SLA-05).
+
+    Desactivado por defecto (``sla_alert_scan_interval_seconds=0``). El scan
+    sigue disponible on-demand vía endpoint.
+    """
+    settings = get_settings()
+    interval = settings.sla_alert_scan_interval_seconds
+    if interval <= 0:
+        logger.info("SLA alert scan desactivado (sla_alert_scan_interval_seconds=%d)", interval)
+        return
+
+    logger.info("SLA alert scan iniciado — cada %d segundos", interval)
+    while True:
+        try:
+            await asyncio.sleep(interval)
+            generated = await _run_sla_scan_once()
+            if generated:
+                logger.info("SLA alert scan: %d alerta(s) generada(s)", generated)
+        except asyncio.CancelledError:
+            logger.info("SLA alert scan: bucle cancelado")
+            break
+        except Exception as exc:
+            logger.error("SLA alert scan: error inesperado: %s", exc)
+
+
 async def seed_queues() -> None:
     """Garantiza la topología de colas por defecto en el arranque (CE-01).
 
@@ -194,6 +253,7 @@ async def lifespan(app: FastAPI):
 
     task = asyncio.create_task(_auto_sync_loop())
     _background_tasks.append(task)
+    _background_tasks.append(asyncio.create_task(_sla_alert_loop()))
     yield
 
     for t in _background_tasks:
