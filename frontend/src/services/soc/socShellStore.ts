@@ -92,6 +92,20 @@ const useSocShellStore = create<SocShellStore>()((set, get) => ({
   },
 }))
 
+function hydrateSocSurfaceFromUrl(): void {
+  const searchParams = new URLSearchParams(window.location.search)
+  const surfaceParam = searchParams.get('soc')
+  if (surfaceParam && surfaceIdSet.has(surfaceParam as SurfaceId)) {
+    const surfaceId = surfaceParam as SurfaceId
+    const current = useSocShellStore.getState().activeSurfaceId
+    if (surfaceId !== current) {
+      useSocShellStore.setState({ activeSurfaceId: surfaceId })
+    }
+
+    window.history.replaceState({ surfaceId }, '', '?soc=' + surfaceId)
+  }
+}
+
 // ── Browser history sync hook ──
 //
 // Mount this inside the SocShell component so that:
@@ -100,17 +114,7 @@ const useSocShellStore = create<SocShellStore>()((set, get) => ({
 
 function useHistorySync(): void {
   useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search)
-    const surfaceParam = searchParams.get('soc')
-    if (surfaceParam && surfaceIdSet.has(surfaceParam as SurfaceId)) {
-      const surfaceId = surfaceParam as SurfaceId
-      const current = useSocShellStore.getState().activeSurfaceId
-      if (surfaceId !== current) {
-        useSocShellStore.setState({ activeSurfaceId: surfaceId })
-      }
-
-      window.history.replaceState({ surfaceId }, '', '?soc=' + surfaceId)
-    }
+    hydrateSocSurfaceFromUrl()
 
     const handlePopState = (event: PopStateEvent) => {
       const surfaceId = event.state?.surfaceId as SurfaceId | undefined
@@ -128,5 +132,5 @@ function useHistorySync(): void {
   }, [])
 }
 
-export { useSocShellStore, useHistorySync }
+export { hydrateSocSurfaceFromUrl, useSocShellStore, useHistorySync }
 export type { SocShellState, SocShellActions, SocShellStore }

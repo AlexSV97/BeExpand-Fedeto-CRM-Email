@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { useSocShellStore } from '../socShellStore'
+import { hydrateSocSurfaceFromUrl, useSocShellStore } from '../socShellStore'
 import { SURFACE_IDS } from '../contracts'
 
 // ---------------------------------------------------------------------------
@@ -23,6 +23,7 @@ beforeEach(() => {
 
   // Mock window.history.pushState / back so tests don't touch real history
   vi.spyOn(window.history, 'pushState').mockImplementation(() => {})
+  vi.spyOn(window.history, 'replaceState').mockImplementation(() => {})
   vi.spyOn(window.history, 'back').mockImplementation(() => {})
 })
 
@@ -112,6 +113,22 @@ describe('socShellStore — navigate', () => {
       { surfaceId: SURFACE_IDS.TICKET_COPILOT },
       '',
       '?soc=' + SURFACE_IDS.TICKET_COPILOT,
+    )
+  })
+})
+
+describe('socShellStore — deep-link hydration', () => {
+  it('restores the active surface from ?soc=', () => {
+    window.history.pushState({}, '', '?soc=' + SURFACE_IDS.SLA_WAR_ROOM)
+
+    hydrateSocSurfaceFromUrl()
+
+    const state = useSocShellStore.getState()
+    expect(state.activeSurfaceId).toBe(SURFACE_IDS.SLA_WAR_ROOM)
+    expect(window.history.replaceState).toHaveBeenCalledWith(
+      { surfaceId: SURFACE_IDS.SLA_WAR_ROOM },
+      '',
+      '?soc=' + SURFACE_IDS.SLA_WAR_ROOM,
     )
   })
 })
