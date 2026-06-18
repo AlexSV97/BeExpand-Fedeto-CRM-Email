@@ -47,6 +47,12 @@ from src.services.ticket_ownership import (
     OwnershipResponse,
     TicketOwnershipService,
 )
+from src.services.external_escalation import (
+    DESTINATION_QUEUE,
+    ExternalEscalationHistoryResponse,
+    ExternalEscalationResult,
+    ExternalEscalationService,
+)
 from src.services.reporting import (
     OperationalReportRequest,
     ReportWindow,
@@ -775,6 +781,34 @@ class LockRequest(BaseModel):
     def validate_reason(cls, v):
         if len(v) > 500:
             raise ValueError('reason must not exceed 500 characters')
+        return v
+
+
+class ExternalEscalationRequest(BaseModel):
+    destination: str
+    reason: str = ""
+    external_id: str | None = None
+
+    @field_validator('destination')
+    @classmethod
+    def validate_destination(cls, v):
+        if v not in DESTINATION_QUEUE:
+            allowed = ", ".join(sorted(DESTINATION_QUEUE))
+            raise ValueError(f'destination must be one of: {allowed}')
+        return v
+
+    @field_validator('reason')
+    @classmethod
+    def validate_reason(cls, v):
+        if len(v) > 500:
+            raise ValueError('reason must not exceed 500 characters')
+        return v
+
+    @field_validator('external_id')
+    @classmethod
+    def validate_external_id(cls, v):
+        if v is not None and len(v) > 100:
+            raise ValueError('external_id must not exceed 100 characters')
         return v
 
 
@@ -1609,6 +1643,53 @@ async def get_ticket_ownership(
 ):
     """Return the current owner/lock state and history for a ticket (CE-05)."""
     return await _ownership_response(TicketOwnershipService(db), ticket_id)
+
+
+@router.post("/soc/tickets/{ticket_id}/escalate-external", response_model=ExternalEscalationResult)
+async def post_escalate_external(
+    ticket_id: str,
+    body: ExternalEscalationRequest,
+    current_user: User = Depends(get_current_user),
+    _rate_limit: None = Depends(RateLimiter(30)),
+    otrs: OtrsZnunyClient | None = Depends(get_otrs_client),
+    queue_svc: QueueStrategyService = Depends(get_queue_strategy),
+    db: AsyncSession = Depends(get_db),
+):
+    """Hand off a ticket to an external destination with a tracking ref (CE-06)."""
+    svc = ExternalEscalationService(db, queue_svc)
+    try:
+        result = await svc.escalate(
+            ticket_id=ticket_id,
+            destination=body.destination,
+            actor_name=current_user.username,
+            reason=body.reason,
+            external_id=body.external_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    if otrs is not None:
+        try:
+            await otrs.update_ticket(ticket_id, queue=_queue_from_slug(result.queue_slug))
+        except Exception:
+            pass  # Best-effort
+
+    return result
+
+
+@router.get("/soc/tickets/{ticket_id}/external-escalations", response_model=ExternalEscalationHistoryResponse)
+async def get_external_escalations(
+    ticket_id: str,
+    limit: int = Query(50, ge=1, le=200),
+    current_user: User = Depends(get_current_user),
+    queue_svc: QueueStrategyService = Depends(get_queue_strategy),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return the external-escalation (handoff) history for a ticket (CE-06)."""
+    svc = ExternalEscalationService(db, queue_svc)
+    records = await svc.list_for_ticket(ticket_id, limit=limit)
+    items = [ExternalEscalationService.to_item(r) for r in records]
+    return ExternalEscalationHistoryResponse(ticket_id=ticket_id, total=len(items), items=items)
 
 
 @router.post("/soc/tickets/{ticket_id}/notes", response_model=AddNoteResponse)
