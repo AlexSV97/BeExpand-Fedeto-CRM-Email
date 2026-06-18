@@ -38,6 +38,11 @@ from src.services.queue_strategy import (
     QueueTier,
 )
 from src.services.escalation import EscalationRequest, EscalationService
+from src.services.escalation_recording import (
+    EscalationHistoryItem,
+    EscalationHistoryResponse,
+    EscalationRecordService,
+)
 from src.services.reporting import (
     OperationalReportRequest,
     ReportWindow,
@@ -1469,10 +1474,38 @@ async def post_escalate_ticket(
         except Exception:
             pass  # Best-effort
 
+    # CE-04: record the escalation in the history (best-effort)
+    try:
+        await EscalationRecordService(db).record(
+            ticket_id=ticket_id,
+            actor_name=current_user.username,
+            plan=plan,
+            reason=body.reason,
+        )
+    except Exception:
+        pass  # Best-effort: recording must never break the escalate flow
+
     return EscalateResponse(
         ticket_id=ticket_id,
         escalation_level=escalation_level,
         target_queue=target_queue,
+    )
+
+
+@router.get("/soc/tickets/{ticket_id}/escalations", response_model=EscalationHistoryResponse)
+async def get_ticket_escalations(
+    ticket_id: str,
+    limit: int = Query(50, ge=1, le=200),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return the escalation history for a ticket (CE-04)."""
+    records = await EscalationRecordService(db).list_for_ticket(ticket_id, limit=limit)
+    items = [EscalationRecordService.to_item(r) for r in records]
+    return EscalationHistoryResponse(
+        ticket_id=ticket_id,
+        total=len(items),
+        items=items,
     )
 
 
