@@ -17,7 +17,8 @@
  *   - Cuando la flag está activa, /dashboard renderiza <SocShell />
  *     en lugar de <Layout /> con <Dashboard />
  *   - El resto de rutas protegidas siguen usando <Layout /> como antes
- *   - Comportamiento legacy 100% preservado cuando la flag está OFF
+ *   - El shell preserva el surface activo vía ?soc=... en la URL
+ *   - Comportamiento legacy preservado cuando la flag está OFF
  */
 
 import { useEffect } from 'react'

@@ -1,6 +1,6 @@
-# Índice maestro — BeConnect AI Layer para Aiuken
+# Índice maestro — Aiuken SOC / AI Layer
 
-Este documento conecta la documentación principal del programa BeConnect sobre OTRS/Znuny para Aiuken.
+Este documento conecta la documentación principal del programa Aiuken SOC sobre OTRS/Znuny para Aiuken.
 
 ## Documentos principales
 
@@ -33,7 +33,7 @@ Contiene el plan de ejecución técnica:
 ### 3) README del repositorio
 **Archivo:** `README.md`
 
-Sigue funcionando como visión general del producto BeConnect y ahora incluye la referencia estratégica a la evolución hacia Aiuken.
+Sirve como visión general del producto Aiuken SOC, su stack de despliegue y la evolución hacia una capa de inteligencia sobre OTRS/Znuny.
 
 ---
 
@@ -45,6 +45,6 @@ Sigue funcionando como visión general del producto BeConnect y ahora incluye la
 ---
 
 ## Mensaje de proyecto
-**BeConnect AI Layer sobre OTRS/Znuny para Aiuken**
+**Aiuken SOC como capa de inteligencia sobre OTRS/Znuny**
 
-La arquitectura propuesta mantiene OTRS/Znuny como system of record y añade BeConnect como capa de inteligencia, copiloto, RAG, agentes gobernados y observabilidad.
+La arquitectura propuesta mantiene OTRS/Znuny como system of record y añade Aiuken SOC como capa de inteligencia, copiloto, RAG, agentes gobernados, observabilidad y background jobs con Redis/Celery.
