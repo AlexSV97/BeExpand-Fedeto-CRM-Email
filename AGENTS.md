@@ -7,6 +7,7 @@
 - **CRM**: VTiger REST API (via httpx)
 - **IA Local**: Ollama (llama3.2:3b), DistilBERT multilingual cased
 - **Contenedores**: Docker / docker-compose (previsto)
+- **Despliegue**: Render blueprint con backend, frontend, Redis y workers Celery
 - **Auth**: JWT (python-jose + passlib + bcrypt < 5.0.0)
 
 ## Clasificación de Emails — Orquestador Multi-Agente en Paralelo

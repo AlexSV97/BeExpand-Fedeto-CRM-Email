@@ -290,6 +290,7 @@ Puntos importantes:
 - El proxy Nginx se resuelve con `API_UPSTREAM`, inyectado desde Render con `fromService.hostport`
 - `REDIS_URL` se inyecta desde el service de Key Value para el backend y los workers
 - `ADMIN_PASSWORD`, `OPENROUTER_API_KEY` y `HUGGINGFACE_TOKEN` quedan como variables manuales (`sync: false`)
+- El backend levanta colas por defecto y además intenta sync con OTRS al arrancar; si OTRS no responde, sigue con seed idempotente
 - Si el backend no está sano, el login del frontend fallará aunque las credenciales sean correctas
 
 Para crear el entorno:
