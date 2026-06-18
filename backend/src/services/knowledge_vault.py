@@ -7,8 +7,13 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.domain.ticketing import Ticket, TicketState
 from src.llm_client import LLMClient
 from src.services.vector_store import VectorStore
+
+
+# KV-01: estados que marcan un ticket como "cerrado" e ingerible al vault.
+_CLOSED_STATES = {TicketState.RESOLVED, TicketState.CLOSED, TicketState.MERGED}
 
 
 _STOPWORDS = {
@@ -119,6 +124,58 @@ class KnowledgeVaultService:
         self._documents.append(document)
         # Embedding will be generated on next embed_all_documents() call
         self._embeddings_done = False
+
+    # ── KV-01: ingesta de tickets cerrados ───────────────────────────────
+    def has_document(self, source_id: str, source_type: str = "ticket") -> bool:
+        return any(
+            d.source_id == source_id and d.source_type == source_type
+            for d in self._documents
+        )
+
+    def ingest_ticket(self, ticket: Ticket) -> KnowledgeDocument | None:
+        """Indexa un ticket como documento de conocimiento (case). Dedup por id.
+
+        Devuelve el documento creado, o None si ya estaba ingerido.
+        """
+        if self.has_document(ticket.id, "ticket"):
+            return None
+
+        body_parts: list[str] = []
+        for article in ticket.articles:
+            text = (article.body_text or article.subject or "").strip()
+            if text:
+                body_parts.append(text)
+        body = "\n".join(body_parts) or (ticket.subject or "")
+
+        doc = KnowledgeDocument(
+            id=f"ticket-{ticket.id}",
+            title=ticket.subject or ticket.id,
+            body=body,
+            source_type="ticket",
+            document_type="case",
+            source_id=ticket.id,
+            customer=ticket.customer_email,
+            tags=[ticket.queue.slug] if ticket.queue and ticket.queue.slug else [],
+            metadata={
+                "state": ticket.state.value if ticket.state else None,
+                "priority": ticket.priority.value if ticket.priority else None,
+            },
+        )
+        self.add_document_with_embedding(doc)
+        return doc
+
+    async def ingest_closed_tickets(self, tickets: list[Ticket], *, embed: bool = True) -> int:
+        """Ingesta los tickets cerrados/resueltos. Devuelve nº de nuevos documentos."""
+        count = 0
+        for ticket in tickets:
+            if ticket.state in _CLOSED_STATES and self.ingest_ticket(ticket) is not None:
+                count += 1
+        if embed and count:
+            try:
+                await self.embed_all_documents()
+            except Exception:  # noqa: BLE001 — embeddings best-effort
+                pass
+        return count
 
     async def embed_all_documents(self) -> int:
         """Generate embeddings for all documents that don't have one yet."""
