@@ -3,7 +3,7 @@ services:
     command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
       - ./backend:/app
-      - beexpand-data:/app/data
+      - aiuken-data:/app/data
     environment:
       - REDIS_URL=redis://redis:6379/0
 
@@ -37,7 +37,7 @@ services:
     command: celery -A src.celery_app worker --loglevel=info --pool=solo
     volumes:
       - ./backend:/app
-      - beexpand-data:/app/data
+      - aiuken-data:/app/data
     environment:
       - REDIS_URL=redis://redis:6379/0
     depends_on:
@@ -50,12 +50,12 @@ services:
     command: celery -A src.celery_app beat --loglevel=info
     volumes:
       - ./backend:/app
-      - beexpand-data:/app/data
+      - aiuken-data:/app/data
     environment:
       - REDIS_URL=redis://redis:6379/0
     depends_on:
       - redis
 
 volumes:
-  beexpand-data:
+  aiuken-data:
   redis-data:

@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 celery_app = Celery(
-    "beexpand",
+    "aiuken",
     broker=settings.redis_url,
     backend=settings.redis_url,
 )

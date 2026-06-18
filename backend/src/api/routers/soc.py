@@ -337,7 +337,7 @@ def _synthetic_tickets(count: int = 25) -> list[Ticket]:
             {"title": "Onboarding status update", "body": "Two of three documents received. Still awaiting signed MSA. Escalated to account manager.", "author": ActorKind.HUMAN},
         ],
         "phishing": [
-            {"title": "Initial triage", "body": "Email reported by financial department contains suspicious link to 'fedeto-secure.com'. Domain registered 48 hours ago in Panama.", "author": ActorKind.IA},
+            {"title": "Initial triage", "body": "Email reported by financial department contains suspicious link to 'aiuken-secure.com'. Domain registered 48 hours ago in Panama.", "author": ActorKind.IA},
             {"title": "Indicators of compromise", "body": "Extracted IOCs: sender IP 185.220.101.x, malicious URL, spoofed display name. Blocked at gateway level.", "author": ActorKind.IA},
             {"title": "User notified", "body": "Informed financial department that this is a confirmed phishing attempt. All users advised to be vigilant.", "author": ActorKind.HUMAN},
         ],

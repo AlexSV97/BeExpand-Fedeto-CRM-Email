@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv("backend/.env")
 
-USER = os.getenv("IMAP_USER", "beexpandcrmpoc@gmail.com")
+USER = os.getenv("IMAP_USER", "<IMAP_USER_DEMO>")
 PASS = os.getenv("IMAP_PASSWORD")
 
 # --- IMAP Cleanup ---
@@ -18,7 +18,7 @@ conn.select("INBOX")
 status, msgs = conn.search(None, "UNSEEN")
 for uid in (msgs[0].split() if msgs[0] else []):
     data = conn.fetch(uid, "BODY.PEEK[HEADER.FIELDS (FROM)]")
-    if "BeExpand CRM" in data[1][0][1].decode(errors="replace"):
+    if "Aiuken SOC" in data[1][0][1].decode(errors="replace"):
         conn.store(uid, "+FLAGS", "\\Seen")
 
 # Re-mark originals UNSEEN
@@ -27,7 +27,7 @@ subject_kw = ["Factura mensual", "de presupuesto", "Orden de compra", "colaborac
 for uid in (msgs[0].split() if msgs[0] else []):
     data = conn.fetch(uid, "(FLAGS BODY.PEEK[HEADER.FIELDS (SUBJECT FROM)])")
     raw = data[1][0][1].decode(errors="replace")
-    if "BeExpand CRM" in raw:
+    if "Aiuken SOC" in raw:
         continue
     if any(k in raw for k in subject_kw) and b"\\Seen" in data[1][0][0]:
         conn.store(uid, "-FLAGS", "\\Seen")
@@ -36,7 +36,7 @@ conn.logout()
 print("1. IMAP ready - forwarded marked SEEN, originals UNSEEN")
 
 # --- Clear DB ---
-db = sqlite3.connect("backend/beexpand.db")
+db = sqlite3.connect("backend/aiuken.db")
 for table in ["classification_history", "emails", "contacts"]:
     db.execute(f"DELETE FROM {table}")
 db.commit()
@@ -45,7 +45,7 @@ print("2. DB cleared")
 
 # --- Sync ---
 BASE = "http://localhost:8001/api/v1"
-r = httpx.post(f"{BASE}/auth/login", json={"username": "admin", "password": "admin123"})
+r = httpx.post(f"{BASE}/auth/login", json={"username": "admin", "password": os.getenv("ADMIN_PASSWORD", "<ADMIN_PASSWORD_DEMO>")})
 headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 print("3. Syncing...")
@@ -68,7 +68,7 @@ for item in (result.get("results") or []):
     print()
 
 print("4. DB State:")
-db = sqlite3.connect("backend/beexpand.db")
+db = sqlite3.connect("backend/aiuken.db")
 for table in ["emails", "contacts"]:
     rows = db.execute(f"SELECT * FROM {table}").fetchall()
     print(f"   {table}: {len(rows)} rows")

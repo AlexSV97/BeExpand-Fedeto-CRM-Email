@@ -40,7 +40,7 @@ Implementation tasks that add queue/priority mapping, input building, ticket cre
 - **Tier 3**: Fall back to `OtrsZnunySettings().default_queue` (`"Support"`)
 
 **Files to modify**:
-- `C:\Users\rjuarcad\Desktop\BeExpand-Fedeto-CRM-Email\backend\src\agents\action_executor.py`
+- `C:\Users\rjuarcad\Desktop\Aiuken-SOC-Email\backend\src\agents\action_executor.py`
 
 **Dependencies**: None
 
@@ -93,7 +93,7 @@ The metadata dict must include:
 **Guard**: If `ctx.extracted` is `None`, use defaults for urgency (`"media"`) and omit summary/action_required.
 
 **Files to modify**:
-- `C:\Users\rjuarcad\Desktop\BeExpand-Fedeto-CRM-Email\backend\src\agents\action_executor.py`
+- `C:\Users\rjuarcad\Desktop\Aiuken-SOC-Email\backend\src\agents\action_executor.py`
 - Plus import `TicketIngestionInput` from `src.domain.ticketing`
 
 **Dependencies**: T1.1 (uses `_resolve_queue` and mapping constants)
@@ -138,7 +138,7 @@ The metadata dict must include:
 - `from src.domain.ticketing import TicketIngestionInput, TicketPriority, TicketState, Queue`
 
 **Files to modify**:
-- `C:\Users\rjuarcad\Desktop\BeExpand-Fedeto-CRM-Email\backend\src\agents\action_executor.py`
+- `C:\Users\rjuarcad\Desktop\Aiuken-SOC-Email\backend\src\agents\action_executor.py`
 
 **Dependencies**: T1.2 (uses `_build_ticket_input`)
 
@@ -170,7 +170,7 @@ actions.append(ticket_action)
 This places ticket creation at the end of the pipeline so that local-side effects (DB save, CRM sync, email forward) are committed before reaching out to external infrastructure (OTRS). If OTRS is down, everything else is already done.
 
 **Files to modify**:
-- `C:\Users\rjuarcad\Desktop\BeExpand-Fedeto-CRM-Email\backend\src\agents\action_executor.py`
+- `C:\Users\rjuarcad\Desktop\Aiuken-SOC-Email\backend\src\agents\action_executor.py`
 
 **Dependencies**: T1.3 (`_create_ticket` must exist)
 
@@ -228,7 +228,7 @@ def sample_context():
 ```
 
 **Files to modify**:
-- `C:\Users\rjuarcad\Desktop\BeExpand-Fedeto-CRM-Email\backend\tests\test_action_executor.py` (CREATE)
+- `C:\Users\rjuarcad\Desktop\Aiuken-SOC-Email\backend\tests\test_action_executor.py` (CREATE)
 
 **Dependencies**: T1.1 (mapping constants must exist to test against)
 
@@ -260,7 +260,7 @@ def sample_context():
 For test #3, mock the entire `_create_ticket` method or use the fake connector approach to verify that `execute_all()` produces 6 actions (including `otrs_ticket_create`).
 
 **Files to modify**:
-- `C:\Users\rjuarcad\Desktop\BeExpand-Fedeto-CRM-Email\backend\tests\test_action_executor.py` (append to existing new file)
+- `C:\Users\rjuarcad\Desktop\Aiuken-SOC-Email\backend\tests\test_action_executor.py` (append to existing new file)
 
 **Dependencies**: T1.3 (`_create_ticket` exists), T2.1 (fixtures and patterns established)
 
@@ -294,7 +294,7 @@ For test #3, mock the entire `_create_ticket` method or use the fake connector a
 - For "API error": mock `TicketIngestionService.ingest_email` to raise `OtrsZnunyError("timeout")`, assert `ActionResult(success=False)`
 
 **Files to modify**:
-- `C:\Users\rjuarcad\Desktop\BeExpand-Fedeto-CRM-Email\backend\tests\test_action_executor.py` (append to existing new file)
+- `C:\Users\rjuarcad\Desktop\Aiuken-SOC-Email\backend\tests\test_action_executor.py` (append to existing new file)
 
 **Dependencies**: T1.3 (`_create_ticket` exists), T2.1 (fixtures), T2.2 (test patterns)
 
@@ -363,7 +363,7 @@ poetry run pytest tests/ -v --tb=short
   - Uses `FakeOtrsConnector` so no real OTRS is needed
 
 **Files to modify**:
-- `C:\Users\rjuarcad\Desktop\BeExpand-Fedeto-CRM-Email\backend\tests\test_action_executor.py` (if adding integration test)
+- `C:\Users\rjuarcad\Desktop\Aiuken-SOC-Email\backend\tests\test_action_executor.py` (if adding integration test)
 - Or `.env` for manual verification
 
 **Dependencies**: T1.4 (pipeline integration), T2.4 (unit tests pass)

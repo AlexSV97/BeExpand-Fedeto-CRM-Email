@@ -174,7 +174,7 @@ def parse_raw_email(raw_bytes: bytes) -> dict:
         "has_attachments": has_attachments,
         "attachments_data": attachment_list,
         "received_at": received_at,
-        "is_beexpand_forwarded": bool(msg.get("X-BeExpand-Category")),
+        "is_aiuken_forwarded": bool(msg.get("X-Aiuken-Category")),
     }
 
 
@@ -327,9 +327,9 @@ async def sync_emails(db: Optional[AsyncSession] = None) -> dict:
                     raw_bytes = data[0][1]
                     parsed = parse_raw_email(raw_bytes)
 
-                    # Dedup 1: saltar correos reenviados por nuestro pipeline (X-BeExpand)
-                    if parsed.get("is_beexpand_forwarded"):
-                        logger.info("Saltando email ya procesado (X-BeExpand): %s", parsed.get("subject"))
+                    # Dedup 1: saltar correos reenviados por nuestro pipeline (X-Aiuken)
+                    if parsed.get("is_aiuken_forwarded"):
+                        logger.info("Saltando email ya procesado (X-Aiuken): %s", parsed.get("subject"))
                         imap.store(msg_id, "+FLAGS", "\\Seen")
                         continue
 

@@ -30,20 +30,20 @@ from src.api.schemas.dashboard import DashboardSummary
 class TestLoginRequest:
     def test_valid(self):
         """Happy path: all required fields."""
-        data = LoginRequest(username="admin", password="admin123")
+        data = LoginRequest(username="admin", password="test-password")
         assert data.username == "admin"
-        assert data.password == "admin123"
+        assert data.password == "test-password"
 
     def test_serialization(self):
         """model_dump produces expected dict."""
-        data = LoginRequest(username="admin", password="admin123")
+        data = LoginRequest(username="admin", password="test-password")
         dumped = data.model_dump()
-        assert dumped == {"username": "admin", "password": "admin123"}
+        assert dumped == {"username": "admin", "password": "test-password"}
 
     def test_missing_username_raises(self):
         """Username is required."""
         with pytest.raises(ValidationError):
-            LoginRequest(password="admin123")
+            LoginRequest(password="test-password")
 
     def test_missing_password_raises(self):
         """Password is required."""

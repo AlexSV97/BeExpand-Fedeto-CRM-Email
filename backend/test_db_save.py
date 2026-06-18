@@ -93,7 +93,7 @@ async def test():
     
     # Check DB
     import sqlite3
-    db = sqlite3.connect("backend/beexpand.db")
+    db = sqlite3.connect("backend/aiuken.db")
     print("\n=== DB State ===")
     emails = db.execute("SELECT subject, category, sender_email FROM emails").fetchall()
     print(f"Emails: {len(emails)}")

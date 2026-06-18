@@ -436,7 +436,7 @@ describe('normalizeAudit', () => {
 describe('normalizeConfiguration', () => {
   const validInput = {
     settings: [
-      { key: 'org_name', value: 'Fedeto', type: 'string' as const },
+      { key: 'org_name', value: 'Aiuken', type: 'string' as const },
     ],
     thresholds: [
       { name: 'Critical SLA', warning: 1800, critical: 600 },

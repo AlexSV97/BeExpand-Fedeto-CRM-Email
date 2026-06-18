@@ -11,6 +11,7 @@ Uso:
 """
 
 import asyncio
+import os
 import random
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -19,7 +20,7 @@ from sqlalchemy import func as safunc, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import selectinload
 
-DATABASE_URL = "sqlite+aiosqlite:///beexpand.db"
+DATABASE_URL = "sqlite+aiosqlite:///aiuken.db"
 
 from src.db.models import Account, ClassificationHistory, Contact, Email, EmailContact, Opportunity
 
@@ -526,7 +527,7 @@ async def main():
                     body_plain=body,
                     sender_email=sender_email,
                     sender_name=sender_name,
-                    recipients=[{"email": "beexpandcrmpoc@gmail.com", "name": "BeExpand CRM"}],
+                    recipients=[{"email": os.getenv("SIMULATION_RECIPIENT", "<SIMULATION_RECIPIENT_DEMO>"), "name": "Aiuken SOC"}],
                     has_attachments=category in ("cliente", "proveedor") and random.random() < 0.3,
                     attachments=[],
                     received_at=received_dt,

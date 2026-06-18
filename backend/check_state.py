@@ -3,7 +3,7 @@ Check DB state after sync
 """
 import sqlite3, json
 
-conn = sqlite3.connect("backend/beexpand.db")
+conn = sqlite3.connect("backend/aiuken.db")
 cur = conn.cursor()
 
 print("=== EMAILS ===")

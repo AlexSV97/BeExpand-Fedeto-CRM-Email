@@ -234,8 +234,8 @@ async def _check_production_settings():
 
     if "dev" in (settings.secret_key or "").lower() or not settings.secret_key:
         warnings.append("SECRET_KEY est� configurada con un valor de desarrollo o vac�o")
-    if getattr(settings, "admin_password", "") == "admin123":
-        warnings.append("ADMIN_PASSWORD sigue siendo el valor por defecto (admin123)")
+    if getattr(settings, "admin_password", "") == "CHANGE_ME_ADMIN_PASSWORD":
+        warnings.append("ADMIN_PASSWORD sigue siendo el valor por defecto (CHANGE_ME_ADMIN_PASSWORD)")
     if settings.debug:
         warnings.append("DEBUG mode activado — desactivar en producci�n")
 

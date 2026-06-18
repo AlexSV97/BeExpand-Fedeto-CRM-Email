@@ -203,7 +203,7 @@ Contraseña: <ADMIN_PASSWORD_DEMO>
 |----------|----------|
 | Backend no arranca | `cd backend && pip install -r requirements.txt && uvicorn src.api.main:app --host 0.0.0.0 --port 8001 --reload` |
 | Frontend no arranca | `cd frontend && npm install && npx vite --port 5173` |
-| Login falla | Verificar que el seed de admin se ejecutó: en backend, revisar `beexpand.db` |
+| Login falla | Verificar que el seed de admin se ejecutó: en backend, revisar `aiuken.db` |
 | Gráficos vacíos | Ejecutar `python scripts/simulate_data.py` para generar 30 días de datos demo |
 | Sincronización no responde | Verificar Ollama: `ollama serve` y `ollama pull llama3.2:3b` |
 | Error de CORS | Backend en puerto 8001, frontend proxy configurado en vite.config.ts |

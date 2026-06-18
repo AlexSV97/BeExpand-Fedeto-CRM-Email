@@ -1,10 +1,10 @@
 """
-Check the beexpand.db database directly
+Check the aiuken.db database directly
 """
 import sqlite3
 import json
 
-conn = sqlite3.connect("backend/beexpand.db")
+conn = sqlite3.connect("backend/aiuken.db")
 cur = conn.cursor()
 
 # Emails

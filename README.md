@@ -225,7 +225,7 @@ Correo → IMAP Sync → Parser → Analyzer (LLM)
 ### Estructura del Proyecto
 
 ```
-BeExpand-Fedeto-CRM-Email/
+Aiuken-SOC-Email/
 ├── backend/
 │   ├── src/
 │   │   ├── email_processor/    # IMAP, parseo y filtrado de correos
@@ -278,11 +278,11 @@ npm run dev
 
 El repositorio incluye `render.yaml` para crear el stack en Render:
 
-- `beexpand-redis` — Key Value/Redis para Celery y jobs asíncronos
-- `beexpand-fedeto-crm-email-api` — FastAPI + disco persistente en `/app/data`
+- `aiuken-redis` — Key Value/Redis para Celery y jobs asíncronos
+- `aiuken-soc-email-api` — FastAPI + disco persistente en `/app/data`
 - `aiuken-frontend` — React servido por Nginx con proxy `/api/*` hacia el backend por red privada de Render
-- `beexpand-celery-worker` — worker Celery para sincronización periódica
-- `beexpand-celery-beat` — scheduler Celery Beat
+- `aiuken-celery-worker` — worker Celery para sincronización periódica
+- `aiuken-celery-beat` — scheduler Celery Beat
 
 Puntos importantes:
 

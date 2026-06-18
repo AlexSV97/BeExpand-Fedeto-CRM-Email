@@ -48,7 +48,7 @@ if not unseen:
     sys.exit(0)
 
 # Clear DB
-db = sqlite3.connect("backend/beexpand.db")
+db = sqlite3.connect("backend/aiuken.db")
 for tbl in ["classification_history", "emails", "contacts"]:
     db.execute(f"DELETE FROM {tbl}")
 db.commit()
@@ -82,7 +82,7 @@ for item in (result.get("results") or []):
     print()
 
 # Final report
-db = sqlite3.connect("backend/beexpand.db")
+db = sqlite3.connect("backend/aiuken.db")
 for tbl in ["emails", "contacts"]:
     rows = db.execute(f"SELECT count(*) FROM {tbl}").fetchone()
     print(f"DB {tbl}: {rows[0]}")

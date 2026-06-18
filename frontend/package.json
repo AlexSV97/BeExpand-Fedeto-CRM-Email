@@ -1,8 +1,8 @@
 {
-  "name": "be-expand-fedeto-frontend",
+  "name": "aiuken-soc-frontend",
   "version": "0.1.0",
   "private": true,
-  "description": "Frontend para Be Expand FEDETO - Dashboard y gestión comercial",
+  "description": "Frontend para Aiuken SOC - Dashboard y gestión comercial",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

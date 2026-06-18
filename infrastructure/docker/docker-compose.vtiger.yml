@@ -1,4 +1,4 @@
-# BeExpand CRM Email — VTiger CRM local para desarrollo
+# Aiuken SOC Email — VTiger CRM local para desarrollo
 # Uso: docker compose -f infrastructure/docker/docker-compose.yml -f infrastructure/docker/docker-compose.vtiger.yml up -d
 
 services:

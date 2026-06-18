@@ -8,7 +8,7 @@ load_dotenv("backend/.env")
 
 conn = imaplib.IMAP4_SSL("imap.gmail.com")
 conn.login(
-    os.getenv("IMAP_USER", "beexpandcrmpoc@gmail.com"),
+    os.getenv("IMAP_USER", "<IMAP_USER_DEMO>"),
     os.getenv("IMAP_PASSWORD"),
 )
 conn.select("INBOX")
@@ -24,7 +24,7 @@ for uid in all_ids:
     flags_raw = data[1][0][0]
     
     # Skip forwarded copies
-    if "BeExpand CRM" in raw_header:
+    if "Aiuken SOC" in raw_header:
         continue
     
     # Mark as UNSEEN if it matches our test emails

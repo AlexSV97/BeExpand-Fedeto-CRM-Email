@@ -1,7 +1,7 @@
 """
 Test DB save - same sender, null message_ids
 """
-import asyncio, uuid
+import asyncio, uuid, os
 from datetime import datetime, timezone
 from src.db.session import async_session_factory
 from src.db.models import Email, Contact, Account
@@ -12,11 +12,11 @@ async def test():
     # Helper
     async def save_email(contact, subject, msg_id=None):
         from sqlalchemy import select
-        result = await session.execute(select(Account).where(Account.email_user == "beexpandcrmpoc@gmail.com"))
+        result = await session.execute(select(Account).where(Account.email_user == os.getenv("IMAP_USER", "<IMAP_USER_DEMO>")))
         account = result.scalar_one_or_none()
         if account is None:
             account = Account(id=str(uuid.uuid4()), name="Test", email_host="imap.gmail.com",
-                             email_port=993, email_user="beexpandcrmpoc@gmail.com",
+             email_port=993, email_user=os.getenv("IMAP_USER", "<IMAP_USER_DEMO>"),
                              email_pass="xxx", provider="gmail", active=True)
             session.add(account)
             await session.flush()
@@ -62,7 +62,7 @@ async def test():
     
     # Check DB
     import sqlite3
-    db = sqlite3.connect("backend/beexpand.db")
+    db = sqlite3.connect("backend/aiuken.db")
     emails = db.execute("SELECT subject, category, sender_email, message_id FROM emails").fetchall()
     print(f"\nTotal emails: {len(emails)}")
     for e in emails:

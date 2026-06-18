@@ -59,7 +59,7 @@ export const MOCK_COMMAND_CENTER: CommandCenterView = {
   recentAlerts: [
     { id: 'alert-1', severity: 'critical', message: 'Circuit timeout on MX-480 edge router', timestamp: '2026-06-17T09:30:00Z' },
     { id: 'alert-2', severity: 'warning', message: 'BGP flap recurrence on peer AS64512', timestamp: '2026-06-17T09:15:00Z' },
-    { id: 'alert-3', severity: 'warning', message: 'SSL certificate for *.fedeto.com expires in 7 days', timestamp: '2026-06-17T09:00:00Z' },
+    { id: 'alert-3', severity: 'warning', message: 'SSL certificate for *.aiuken.com expires in 7 days', timestamp: '2026-06-17T09:00:00Z' },
     { id: 'alert-4', severity: 'info', message: 'DDoS mitigation drill scheduled for 22:00 UTC', timestamp: '2026-06-17T08:45:00Z' },
     { id: 'alert-5', severity: 'info', message: 'Routine maintenance: SNMP poller upgrade', timestamp: '2026-06-17T08:30:00Z' },
   ],
@@ -92,7 +92,7 @@ export const MOCK_TICKET_QUEUE: TicketQueueView = {
     { id: 'TKT-1024', subject: 'Circuit timeout on MX-480 edge router', status: 'in_progress', priority: 'critical', assignee: 'Ana López', createdAt: '2026-06-17T08:00:00Z', updatedAt: '2026-06-17T09:30:00Z' },
     { id: 'TKT-1021', subject: 'BGP flap recurrence — Tier-1 ISP peer', status: 'open', priority: 'high', assignee: 'Miguel Torres', createdAt: '2026-06-17T06:30:00Z', updatedAt: '2026-06-17T09:15:00Z' },
     { id: 'TKT-1018', subject: 'Port security violation — access switch', status: 'open', priority: 'medium', assignee: 'Valentina Ortiz', createdAt: '2026-06-17T05:00:00Z', updatedAt: '2026-06-17T09:00:00Z' },
-    { id: 'TKT-1015', subject: 'SSL certificate renewal — *.fedeto.com', status: 'resolved', priority: 'low', assignee: 'Sofía Ramírez', createdAt: '2026-06-16T14:00:00Z', updatedAt: '2026-06-17T07:50:00Z' },
+    { id: 'TKT-1015', subject: 'SSL certificate renewal — *.aiuken.com', status: 'resolved', priority: 'low', assignee: 'Sofía Ramírez', createdAt: '2026-06-16T14:00:00Z', updatedAt: '2026-06-17T07:50:00Z' },
     { id: 'TKT-1027', subject: 'DDoS mitigation rule deployment', status: 'open', priority: 'critical', assignee: 'Carlos Ruiz', createdAt: '2026-06-17T09:00:00Z', updatedAt: '2026-06-17T09:20:00Z' },
     { id: 'TKT-1012', subject: 'SNMP poller timeout — core switch stack', status: 'in_progress', priority: 'high', assignee: 'Laura García', createdAt: '2026-06-16T10:00:00Z', updatedAt: '2026-06-17T08:45:00Z' },
     { id: 'TKT-1009', subject: 'Firewall policy audit — PCI DSS scope', status: 'closed', priority: 'medium', assignee: 'Pedro Martínez', createdAt: '2026-06-15T09:00:00Z', updatedAt: '2026-06-16T18:00:00Z' },
@@ -208,7 +208,7 @@ export const MOCK_SLA_TIMERS: ActiveSlaTimer[] = [
   { ticketId: 'TKT-1024', subject: 'Circuit timeout on MX-480 edge router', priority: 'critical', deadline: '2026-06-17T18:00:00Z', remainingSeconds: 1800, totalSeconds: 3600 },
   { ticketId: 'TKT-1021', subject: 'BGP flap recurrence — Tier-1 ISP peer', priority: 'high', deadline: '2026-06-17T20:00:00Z', remainingSeconds: 5400, totalSeconds: 14400 },
   { ticketId: 'TKT-1018', subject: 'Port security violation -- access switch', priority: 'medium', deadline: '2026-06-18T06:00:00Z', remainingSeconds: 28800, totalSeconds: 28800 },
-  { ticketId: 'TKT-1015', subject: 'SSL certificate renewal -- *.fedeto.com', priority: 'low', deadline: '2026-06-19T12:00:00Z', remainingSeconds: 72000, totalSeconds: 86400 },
+  { ticketId: 'TKT-1015', subject: 'SSL certificate renewal -- *.aiuken.com', priority: 'low', deadline: '2026-06-19T12:00:00Z', remainingSeconds: 72000, totalSeconds: 86400 },
   { ticketId: 'TKT-1027', subject: 'DDoS mitigation rule deployment', priority: 'critical', deadline: '2026-06-17T16:30:00Z', remainingSeconds: -600, totalSeconds: 3600 },
 ]
 
@@ -478,8 +478,8 @@ export const MOCK_AUDIT_SUMMARY = {
 
 export const MOCK_CONFIGURATION: ConfigurationView = {
   settings: [
-    { key: 'org_name', value: 'Fedeto CRM', type: 'string' },
-    { key: 'soc_name', value: 'Fedeto SOC-NOC', type: 'string' },
+    { key: 'org_name', value: 'Aiuken CRM', type: 'string' },
+    { key: 'soc_name', value: 'Aiuken SOC-NOC', type: 'string' },
     { key: 'timezone', value: 'America/Argentina/Buenos_Aires', type: 'string' },
     { key: 'language', value: 'es-AR', type: 'string' },
     { key: 'critical_seconds', value: 3600, type: 'number' },
@@ -490,7 +490,7 @@ export const MOCK_CONFIGURATION: ConfigurationView = {
     { key: 'escalation_delay_min', value: 5, type: 'number' },
     { key: 'email_enabled', value: true, type: 'boolean' },
     { key: 'slack_enabled', value: true, type: 'boolean' },
-    { key: 'webhook_url', value: 'https://hooks.fedeto.com/soc/alerts', type: 'string' },
+    { key: 'webhook_url', value: 'https://hooks.aiuken.com/soc/alerts', type: 'string' },
   ],
   thresholds: [
     { name: 'Critical SLA', warning: 1800, critical: 600 },

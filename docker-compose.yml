@@ -7,7 +7,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - beexpand-data:/app/data
+      - aiuken-data:/app/data
     env_file:
       - ./.env
     environment:
@@ -68,5 +68,5 @@ services:
       - redis
 
 volumes:
-  beexpand-data:
+  aiuken-data:
   redis-data:

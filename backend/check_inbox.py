@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv("backend/.env")
 
 host = "imap.gmail.com"
-user = os.getenv("IMAP_USER", "beexpandcrmpoc@gmail.com")
+user = os.getenv("IMAP_USER", "<IMAP_USER_DEMO>")
 pwd = os.getenv("IMAP_PASSWORD")
 
 conn = imaplib.IMAP4_SSL(host)

@@ -16,7 +16,7 @@ except Exception as e:
 print()
 
 # Delete database for fresh start
-db_path = "backend/beexpand.db"
+db_path = "backend/aiuken.db"
 if os.path.exists(db_path):
     try:
         # Try to delete - but it might be locked by the running server

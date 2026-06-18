@@ -4,6 +4,7 @@ Test script para probar el Orchestrator vía API.
 import httpx
 import json
 import sys
+import os
 
 BASE = "http://localhost:8001/api/v1"
 
@@ -13,7 +14,7 @@ def main():
     print("1. LOGIN...")
     r = httpx.post(f"{BASE}/auth/login", json={
         "username": "admin",
-        "password": "admin123",
+        "password": os.getenv("ADMIN_PASSWORD", "<ADMIN_PASSWORD_DEMO>"),
     })
     assert r.status_code == 200, f"Login failed: {r.text}"
     token = r.json()["access_token"]

@@ -17,6 +17,8 @@ from src.api.main import app
 from src.db.models import User
 from src.db.session import Base, get_db
 
+TEST_ADMIN_PASSWORD = "test-admin-password"
+
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 TestSession = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
@@ -32,7 +34,7 @@ async def setup_db():
         admin = User(
             id="admin-uuid-1",
             username="admin",
-            hashed_password=hash_password("admin123"),
+            hashed_password=hash_password(TEST_ADMIN_PASSWORD),
             role="admin",
             active=True,
         )
@@ -66,7 +68,7 @@ async def test_login_success(client):
     """POST /api/v1/auth/login with valid credentials returns 200 + token."""
     response = await client.post("/api/v1/auth/login", json={
         "username": "admin",
-        "password": "admin123",
+        "password": TEST_ADMIN_PASSWORD,
     })
     assert response.status_code == 200
     data = response.json()
@@ -93,7 +95,7 @@ async def test_login_invalid_username(client):
     """POST /api/v1/auth/login with non-existent user returns 401."""
     response = await client.post("/api/v1/auth/login", json={
         "username": "nonexistent",
-        "password": "admin123",
+        "password": TEST_ADMIN_PASSWORD,
     })
     assert response.status_code == 401
     data = response.json()
@@ -123,7 +125,7 @@ async def test_me_with_valid_token(client):
     # First login to get token
     login_resp = await client.post("/api/v1/auth/login", json={
         "username": "admin",
-        "password": "admin123",
+        "password": TEST_ADMIN_PASSWORD,
     })
     assert login_resp.status_code == 200
     token = login_resp.json()["access_token"]

@@ -8,19 +8,19 @@ load_dotenv("backend/.env")
 
 conn = imaplib.IMAP4_SSL("imap.gmail.com")
 conn.login(
-    os.getenv("IMAP_USER", "beexpandcrmpoc@gmail.com"),
+    os.getenv("IMAP_USER", "<IMAP_USER_DEMO>"),
     os.getenv("IMAP_PASSWORD"),
 )
 conn.select("INBOX")
 
-# Step 1: Mark all forwarded copies (BeExpand CRM) as SEEN
+# Step 1: Mark all forwarded copies (Aiuken SOC) as SEEN
 status, msgs = conn.search(None, "UNSEEN")
 unseen = msgs[0].split() if msgs[0] else []
 marked = 0
 for uid in unseen:
     data = conn.fetch(uid, "BODY.PEEK[HEADER.FIELDS (FROM)]")
     raw = data[1][0][1].decode(errors="replace")
-    if "BeExpand CRM" in raw:
+    if "Aiuken SOC" in raw:
         conn.store(uid, "+FLAGS", "\\Seen")
         marked += 1
 print(f"Forwarded copies marked SEEN: {marked}")
@@ -34,7 +34,7 @@ for uid in all_ids:
     raw_header = data[1][0][1].decode(errors="replace")
     flags_raw = data[1][0][0]
     
-    if "BeExpand CRM" in raw_header:
+    if "Aiuken SOC" in raw_header:
         continue  # skip forwarded copies
     
     subject_keywords = ["Factura mensual", "de presupuesto", "Orden de compra", "colaboracion", "Newsletter Semanal"]
@@ -50,7 +50,7 @@ print()
 
 # Step 3: Clear DB and re-sync with full error details
 print("Clearing DB...")
-conn2 = sqlite3.connect("backend/beexpand.db")
+conn2 = sqlite3.connect("backend/aiuken.db")
 conn2.execute("DELETE FROM classification_history")
 conn2.execute("DELETE FROM emails")
 conn2.execute("DELETE FROM contacts")
@@ -63,7 +63,7 @@ print()
 import sqlite3
 BASE = "http://localhost:8001/api/v1"
 
-r = httpx.post(f"{BASE}/auth/login", json={"username": "admin", "password": "admin123"})
+r = httpx.post(f"{BASE}/auth/login", json={"username": "admin", "password": os.getenv("ADMIN_PASSWORD", "<ADMIN_PASSWORD_DEMO>")})
 token = r.json()["access_token"]
 headers = {"Authorization": f"Bearer {token}"}
 

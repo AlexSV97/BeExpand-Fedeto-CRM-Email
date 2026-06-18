@@ -13,7 +13,7 @@ Uso:
 Requiere:
     - Ollama corriendo (http://127.0.0.1:11434)
     - .env con IMAP configurado
-    - SQLite (beexpand.db) con las tablas creadas
+    - SQLite (aiuken.db) con las tablas creadas
 """
 
 import argparse

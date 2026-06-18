@@ -31,7 +31,7 @@ def _find_env_file() -> str | None:
 
 class Settings(BaseSettings):
     # 🔐 Base de datos 🔐
-    database_url: str = "sqlite+aiosqlite:///./beexpand.db"
+    database_url: str = "sqlite+aiosqlite:///./aiuken.db"
 
     # 🔐 JWT 🔐
     # TODO: SECRET_KEY debe configurarse mediante variable de entorno.
@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     #       pero el valor plano en Settings NO debe usarse como secreto compartido.
     #       Considera mover la gestión de credenciales a un secret manager externo.
     admin_username: str = "admin"
-    admin_password: str = "admin123"
+    admin_password: str = "CHANGE_ME_ADMIN_PASSWORD"
 
     # ── IMAP (Gmail) ──
     imap_server: str = "imap.gmail.com"
@@ -92,13 +92,13 @@ class Settings(BaseSettings):
     """Ruta al directorio del modelo BERT fine-tuneado local.
     Vacío = usar ruta por defecto (backend/src/classifier/model-onnx/).
     Útil para sincronizar el modelo vía Dropbox/OneDrive:
-        BERT_MODEL_PATH=D:/Dropbox/BeExpand/bert-model
+        BERT_MODEL_PATH=D:/Dropbox/Aiuken/bert-model
     """
-    bert_onnx_model_id: str = "AlexSV97/beexpand-bert-crm"
+    bert_onnx_model_id: str = "AlexSV97/aiuken-bert-crm"
     """Repo ID del modelo ONNX en HuggingFace Hub para descarga automática.
     BERT ONNX se descarga desde hub si no hay modelo local.
     Requiere HUGGINGFACE_TOKEN configurado.
-    El modelo se sirve desde: huggingface.co/AlexSV97/beexpand-bert-crm/tree/main/onnx/"""
+    El modelo se sirve desde: huggingface.co/AlexSV97/aiuken-bert-crm/tree/main/onnx/"""
 
     # ── HuggingFace Hub (credenciales para descarga de modelos) ──
     huggingface_token: str = ""

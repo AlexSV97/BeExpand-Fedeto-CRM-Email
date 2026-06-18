@@ -171,4 +171,4 @@
 - [ ] Oportunidades muestra 20+ registros
 - [ ] Forecast muestra gráficos (Ollama funcionando)
 - [ ] Navegador en pantalla completa, sin pestañas de debug
-- [ ] Copia de seguridad BD hecha (`copy backend\beexpand.db backend\beexpand_demo_backup.db`)
+- [ ] Copia de seguridad BD hecha (`copy backend\aiuken.db backend\aiuken_demo_backup.db`)

@@ -28,6 +28,8 @@ from src.db.models import (
 )
 from src.db.session import Base, get_db
 
+TEST_ADMIN_PASSWORD = "test-admin-password"
+
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 TestSession = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
@@ -55,7 +57,7 @@ async def client():
         admin = User(
             id="admin-uuid-1",
             username="admin",
-            hashed_password=hash_password("admin123"),
+            hashed_password=hash_password(TEST_ADMIN_PASSWORD),
             role="admin",
             active=True,
         )
@@ -86,7 +88,7 @@ async def auth_headers(client):
     """Login as admin and return Authorization headers for protected endpoints."""
     response = await client.post("/api/v1/auth/login", json={
         "username": "admin",
-        "password": "admin123",
+        "password": TEST_ADMIN_PASSWORD,
     })
     token = response.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}

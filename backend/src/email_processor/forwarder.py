@@ -5,8 +5,8 @@ Usa las mismas credenciales Gmail que la conexión IMAP.
 Los departamentos se mapean a alias "+" de Gmail para pruebas.
 
 Ejemplo:
-  Departamento "contabilidad" → beexpandcrmpoc+contabilidad@gmail.com
-  Departamento "soporte"     → beexpandcrmpoc+soporte@gmail.com
+  Departamento "contabilidad" → aiuken-soc+contabilidad@gmail.com
+  Departamento "soporte"     → aiuken-soc+soporte@gmail.com
 """
 
 import email.message
@@ -23,12 +23,12 @@ logger = logging.getLogger(__name__)
 # Mapeo de departamentos a alias de email (Gmail + addressing)
 # Todas las direcciones +alias entregan en la misma bandeja principal
 DEPARTMENT_EMAILS: dict[str, str] = {
-    "contabilidad": "beexpandcrmpoc+contabilidad@gmail.com",
-    "soporte": "beexpandcrmpoc+soporte@gmail.com",
-    "comercial": "beexpandcrmpoc+comercial@gmail.com",
-    "proveedores": "beexpandcrmpoc+proveedores@gmail.com",
-    "direccion": "beexpandcrmpoc+direccion@gmail.com",
-    "otro": "beexpandcrmpoc+otro@gmail.com",
+    "contabilidad": "aiuken-soc+contabilidad@gmail.com",
+    "soporte": "aiuken-soc+soporte@gmail.com",
+    "comercial": "aiuken-soc+comercial@gmail.com",
+    "proveedores": "aiuken-soc+proveedores@gmail.com",
+    "direccion": "aiuken-soc+direccion@gmail.com",
+    "otro": "aiuken-soc+otro@gmail.com",
 }
 
 CATEGORY_LABELS: dict[str, str] = {
@@ -89,15 +89,15 @@ Asunto: {subject or '(sin asunto)'}
     msg["Subject"] = new_subject
     msg["From"] = f"Aiuken SOC <{sender_email}>"
     msg["To"] = ", ".join(
-        DEPARTMENT_EMAILS.get(d, f"beexpandcrmpoc+{d}@gmail.com")
+        DEPARTMENT_EMAILS.get(d, f"aiuken-soc+{d}@gmail.com")
         for d in departments
     )
     msg["Date"] = email.utils.formatdate(localtime=True)
-    msg["Message-ID"] = email.utils.make_msgid(domain="beexpand.crm")
-    msg["X-BeExpand-Category"] = category or "sin-categoria"
-    msg["X-BeExpand-Departments"] = ",".join(departments)
+    msg["Message-ID"] = email.utils.make_msgid(domain="aiuken.soc")
+    msg["X-Aiuken-Category"] = category or "sin-categoria"
+    msg["X-Aiuken-Departments"] = ",".join(departments)
     if original_message_id:
-        msg["X-BeExpand-Original-Message-ID"] = original_message_id
+        msg["X-Aiuken-Original-Message-ID"] = original_message_id
 
     msg.set_content(forward_body)
 
@@ -160,7 +160,7 @@ async def forward_email(
                 server.starttls()
                 server.login(settings.imap_email, settings.imap_password)
                 to_addrs = [
-                    DEPARTMENT_EMAILS.get(d, f"beexpandcrmpoc+{d}@gmail.com")
+                    DEPARTMENT_EMAILS.get(d, f"aiuken-soc+{d}@gmail.com")
                     for d in departments
                 ]
                 server.sendmail(settings.imap_email, to_addrs, email_content)

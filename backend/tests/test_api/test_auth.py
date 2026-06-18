@@ -14,7 +14,7 @@ class TestLogin:
         """Login with valid credentials returns 200 + JWT token."""
         response = await client.post(
             "/api/v1/auth/login",
-            json={"username": "admin", "password": "admin123"},
+            json={"username": "admin", "password": TEST_ADMIN_PASSWORD},
         )
         assert response.status_code == 200
         data = response.json()
@@ -37,7 +37,7 @@ class TestLogin:
         """Login with non-existent username returns 401."""
         response = await client.post(
             "/api/v1/auth/login",
-            json={"username": "nonexistent", "password": "admin123"},
+            json={"username": "nonexistent", "password": TEST_ADMIN_PASSWORD},
         )
         assert response.status_code == 401
         data = response.json()
@@ -78,3 +78,4 @@ class TestMe:
         assert data["username"] == "admin"
         assert data["role"] == "admin"
         assert data["active"] is True
+TEST_ADMIN_PASSWORD = "test-admin-password"

@@ -9,8 +9,7 @@
 // ── Term map ──
 
 const SOC_TERM_MAP: Record<string, string> = {
-  'BeConnect': 'Aiuken SOC',
-  'BeExpand': 'Aiuken SOC',
+  'Aiuken Legacy': 'Aiuken SOC',
   'race': 'priority tier',
   'Race': 'Priority tier',
   'Pit': 'Operations',
@@ -27,7 +26,6 @@ const SOC_TERM_MAP: Record<string, string> = {
 // ── Forbidden terms ──
 
 const forbiddenTerms: string[] = [
-  'BeConnect',
   'race',
   'Race',
   'Pit',

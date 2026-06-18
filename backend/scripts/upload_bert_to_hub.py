@@ -3,7 +3,7 @@ Sube el modelo BERT fine-tuneado a HuggingFace Hub.
 
 Uso:
     # Primero crea el repo en https://huggingface.co/new
-    #   Model name: beexpand-bert-crm
+    #   Model name: aiuken-bert-crm
     #   Visibility: Private
 
     python scripts/upload_bert_to_hub.py
@@ -26,7 +26,7 @@ from src.config import get_settings
 def main():
     settings = get_settings()
     token = settings.huggingface_token or os.getenv("HUGGINGFACE_TOKEN")
-    model_id = settings.bert_onnx_model_id or os.getenv("HUGGINGFACE_MODEL_ID", "AlexSV97/beexpand-bert-crm")
+    model_id = settings.bert_onnx_model_id or os.getenv("HUGGINGFACE_MODEL_ID", "AlexSV97/aiuken-bert-crm")
 
     if not token:
         print("ERROR: No hay HUGGINGFACE_TOKEN configurado.")
@@ -49,7 +49,7 @@ def main():
         print()
         print("  Crea el repo manualmente en:")
         print("    https://huggingface.co/new")
-        print("    Type: Model | Name: beexpand-bert-crm | Visibility: Private")
+        print("    Type: Model | Name: aiuken-bert-crm | Visibility: Private")
         sys.exit(1)
 
     # Subir archivos del modelo

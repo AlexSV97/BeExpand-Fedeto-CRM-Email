@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv("backend/.env")
 
 host = "imap.gmail.com"
-user = os.getenv("IMAP_USER", "beexpandcrmpoc@gmail.com")
+user = os.getenv("IMAP_USER", "<IMAP_USER_DEMO>")
 pwd = os.getenv("IMAP_PASSWORD")
 
 # ── Step 1: Connect IMAP and clean up ──
@@ -23,7 +23,7 @@ print(f"UNSEEN antes de limpiar: {len(unseen_ids)}")
 for uid in unseen_ids:
     data = conn.fetch(uid, "BODY.PEEK[HEADER.FIELDS (FROM)]")
     from_hdr = data[1][0][1].decode(errors="replace") if len(data[1]) > 0 else ""
-    if "BeExpand CRM" in from_hdr:
+    if "Aiuken SOC" in from_hdr:
         conn.store(uid, "+FLAGS", "\\Seen")
         print(f"  Marcado SEEN (reenviado): ID {uid.decode()}")
 

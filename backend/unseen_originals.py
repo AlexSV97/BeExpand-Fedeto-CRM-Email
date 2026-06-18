@@ -8,7 +8,7 @@ load_dotenv("backend/.env")
 
 conn = imaplib.IMAP4_SSL("imap.gmail.com")
 conn.login(
-    os.getenv("IMAP_USER", "beexpandcrmpoc@gmail.com"),
+    os.getenv("IMAP_USER", "<IMAP_USER_DEMO>"),
     os.getenv("IMAP_PASSWORD")
 )
 conn.select("INBOX")
@@ -24,8 +24,8 @@ for uid in all_ids:
     raw_header = data[1][0][1].decode(errors="replace")
     flags = data[1][0][0]
     
-    # Only process if NOT a forwarded copy (dont contain "BeExpand CRM" in From)
-    if "BeExpand CRM" in raw_header:
+    # Only process if NOT a forwarded copy (dont contain "Aiuken SOC" in From)
+    if "Aiuken SOC" in raw_header:
         continue
     
     if any(kw in raw_header for kw in subject_keywords):

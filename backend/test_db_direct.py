@@ -1,7 +1,7 @@
 """
 Test DB save directly without circular imports
 """
-import asyncio, uuid
+import asyncio, uuid, os
 from datetime import datetime, timezone
 from src.db.session import async_session_factory
 from src.db.models import Email, Contact, ClassificationHistory
@@ -35,7 +35,7 @@ async def test():
         # Get or create account
         from sqlalchemy import select
         from src.db.models import Account
-        result = await session.execute(select(Account).where(Account.email_user == "beexpandcrmpoc@gmail.com"))
+        result = await session.execute(select(Account).where(Account.email_user == os.getenv("IMAP_USER", "<IMAP_USER_DEMO>")))
         account = result.scalar_one_or_none()
         if account is None:
             account = Account(
@@ -43,7 +43,7 @@ async def test():
                 name="Test",
                 email_host="imap.gmail.com",
                 email_port=993,
-                email_user="beexpandcrmpoc@gmail.com",
+                email_user=os.getenv("IMAP_USER", "<IMAP_USER_DEMO>"),
                 email_pass="xxx",
                 provider="gmail",
                 active=True,
@@ -97,7 +97,7 @@ async def test():
     
     # Check DB
     import sqlite3
-    db = sqlite3.connect("backend/beexpand.db")
+    db = sqlite3.connect("backend/aiuken.db")
     emails = db.execute("SELECT subject, category, sender_email FROM emails").fetchall()
     print(f"\nEmails in DB: {len(emails)}")
     for e in emails:

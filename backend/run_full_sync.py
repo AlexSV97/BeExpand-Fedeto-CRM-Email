@@ -1,14 +1,14 @@
 """
 Full test sync with Orchestrator
 """
-import httpx, time, sys
+import httpx, time, sys, os
 
 BASE = "http://localhost:8001/api/v1"
 
 # Login
 r = httpx.post(f"{BASE}/auth/login", json={
     "username": "admin",
-    "password": "admin123",
+    "password": os.getenv("ADMIN_PASSWORD", "<ADMIN_PASSWORD_DEMO>"),
 })
 token = r.json()["access_token"]
 headers = {"Authorization": f"Bearer {token}"}

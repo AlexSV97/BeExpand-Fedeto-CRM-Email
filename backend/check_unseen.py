@@ -8,7 +8,7 @@ load_dotenv("backend/.env")
 
 conn = imaplib.IMAP4_SSL("imap.gmail.com")
 conn.login(
-    os.getenv("IMAP_USER", "beexpandcrmpoc@gmail.com"),
+    os.getenv("IMAP_USER", "<IMAP_USER_DEMO>"),
     os.getenv("IMAP_PASSWORD"),
 )
 conn.select("INBOX")
