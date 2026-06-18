@@ -354,6 +354,26 @@ OTRS_ZNUNY_DEFAULT_QUEUE=Support   # opcional (por defecto "Support")
 > `update_ticket`, `get_ticket`). El paso a productivo real requiere una instancia
 > OTRS/Znuny de Aiuken con credenciales válidas.
 
+#### Smoke test contra OTRS real
+
+Hay un smoke parametrizable que habla con un OTRS/Znuny **real**. Se **salta solo**
+si no hay credenciales (por eso CI nunca lo ejecuta) y por defecto es **de solo
+lectura**:
+
+```bash
+cd backend
+OTRS_ZNUNY_BASE_URL=... OTRS_ZNUNY_API_TOKEN=... \
+    pytest tests/smoke -m smoke -v
+```
+
+Comprueba `health_check`, `list_queues`, `list_tickets` y (si se indica
+`OTRS_SMOKE_TICKET_ID`) `get_ticket`.
+
+La prueba de **escritura** (publicar una nota interna en un ticket) está
+**doblemente protegida** porque es una acción externa difícil de revertir: solo se
+ejecuta si se definen `OTRS_SMOKE_WRITE_TICKET_ID` **y** `OTRS_SMOKE_ALLOW_WRITE=1`.
+Publica una nota interna (no visible al cliente) marcada como `[SMOKE TEST]`.
+
 ### Tests
 
 ```bash
