@@ -29,14 +29,14 @@ services:
           type: keyvalue
           property: connectionString
       - key: CORS_ORIGINS
-        value: https://beconnect-frontend.onrender.com
+        value: https://aiuken-frontend.onrender.com
     disk:
       name: beexpand-data
       mountPath: /app/data
       sizeGB: 5
 
   - type: web
-    name: beconnect-frontend
+    name: aiuken-frontend
     runtime: docker
     dockerContext: ./frontend
     dockerfilePath: ./frontend/Dockerfile

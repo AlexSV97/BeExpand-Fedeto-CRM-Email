@@ -280,7 +280,7 @@ El repositorio incluye `render.yaml` para crear el stack en Render:
 
 - `beexpand-redis` — Key Value/Redis para Celery y jobs asíncronos
 - `beexpand-fedeto-crm-email-api` — FastAPI + disco persistente en `/app/data`
-- `beconnect-frontend` — React servido por Nginx con proxy `/api/*` hacia el backend por red privada de Render (se conserva el nombre del servicio por compatibilidad)
+- `aiuken-frontend` — React servido por Nginx con proxy `/api/*` hacia el backend por red privada de Render
 - `beexpand-celery-worker` — worker Celery para sincronización periódica
 - `beexpand-celery-beat` — scheduler Celery Beat
 
