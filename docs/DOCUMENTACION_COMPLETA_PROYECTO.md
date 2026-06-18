@@ -1,7 +1,7 @@
 # Documentación Completa del Proyecto — Aiuken SOC
 
 > **Proyecto**: Aiuken SOC
-> **Cliente**: Be Expand
+> **Cliente**: Aiuken
 > **Última actualización**: 15/05/2026
 > **Estado actual**: M1-M4 ✅ Completados | M5 🟡 En progreso
 
