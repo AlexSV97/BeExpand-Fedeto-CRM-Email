@@ -11,6 +11,11 @@ from src.services.queue_strategy import (
     QueueTopology,
     get_queue_strategy_service,
 )
+from src.services.queue_suggestion import (
+    QueueSuggestion,
+    QueueSuggestionRequest,
+    QueueSuggestionService,
+)
 
 router = APIRouter(tags=["queues"])
 
@@ -30,3 +35,14 @@ async def recommend_queue_decision(
     service: QueueStrategyService = Depends(get_queue_strategy_service),
 ):
     return service.recommend(body)
+
+
+@router.post("/queues/suggestion", response_model=QueueSuggestion)
+async def suggest_queue(
+    body: QueueSuggestionRequest,
+    current_user: User = Depends(get_current_user),
+    service: QueueStrategyService = Depends(get_queue_strategy_service),
+):
+    """Sugerencia de cola asistida por IA (CE-02) con fallback a reglas."""
+    suggester = QueueSuggestionService(strategy=service)
+    return await suggester.suggest(body)
