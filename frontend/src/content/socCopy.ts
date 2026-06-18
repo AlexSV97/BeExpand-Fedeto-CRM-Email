@@ -102,24 +102,35 @@ function applyNeutralCopy(text: string): string {
 }
 
 /**
+ * Copy catalog (es). Keys not present fall back to the key itself, so callers
+ * still work for not-yet-translated strings.
+ */
+const COPY: Record<string, string> = {
+  loading: 'Cargando…',
+  'loading.surface': 'Cargando {{surface}}…',
+}
+
+/**
  * Simple key-based copy resolver.
  *
- * Returns a copy string for the given key.  For now it just returns the key
- * itself (interpolating any {{var}} placeholders from `vars`) as a fallback.
- * Future iterations will load strings from a locale map.
+ * Looks up `key` in the COPY catalog (falls back to the key), interpolates any
+ * `{{var}}` placeholders from `vars`, then drops unfilled placeholders and tidies
+ * whitespace.
  *
  * @example
- *   t('loading')                    // → "loading"
- *   t('surface.title', { name })    // → "surface.title"
- *   t('error.ECONNREFUSED')         // → "error.ECONNREFUSED"
+ *   t('loading')                          // → "Cargando…"
+ *   t('loading.surface', { surface })     // → "Cargando <surface>…"
+ *   t('error.ECONNREFUSED')               // → "error.ECONNREFUSED" (passthrough)
  */
 function t(key: string, vars?: Record<string, string>): string {
-  if (!vars) return key
-
-  let result = key
-  for (const [k, v] of Object.entries(vars)) {
-    result = result.replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), v)
+  let result = COPY[key] ?? key
+  if (vars) {
+    for (const [k, v] of Object.entries(vars)) {
+      result = result.replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), v)
+    }
   }
+  // Drop any unfilled placeholders and collapse the resulting whitespace.
+  result = result.replace(/\{\{\w+\}\}/g, '').replace(/\s{2,}/g, ' ').trim()
   return result
 }
 

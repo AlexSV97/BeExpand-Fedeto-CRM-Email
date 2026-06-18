@@ -133,7 +133,7 @@ export default function SocShell() {
 
       {/* ── Contenido de la superficie activa ── */}
       <main className="pt-16 p-6 max-w-7xl mx-auto">
-        <Suspense fallback={<SocLoadingState surfaceLabel={t('loading.surface')} />}>
+        <Suspense fallback={<SocLoadingState />}>
           {SurfaceComponent ? <SurfaceComponent /> : null}
         </Suspense>
       </main>
