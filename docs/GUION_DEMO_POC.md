@@ -10,9 +10,9 @@
 **Acción**: Abres http://localhost:5173, ves pantalla de login.
 
 **Guión**:
-> "Este es el dashboard de gestión de correos. Usamos autenticación JWT — cada usuario tiene su sesión. Ahora entramos con admin."
+> "Este es el dashboard de gestión de correos. Usamos autenticación JWT — cada usuario tiene su sesión. Ahora entramos con las credenciales de demo."
 
-**Click**: `admin` / `admin123` → **Login**
+**Click**: `admin` / `<ADMIN_PASSWORD_DEMO>` → **Login**
 
 ---
 
@@ -165,7 +165,7 @@
 
 - [ ] Backend arrancado (`uvicorn src.api.main:app --host 0.0.0.0 --port 8001 --reload`)
 - [ ] Frontend arrancado (`npm run dev`)
-- [ ] Login funciona (admin/admin123)
+- [ ] Login funciona (credenciales de demo)
 - [ ] Dashboard carga con 390+ emails
 - [ ] Contactos muestra 25+ registros
 - [ ] Oportunidades muestra 20+ registros

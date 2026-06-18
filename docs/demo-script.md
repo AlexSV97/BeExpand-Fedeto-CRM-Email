@@ -37,11 +37,11 @@ curl http://localhost:8001/health
 
 ```
 Usuario:    admin
-Contraseña: admin123
+Contraseña: <ADMIN_PASSWORD_DEMO>
 ```
 
 **🎙️ Discurso:**
-> "Este es el acceso al sistema. Cada usuario del equipo tendrá su propio login. Entramos con las credenciales de administrador."
+> "Este es el acceso al sistema. Cada usuario del equipo tendrá su propio login. Entramos con las credenciales de administrador de demo."
 
 [clic en "Iniciar sesión"]
 

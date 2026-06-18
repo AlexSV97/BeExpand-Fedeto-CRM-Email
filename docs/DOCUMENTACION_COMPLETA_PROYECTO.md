@@ -543,7 +543,7 @@ cd backend
 python scripts/test_classifier.py --verbose
 python scripts/test_classifier.py --inject-db
 
-# Login de prueba: admin / admin123
+# Login de prueba: admin / <ADMIN_PASSWORD_DEMO>
 ```
 
 ### Servicios

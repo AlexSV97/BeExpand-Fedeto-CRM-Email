@@ -70,7 +70,7 @@ cd backend && python scripts/train_bert_hybrid.py
 cd backend && python scripts/test_classifier.py --verbose
 
 # Login demo
-admin / admin123
+admin / <ADMIN_PASSWORD_DEMO>
 ```
 
 ## Convenciones
