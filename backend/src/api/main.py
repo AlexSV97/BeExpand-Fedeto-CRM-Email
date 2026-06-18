@@ -342,6 +342,7 @@ _cors_default = (
     "http://localhost:5173,"
     "http://localhost:3000,"
     "http://127.0.0.1:5173,"
+    "https://beconnect-frontend.onrender.com,"
     "https://aiuken-frontend.onrender.com"
 )
 _cors_origins_str = os.getenv("CORS_ORIGINS", _cors_default)
