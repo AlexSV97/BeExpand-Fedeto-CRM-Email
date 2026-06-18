@@ -63,7 +63,7 @@ class WhatsAppNotifier:
     ) -> str:
         """Construye el mensaje de texto plano (WhatsApp no soporta Markdown)."""
         lines = [
-            "⚠️ CORREO URGENTE - BeConnect",
+            "⚠️ CORREO URGENTE - Aiuken SOC",
             "",
             f"Asunto: {subject or '(sin asunto)'}",
             f"De: {sender_name} <{sender_email}>",

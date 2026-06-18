@@ -1,4 +1,4 @@
-"""Ticket ingestion service for BeConnect AI over OTRS/Znuny."""
+"""Ticket ingestion service for Aiuken SOC over OTRS/Znuny."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""SLA lifecycle router for BeConnect AI over OTRS/Znuny."""
+"""SLA lifecycle router for Aiuken SOC over OTRS/Znuny."""
 
 from fastapi import APIRouter, Depends
 

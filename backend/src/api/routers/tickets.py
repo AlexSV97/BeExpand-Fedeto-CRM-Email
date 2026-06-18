@@ -1,4 +1,4 @@
-"""Ticket ingestion router for BeConnect AI over OTRS/Znuny."""
+"""Ticket ingestion router for Aiuken SOC over OTRS/Znuny."""
 
 from fastapi import APIRouter, Depends
 

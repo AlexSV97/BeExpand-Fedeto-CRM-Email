@@ -14,7 +14,7 @@ class OtrsZnunySettings(BaseSettings):
     verify_ssl: bool = True
     default_queue: str = "Support"
     default_sla: str = "Standard"
-    ai_actor_name: str = "BeConnect AI"
+    ai_actor_name: str = "Aiuken SOC AI"
     human_actor_name: str = "Human Operator"
 
     @field_validator("base_url")

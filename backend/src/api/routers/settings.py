@@ -377,7 +377,7 @@ async def test_whatsapp(
         from base64 import b64encode
 
         text = (
-            "⚠️ Prueba de Notificación - BeConnect\n\n"
+            "⚠️ Prueba de Notificación - Aiuken SOC\n\n"
             "Si recibes este mensaje, la integración con Twilio WhatsApp funciona correctamente.\n\n"
             f"Enviado: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}"
         )

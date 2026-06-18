@@ -249,7 +249,7 @@ async def test_otrs_connector_add_article_posts_comment_payload():
                     "id": "a-99",
                     "ticket_id": "TCK-9",
                     "author_kind": "system",
-                    "author_name": "BeConnect AI",
+                    "author_name": "Aiuken SOC AI",
                     "subject": "Internal note",
                     "body_text": "Watching this case.",
                     "is_visible_to_customer": False,
@@ -260,7 +260,7 @@ async def test_otrs_connector_add_article_posts_comment_payload():
     settings = OtrsZnunySettings(base_url="https://otrs.example.com", api_token="secret-token")
     comment = ArticleDraft(
         author_kind=ActorKind.SYSTEM,
-        author_name="BeConnect AI",
+        author_name="Aiuken SOC AI",
         subject="Internal note",
         body_text="Watching this case.",
         is_visible_to_customer=False,
@@ -366,7 +366,7 @@ def test_audit_event_identifies_human_actor():
 def test_audit_event_identifies_ai_actor():
     event = AuditEvent(
         actor_kind=AuditActorKind.IA,
-        actor_name="BeConnect AI",
+        actor_name="Aiuken SOC AI",
         action="ticket.summarized",
         resource_type="ticket",
         resource_id="TCK-2",
