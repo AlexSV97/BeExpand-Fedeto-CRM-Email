@@ -67,6 +67,7 @@ from src.services.sla_alerts import (
     SlaAlertService,
 )
 from src.notifiers.telegram import TelegramNotifier
+from src.services.ticket_drafts import DraftResult, TicketDraftService
 from src.api.middleware.rate_limit import RateLimiter
 
 router = APIRouter(tags=["soc"])
@@ -1781,6 +1782,29 @@ async def get_external_escalations(
     records = await svc.list_for_ticket(ticket_id, limit=limit)
     items = [ExternalEscalationService.to_item(r) for r in records]
     return ExternalEscalationHistoryResponse(ticket_id=ticket_id, total=len(items), items=items)
+
+
+@router.post("/soc/tickets/{ticket_id}/draft", response_model=DraftResult)
+async def post_ticket_draft(
+    ticket_id: str,
+    kind: str = Query("customer_reply"),
+    current_user: User = Depends(get_current_user),
+    _rate_limit: None = Depends(RateLimiter(30)),
+    otrs: OtrsZnunyClient | None = Depends(get_otrs_client),
+):
+    """Generate an AI draft for a ticket (CP-05 customer reply / CP-06 internal note).
+
+    Drafts always require human approval before sending (CP-07): this only writes.
+    """
+    if kind not in ("customer_reply", "internal_note"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="kind must be one of: customer_reply, internal_note",
+        )
+    ticket = await _resolve_ticket(otrs, ticket_id)
+    if ticket is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found")
+    return await TicketDraftService().draft(ticket, kind)  # type: ignore[arg-type]
 
 
 @router.post("/soc/tickets/{ticket_id}/notes", response_model=AddNoteResponse)
