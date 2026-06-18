@@ -100,135 +100,11 @@ def get_ticket_lifecycle(request: Request) -> TicketLifecycleService:
     return svc
 
 
-async def get_knowledge_vault(request: Request) -> KnowledgeVaultService:
-    svc = getattr(request.app.state, "knowledge_vault_service", None)
-    if isinstance(svc, KnowledgeVaultService):
-        return svc
-
-    from src.llm_client import LLMClient
-    from src.services.vector_store import VectorStore
-
-    async def _snapshot_writer(snapshot: dict[str, Any]) -> None:
-        # Best-effort: snapshot persistence must never break a request.
-        try:
-            async with async_session_factory() as writer_session:
-                await save_knowledge_vault_snapshot(
-                    writer_session,
-                    KnowledgeVaultService.from_snapshot(snapshot, llm_client=llm_client),
-                )
-        except Exception:  # noqa: BLE001 — persistence is an optimization
-            logger.warning("knowledge vault snapshot write failed (best-effort)", exc_info=True)
-
-    # Add seed documents if vault is empty
-    documents = _seed_knowledge_documents()
-    llm_client = LLMClient(use_chat_model=True)
-    vector_store = VectorStore()
-
-    svc = KnowledgeVaultService(
-        documents=documents,
-        vector_store=vector_store,
-        llm_client=llm_client,
-        snapshot_writer=_snapshot_writer,
-    )
-
-    # Load/persist snapshot best-effort: the vault must work from seed even if the
-    # snapshot store (settings table) is unavailable. This keeps the SOC surfaces
-    # resilient in production and hermetic in tests.
-    try:
-        async with async_session_factory() as session:
-            snapshot = await load_knowledge_vault_snapshot(session)
-            if snapshot:
-                svc = KnowledgeVaultService.from_snapshot(
-                    snapshot, llm_client=llm_client, snapshot_writer=_snapshot_writer
-                )
-            else:
-                await svc.embed_all_documents()
-                await save_knowledge_vault_snapshot(session, svc)
-    except Exception:  # noqa: BLE001 — fall back to in-memory seed vault
-        logger.warning("knowledge vault snapshot load failed; using seed (best-effort)", exc_info=True)
-        try:
-            await svc.embed_all_documents()
-        except Exception:  # noqa: BLE001 — embeddings also best-effort
-            pass
-
-    request.app.state.knowledge_vault_service = svc
-    return svc
-
-
-def _seed_knowledge_documents() -> list[KnowledgeDocument]:
-    """Return seed documents for the knowledge vault."""
-    from src.services.knowledge_vault import KnowledgeDocument
-
-    return [
-        KnowledgeDocument(
-            id="KB-001",
-            title="Password Reset Procedure",
-            body=(
-                "Step-by-step guide for resetting user passwords in the OTRS portal. "
-                "1. Verify user identity via security questions. "
-                "2. Generate temporary password. "
-                "3. Force password change on next login."
-            ),
-            document_type="case",
-            tags=["password", "security", "authentication"],
-        ),
-        KnowledgeDocument(
-            id="KB-002",
-            title="SLA Breach Response Runbook",
-            body=(
-                "Standard operating procedure for SLA breach notifications. "
-                "When SLA exceeds 90% of threshold, notify team lead. "
-                "At 100%, escalate to N2 immediately."
-            ),
-            document_type="runbook",
-            tags=["sla", "breach", "escalation", "urgent"],
-        ),
-        KnowledgeDocument(
-            id="KB-003",
-            title="VPN Access Troubleshooting",
-            body=(
-                "Common VPN connection issues and solutions. "
-                "Check client version, verify credentials, test network connectivity, "
-                "check firewall rules."
-            ),
-            document_type="faq",
-            tags=["vpn", "network", "connectivity"],
-        ),
-        KnowledgeDocument(
-            id="KB-004",
-            title="Email Classification Guidelines",
-            body=(
-                "Rules for classifying incoming emails: "
-                "SPAM (unsolicited bulk), PHISHING (suspicious links), "
-                "SUPPORT (service requests), BILLING (invoice queries)."
-            ),
-            document_type="case",
-            tags=["email", "classification", "security"],
-        ),
-        KnowledgeDocument(
-            id="KB-005",
-            title="Incident Response Plan",
-            body=(
-                "Tier 1: Acknowledge and categorize. "
-                "Tier 2: Investigate and contain. "
-                "Tier 3: Eradicate and recover. "
-                "Post-incident: Document lessons learned."
-            ),
-            document_type="runbook",
-            tags=["incident", "security", "response"],
-        ),
-        KnowledgeDocument(
-            id="KB-006",
-            title="New User Onboarding Checklist",
-            body=(
-                "Create account, assign mailbox, configure OTRS profile, "
-                "set up VPN access, schedule security training, "
-                "grant initial permissions."
-            ),
-            document_type="faq",
-            tags=["onboarding", "user", "setup"],
-        ),
-    ]
+# Knowledge vault: single shared provider (canonical app.state.knowledge_vault).
+from src.api.knowledge_vault_provider import (  # noqa: E402
+    get_knowledge_vault,
+    _seed_knowledge_documents,
+)
 
 
 def _get_agent_governance_service(request: Request) -> AgentGovernanceService:
@@ -1267,7 +1143,7 @@ async def post_ack_sla_alert(
 
 
 @router.get("/soc/knowledge", response_model=KnowledgeVaultResponse)
-async def get_knowledge_vault(
+async def get_soc_knowledge(
     search: str = Query("", description="Search query"),
     category: str | None = Query(None),
     limit: int = Query(10, ge=1, le=50),

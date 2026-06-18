@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from src.api import main
+from src.api import knowledge_vault_provider as kv_provider
 from src.api.routers import knowledge as knowledge_router
 from src.api.routers import soc as soc_router
 from src.domain.ticketing import ActorKind, Article, Queue, Ticket, TicketPriority, TicketState
@@ -208,7 +209,7 @@ async def test_startup_seed_is_visible_through_knowledge_search(client, auth_hea
     monkeypatch.setattr(main, "async_session_factory", TestSession)
     monkeypatch.setattr("src.integrations.otrs_znuny.settings.OtrsZnunySettings", lambda: _FakeSettings())
     monkeypatch.setattr("src.llm_client.LLMClient", _FakeLLMClient)
-    monkeypatch.setattr(knowledge_router, "async_session_factory", TestSession)
+    monkeypatch.setattr(kv_provider, "async_session_factory", TestSession)
     monkeypatch.setattr(main.app.state, "knowledge_vault", None, raising=False)
 
     async with main.lifespan(main.app):
@@ -251,7 +252,7 @@ async def test_startup_seed_is_visible_through_similar_cases(client, auth_header
     monkeypatch.setattr(main, "async_session_factory", TestSession)
     monkeypatch.setattr("src.integrations.otrs_znuny.settings.OtrsZnunySettings", lambda: _FakeSettings())
     monkeypatch.setattr("src.llm_client.LLMClient", _FakeLLMClient)
-    monkeypatch.setattr(knowledge_router, "async_session_factory", TestSession)
+    monkeypatch.setattr(kv_provider, "async_session_factory", TestSession)
     monkeypatch.setattr(main.app.state, "knowledge_vault", None, raising=False)
 
     async with main.lifespan(main.app):
@@ -294,8 +295,8 @@ async def test_startup_seed_is_visible_through_soc_knowledge(client, auth_header
     monkeypatch.setattr(main, "async_session_factory", TestSession)
     monkeypatch.setattr("src.integrations.otrs_znuny.settings.OtrsZnunySettings", lambda: _FakeSettings())
     monkeypatch.setattr("src.llm_client.LLMClient", _FakeLLMClient)
-    monkeypatch.setattr(knowledge_router, "async_session_factory", TestSession)
-    monkeypatch.setattr(soc_router, "async_session_factory", TestSession)
+    monkeypatch.setattr(kv_provider, "async_session_factory", TestSession)
+    monkeypatch.setattr(kv_provider, "async_session_factory", TestSession)
     monkeypatch.setattr(main.app.state, "knowledge_vault", None, raising=False)
     monkeypatch.setattr(main.app.state, "knowledge_vault_service", None, raising=False)
 
@@ -339,8 +340,8 @@ async def test_startup_seed_is_visible_through_soc_copilot(client, auth_headers,
     monkeypatch.setattr(main, "async_session_factory", TestSession)
     monkeypatch.setattr("src.integrations.otrs_znuny.settings.OtrsZnunySettings", lambda: _FakeSettings())
     monkeypatch.setattr("src.llm_client.LLMClient", _FakeLLMClient)
-    monkeypatch.setattr(knowledge_router, "async_session_factory", TestSession)
-    monkeypatch.setattr(soc_router, "async_session_factory", TestSession)
+    monkeypatch.setattr(kv_provider, "async_session_factory", TestSession)
+    monkeypatch.setattr(kv_provider, "async_session_factory", TestSession)
     monkeypatch.setattr(main.app.state, "knowledge_vault", None, raising=False)
     monkeypatch.setattr(main.app.state, "knowledge_vault_service", None, raising=False)
 
