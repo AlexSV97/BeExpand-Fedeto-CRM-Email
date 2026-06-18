@@ -6,7 +6,9 @@ from types import SimpleNamespace
 import pytest
 
 from src.api import main
+from src.api.routers import knowledge as knowledge_router
 from src.domain.ticketing import ActorKind, Article, Queue, Ticket, TicketPriority, TicketState
+from tests.conftest import TestSession
 
 
 class _DummySessionFactory:
@@ -178,3 +180,46 @@ async def test_seed_knowledge_vault_merges_snapshot_and_demo_tickets(monkeypatch
     assert "KB-001" in document_ids
     assert any(doc_id.startswith("ticket-T-CLOSED") for doc_id in document_ids)
     assert all(doc_id != "ticket-T-OPEN" for doc_id in document_ids)
+
+
+@pytest.mark.asyncio
+async def test_startup_seed_is_visible_through_knowledge_search(client, auth_headers, monkeypatch):
+    async def noop(*args, **kwargs):
+        return None
+
+    class _FakeSettings:
+        is_configured = False
+
+    class _FakeLLMClient:
+        def __init__(self, use_chat_model=True):
+            self.use_chat_model = use_chat_model
+
+        async def generate_embedding(self, text: str):
+            return [0.1, 0.2, 0.3]
+
+    monkeypatch.setattr(main, "init_db", noop)
+    monkeypatch.setattr(main, "_recover_orphan_tasks", noop)
+    monkeypatch.setattr(main, "seed_admin", noop)
+    monkeypatch.setattr(main, "seed_queues", noop)
+    monkeypatch.setattr(main, "_check_production_settings", noop)
+    monkeypatch.setattr(main, "_auto_sync_loop", lambda: asyncio.sleep(3600))
+    monkeypatch.setattr(main, "_sla_alert_loop", lambda: asyncio.sleep(3600))
+    monkeypatch.setattr(main, "async_session_factory", TestSession)
+    monkeypatch.setattr("src.integrations.otrs_znuny.settings.OtrsZnunySettings", lambda: _FakeSettings())
+    monkeypatch.setattr("src.llm_client.LLMClient", _FakeLLMClient)
+    monkeypatch.setattr(knowledge_router, "async_session_factory", TestSession)
+    monkeypatch.setattr(main.app.state, "knowledge_vault", None, raising=False)
+
+    async with main.lifespan(main.app):
+        await asyncio.sleep(0)
+
+    response = await client.get(
+        "/api/v1/search/knowledge",
+        params={"query": "password reset", "limit": 5},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] > 0
+    assert data["items"][0]["document"]["id"] == "KB-001"
