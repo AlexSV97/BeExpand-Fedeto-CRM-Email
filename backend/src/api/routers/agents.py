@@ -70,6 +70,18 @@ async def approve_agent_plan(
     return record
 
 
+@router.get("/agents/approvals/pending", response_model=OperationalHistoryResponse)
+async def list_pending_approvals(
+    limit: int = 50,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    service: AgentGovernanceService = Depends(get_agent_governance_service),
+):
+    """Agent recommendations awaiting human approval (AG-07, human-in-the-loop)."""
+    records = await service.list_pending_approvals(db, limit=limit)
+    return OperationalHistoryResponse(items=[_serialize_record(r) for r in records], total=len(records))
+
+
 @router.get("/agents/audit", response_model=AuditTrailResponse)
 async def list_agent_audit(
     current_user: User = Depends(get_current_user),

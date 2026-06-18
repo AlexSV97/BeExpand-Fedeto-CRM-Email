@@ -332,6 +332,24 @@ class AgentGovernanceService:
         )
         return list(result.scalars().all())
 
+    async def list_pending_approvals(self, db: AsyncSession, limit: int = 50) -> list[OperationalRecord]:
+        """Agent recommendations awaiting a human decision (AG-07).
+
+        Returns recommendations persisted with ``status="pending"`` (i.e. they
+        required approval and have not been approved/rejected yet), newest-first.
+        Once decided, ``persist_approval`` flips the status so they leave the queue.
+        """
+        result = await db.execute(
+            select(OperationalRecord)
+            .where(
+                OperationalRecord.record_kind == "agent_recommendation",
+                OperationalRecord.status == "pending",
+            )
+            .order_by(OperationalRecord.created_at.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
     async def query_audit_events(
         self,
         db: AsyncSession,
