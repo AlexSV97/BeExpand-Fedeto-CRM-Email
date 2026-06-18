@@ -276,15 +276,19 @@ npm run dev
 
 ### Despliegue en Render
 
-El repositorio incluye `render.yaml` para crear dos servicios web Docker:
+El repositorio incluye `render.yaml` para crear el stack en Render:
 
+- `beexpand-redis` — Key Value/Redis para Celery y jobs asíncronos
 - `beexpand-fedeto-crm-email-api` — FastAPI + disco persistente en `/app/data`
 - `beconnect-frontend` — React servido por Nginx con proxy `/api/*` hacia el backend por red privada de Render
+- `beexpand-celery-worker` — worker Celery para sincronización periódica
+- `beexpand-celery-beat` — scheduler Celery Beat
 
 Puntos importantes:
 
 - El frontend Docker build queda por defecto en `VITE_API_URL=/api/v1`
 - El proxy Nginx se resuelve con `API_UPSTREAM`, inyectado desde Render con `fromService.hostport`
+- `REDIS_URL` se inyecta desde el service de Key Value para el backend y los workers
 - `ADMIN_PASSWORD`, `OPENROUTER_API_KEY` y `HUGGINGFACE_TOKEN` quedan como variables manuales (`sync: false`)
 - Si el backend no está sano, el login del frontend fallará aunque las credenciales sean correctas
 

@@ -1,4 +1,9 @@
 services:
+  - type: keyvalue
+    name: beexpand-redis
+    ipAllowList: []
+    plan: free
+
   - type: web
     name: beexpand-fedeto-crm-email-api
     runtime: docker
@@ -18,6 +23,11 @@ services:
         sync: false
       - key: HUGGINGFACE_TOKEN
         sync: false
+      - key: REDIS_URL
+        fromService:
+          name: beexpand-redis
+          type: keyvalue
+          property: connectionString
       - key: CORS_ORIGINS
         value: https://beconnect-frontend.onrender.com
     disk:
@@ -36,3 +46,33 @@ services:
           name: beexpand-fedeto-crm-email-api
           type: web
           property: hostport
+
+  - type: worker
+    name: beexpand-celery-worker
+    runtime: docker
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    dockerCommand: celery -A src.celery_app worker --loglevel=info --pool=solo
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          name: beexpand-redis
+          type: keyvalue
+          property: connectionString
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: HUGGINGFACE_TOKEN
+        sync: false
+
+  - type: worker
+    name: beexpand-celery-beat
+    runtime: docker
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    dockerCommand: celery -A src.celery_app beat --loglevel=info
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          name: beexpand-redis
+          type: keyvalue
+          property: connectionString
