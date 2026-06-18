@@ -1,7 +1,7 @@
 # Estimación Económica — Aiuken SOC
 
 > Documento generado el 12/05/2026
-> Proyecto: BeExpand-Fedeto-CRM-Email
+> Proyecto: Aiuken SOC
 > Cliente: Be Expand
 
 ---
@@ -216,4 +216,4 @@ Incluye el desarrollo completo + implantación en el entorno real de Be Expand.
 
 ---
 
-*Documento generado el 12/05/2026 para el proyecto BeExpand-Fedeto-CRM-Email.*
+*Documento generado el 12/05/2026 para el proyecto Aiuken SOC.*

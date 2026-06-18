@@ -1,6 +1,6 @@
 # Documentación Completa del Proyecto — Aiuken SOC
 
-> **Proyecto**: BeExpand-Fedeto-CRM-Email
+> **Proyecto**: Aiuken SOC
 > **Cliente**: Be Expand
 > **Última actualización**: 15/05/2026
 > **Estado actual**: M1-M4 ✅ Completados | M5 🟡 En progreso
@@ -247,7 +247,7 @@ Email procesado y filtrado
 ## 7. Estructura del Proyecto
 
 ```
-BeExpand-Fedeto-CRM-Email/
+Aiuken SOC/
 ├── backend/
 │   ├── src/
 │   │   ├── api/

@@ -117,7 +117,7 @@ function DarkModeDetector() {
   useEffect(() => {
     // Siempre dark mode — como el diseño original de v0
     document.documentElement.classList.add('dark')
-    document.title = isSocShellEnabled() ? 'Aiuken SOC' : 'BeExpand CRM'
+    document.title = isSocShellEnabled() ? 'Aiuken SOC' : 'CRM legacy'
   }, [])
   return null
 }

@@ -33,7 +33,7 @@ curl http://localhost:8001/health
 
 ### 0. Pantalla de Login (30s)
 
-> **Lo que ve el cliente**: Fondo slate-900, tarjeta blanca centrada con logo "BeExpand CRM", campos Usuario y Contraseña.
+> **Lo que ve el cliente**: Fondo slate-900, tarjeta blanca centrada con logo "Aiuken SOC", campos Usuario y Contraseña.
 
 ```
 Usuario:    admin
