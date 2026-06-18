@@ -51,6 +51,25 @@ simulado y hay un smoke parametrizable para validar el OTRS real."
 
 ---
 
+## ⏱️ Pitch de 5 minutos (versión corta)
+
+Subset de alto impacto cuando solo hay 5 min. Cuenta una historia completa:
+**inteligencia → conocimiento citado → gobierno → operación → listo para OTRS real.**
+Ensayo cronometrado de esta versión: `DEMO_QUICK=1 python backend/scripts/demo_rehearsal.py`.
+
+| Tiempo | Escena (ver detalle abajo) | Gancho de una frase |
+|--------|----------------------------|---------------------|
+| 0:00–1:00 | **Smart Inbox** (Esc. 3) | "Triage de un vistazo: la IA ya marca **riesgo SLA, cola sugerida y owner** en cada ticket." |
+| 1:00–2:30 | **Copilot + RAG citado** (Esc. 4 + 6) | "El copiloto resume el caso, trae **casos similares** y responde con conocimiento que **cita sus fuentes**." |
+| 2:30–3:30 | **Borrador IA + aprobación** (Esc. 5) | "Redacta la respuesta… pero **no se envía**: requiere **aprobación humana**." |
+| 3:30–4:30 | **Escalado + gobierno** (Esc. 8 + 9) | "Escala con **registro** (motivo/actor/tiempo) y las acciones críticas pasan por una **cola de aprobación**." |
+| 4:30–5:00 | **Cierre** (Esc. 10) | "Todo sobre **OTRS como system of record**. En demo ahora; a **Live** con solo añadir credenciales OTRS." |
+
+> Si solo puedes enseñar UNA cosa: **Smart Inbox + RAG citado** (inteligencia con
+> fuentes verificables) — es el diferencial frente a "un dashboard bonito".
+
+---
+
 ## Escena 1 — Login y modo de operación (1 min)
 - Entra con `admin`/`admin123`.
 - Señala el **badge de modo** (Demo). Explica el encadre OTRS real vs demo.

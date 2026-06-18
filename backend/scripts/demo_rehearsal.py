@@ -83,6 +83,14 @@ def main() -> int:
     scene(9, "Agentes + gobierno", 2, lambda: ("governance", _gov(P, G)))
     scene(10, "Observabilidad", 1, lambda: G("/reporting/observability"))
 
+    # 5-minute pitch subset (DEMO_QUICK=1): inteligencia → conocimiento citado →
+    # gobierno → operación → cierre.
+    is_quick = os.getenv("DEMO_QUICK", "").strip().lower() in {"1", "true", "yes", "on"}
+    if is_quick:
+        quick = {3, 4, 6, 5, 8, 9, 10}
+        scenes = [s for s in scenes if s[0] in quick]
+        print(f"{BOLD}Modo pitch 5 min{RESET} {DIM}(subset de escenas){RESET}\n")
+
     total_api = 0.0
     total_budget = 0
     all_ok = True
@@ -107,8 +115,8 @@ def main() -> int:
         print(f"{n:<2} {title:<32} {api:>6.1f}s {budget:>5}m   [{mark}] {highlight}")
 
     print(f"{DIM}{'-'*92}{RESET}")
-    mm = total_budget
-    print(f"{BOLD}Total: API {total_api:.1f}s · talk budget ~{mm} min{RESET}")
+    budget_label = "~5 min (pitch, ver guion)" if is_quick else f"~{total_budget} min"
+    print(f"{BOLD}Total: API {total_api:.1f}s · talk budget {budget_label}{RESET}")
     print(f"{DIM}(La API está lista en segundos; el tiempo de demo lo marca el discurso, no las llamadas.){RESET}")
     print((f"{GREEN}Ensayo OK — todas las escenas respondieron 200.{RESET}" if all_ok
            else f"{RED}Alguna escena falló — revisa antes de la demo.{RESET}"))
