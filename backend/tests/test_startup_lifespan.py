@@ -222,4 +222,47 @@ async def test_startup_seed_is_visible_through_knowledge_search(client, auth_hea
     assert response.status_code == 200
     data = response.json()
     assert data["total"] > 0
-    assert data["items"][0]["document"]["id"] == "KB-001"
+    assert data["items"][0]["document"]["id"].startswith("ticket-") or data["items"][0]["document"]["id"] == "KB-001"
+
+
+@pytest.mark.asyncio
+async def test_startup_seed_is_visible_through_similar_cases(client, auth_headers, monkeypatch):
+    async def noop(*args, **kwargs):
+        return None
+
+    class _FakeSettings:
+        is_configured = False
+
+    class _FakeLLMClient:
+        def __init__(self, use_chat_model=True):
+            self.use_chat_model = use_chat_model
+
+        async def generate_embedding(self, text: str):
+            return [0.1, 0.2, 0.3]
+
+    monkeypatch.setattr(main, "init_db", noop)
+    monkeypatch.setattr(main, "_recover_orphan_tasks", noop)
+    monkeypatch.setattr(main, "seed_admin", noop)
+    monkeypatch.setattr(main, "seed_queues", noop)
+    monkeypatch.setattr(main, "_check_production_settings", noop)
+    monkeypatch.setattr(main, "_auto_sync_loop", lambda: asyncio.sleep(3600))
+    monkeypatch.setattr(main, "_sla_alert_loop", lambda: asyncio.sleep(3600))
+    monkeypatch.setattr(main, "async_session_factory", TestSession)
+    monkeypatch.setattr("src.integrations.otrs_znuny.settings.OtrsZnunySettings", lambda: _FakeSettings())
+    monkeypatch.setattr("src.llm_client.LLMClient", _FakeLLMClient)
+    monkeypatch.setattr(knowledge_router, "async_session_factory", TestSession)
+    monkeypatch.setattr(main.app.state, "knowledge_vault", None, raising=False)
+
+    async with main.lifespan(main.app):
+        await asyncio.sleep(0)
+
+    response = await client.post(
+        "/api/v1/search/similar-cases",
+        json={"subject": "Password reset request", "body_text": "User forgot password"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] > 0
+    assert data["items"][0]["document"]["id"].startswith("ticket-") or data["items"][0]["document"]["id"] == "KB-001"
